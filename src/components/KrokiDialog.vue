@@ -353,33 +353,35 @@ function computeArea(pts) {
 
 /** مرکز هندسی دقیق (گرانی‌گاه) یک چندضلعی/خط در زون UTM مشخص */
 function computeShapeCentroid(pos, zone) {
-  if (!pos || !pos.length) return null;
-  const projStr = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
-  const pts = pos.map((p) => {
-    const lon = p.lon ?? p.lng;
-    const [x, y] = proj4("EPSG:4326", projStr, [lon, p.lat]);
+  if (!pos || pos.length < 3) return null;
+  const meanLat = pos.reduce((s, p) => s + Number(p.lat), 0) / pos.length;
+  const projStr = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs${meanLat < 0 ? "+south" : ""}`;
+  const projected = pos.map((p) => {
+    const lon = Number(p.lon ?? p.lng);
+    const [x, y] = proj4("EPSG:4326", projStr, [lon, Number(p.lat)]);
     return { x, y };
   });
-  let area = 0,
-    cx = 0,
-    cy = 0;
+
+  // Translate the local coordinates before the shoelace calculation to avoid
+  // floating-point cancellation from UTM eastings/northings around 10^5-10^6.
+  const origin = projected[0];
+  const pts = projected.map((p) => ({ x: p.x - origin.x, y: p.y - origin.y }));
+
+  let twiceArea = 0;
+  let cx = 0;
+  let cy = 0;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     const q = pts[(i + 1) % pts.length];
     const cross = p.x * q.y - q.x * p.y;
-    area += cross;
+    twiceArea += cross;
     cx += (p.x + q.x) * cross;
     cy += (p.y + q.y) * cross;
   }
-  area /= 2;
-  let x, y;
-  if (Math.abs(area) < 1e-6) {
-    x = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-    y = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-  } else {
-    x = cx / (6 * area);
-    y = cy / (6 * area);
-  }
+
+  if (Math.abs(twiceArea) < 1e-9) return null;
+  const x = origin.x + cx / (3 * twiceArea);
+  const y = origin.y + cy / (3 * twiceArea);
   const [lon, lat] = proj4(projStr, "EPSG:4326", [x, y]);
   return { x, y, lon, lat, zone };
 }
@@ -668,18 +670,48 @@ function drawSketch() {
   }
 
   // نقاط مرکز هر ترسیم + نشانی
+  // مهم: برای جای‌گذاری روی خود تصویر، مرکز را مستقیماً از مختصات پیکسلی
+  // همان شکلی که رسم شده محاسبه می‌کنیم. این کار هرگونه اختلاف بین UTM،
+  // تبدیل تصویر و مرکز ذخیره‌شده را حذف می‌کند.
+  function canvasPolygonCentroid(points) {
+    if (!points || points.length < 3) return null;
+    let twiceArea = 0;
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i];
+      const b = points[(i + 1) % points.length];
+      const cross = a.x * b.y - b.x * a.y;
+      twiceArea += cross;
+      cx += (a.x + b.x) * cross;
+      cy += (a.y + b.y) * cross;
+    }
+    if (Math.abs(twiceArea) < 1e-9) return null;
+    return {
+      x: cx / (3 * twiceArea),
+      y: cy / (3 * twiceArea),
+    };
+  }
+
   for (let m = 0; m < metas.length; m++) {
     const meta = metas[m];
-    let cp;
-    const sc = shapeCentroids.value[m];
-    if (sc && sc.utm && isFinite(sc.utm.x) && isFinite(sc.utm.y)) {
-      cp = toCanvas({ x: sc.utm.x, y: sc.utm.y });
-    } else {
-      const utmSlice = pts.slice(meta.startIdx, meta.startIdx + meta.count);
-      if (!utmSlice.length) continue;
-      const avgX = utmSlice.reduce((s, p) => s + p.x, 0) / utmSlice.length;
-      const avgY = utmSlice.reduce((s, p) => s + p.y, 0) / utmSlice.length;
-      cp = toCanvas({ x: avgX, y: avgY });
+    const slice = cpts.slice(meta.startIdx, meta.startIdx + meta.count);
+    if (!slice.length) continue;
+
+    let cp = null;
+    if (meta.isClosed) {
+      // این همان مرکز ثقل واقعی خود پلیگان در دستگاه مختصات تصویر است؛
+      // بنابراین نشانگر مرکز دقیقاً داخل همان شکل قرار می‌گیرد.
+      cp = canvasPolygonCentroid(slice);
+    }
+
+    if (!cp) {
+      // فقط برای هندسه‌های بدون مرکز مساحت‌محور، میانگین نقاط به‌عنوان
+      // fallback استفاده می‌شود.
+      cp = {
+        x: slice.reduce((sum, p) => sum + p.x, 0) / slice.length,
+        y: slice.reduce((sum, p) => sum + p.y, 0) / slice.length,
+      };
     }
 
     ctx.beginPath();

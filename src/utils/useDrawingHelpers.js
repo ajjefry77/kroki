@@ -49,20 +49,56 @@ export function fromUTM(easting, northing, zone, northern = true) {
 }
 
 export function computeCentroid(positions) {
-  if (!positions || !positions.length) return null;
-  let sumLon = 0;
-  let sumLat = 0;
-  let count = 0;
-  for (const p of positions) {
-    const lon = p.lon ?? p.lng;
-    const lat = p.lat;
-    if (lon == null || lat == null) continue;
-    sumLon += lon;
-    sumLat += lat;
-    count++;
+  if (!positions || positions.length < 3) return null;
+
+  const valid = positions
+    .map((p) => ({
+      lon: Number(p.lon ?? p.lng),
+      lat: Number(p.lat),
+    }))
+    .filter((p) => Number.isFinite(p.lon) && Number.isFinite(p.lat));
+
+  if (valid.length < 3) return null;
+
+  // Use one local UTM zone and translate the projected coordinates so the
+  // shoelace calculation does not subtract very large, nearly equal numbers.
+  const meanLon = valid.reduce((s, p) => s + p.lon, 0) / valid.length;
+  const meanLat = valid.reduce((s, p) => s + p.lat, 0) / valid.length;
+  const zone = Math.floor((meanLon + 180) / 6) + 1;
+  const hemisphere = meanLat >= 0 ? "" : "+south";
+  const proj = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs${hemisphere}`;
+
+  const projected = valid.map((p) => {
+    const [x, y] = proj4("EPSG:4326", proj, [p.lon, p.lat]);
+    return { x, y };
+  });
+
+  const origin = projected[0];
+  const pts = projected.map((p) => ({
+    x: p.x - origin.x,
+    y: p.y - origin.y,
+  }));
+
+  let twiceArea = 0;
+  let cx = 0;
+  let cy = 0;
+
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const cross = a.x * b.y - b.x * a.y;
+    twiceArea += cross;
+    cx += (a.x + b.x) * cross;
+    cy += (a.y + b.y) * cross;
   }
-  if (!count) return null;
-  return { lon: sumLon / count, lat: sumLat / count, lng: sumLon / count };
+
+  if (Math.abs(twiceArea) < 1e-9) return null;
+
+  const x = origin.x + cx / (3 * twiceArea);
+  const y = origin.y + cy / (3 * twiceArea);
+  const [lon, lat] = proj4(proj, "EPSG:4326", [x, y]);
+
+  return { lon, lat, lng: lon };
 }
 
 export function getDrawTypeName(type, isEditing) {

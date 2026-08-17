@@ -302,7 +302,7 @@ export function useDrawing(map, pins) {
     if (pts.length >= 3) {
       features.push(edgeFeature(pts[pts.length - 1], pts[0]));
     }
-    if (pts.length >= 1) {
+    if (pts.length >= 3) {
       const c = computeCentroid(
         pts.map((p) => ({ lon: p.lng ?? p.lon, lat: p.lat })),
       );
@@ -324,18 +324,7 @@ export function useDrawing(map, pins) {
     for (let i = 1; i < pts.length; i++) {
       features.push(edgeFeature(pts[i - 1], pts[i]));
     }
-    if (pts.length >= 2) {
-      const c = computeCentroid(
-        pts.map((p) => ({ lon: p.lng ?? p.lon, lat: p.lat })),
-      );
-      if (c) {
-        features.push({
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [c.lon, c.lat] },
-          properties: { kind: "center", label: "C" },
-        });
-      }
-    }
+    // A polyline has no area centroid, so do not place a fake center marker.
     labelSrc.setData({ type: "FeatureCollection", features });
   }
 
