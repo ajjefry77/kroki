@@ -204,6 +204,17 @@ function escapeHtml(s = "") {
   );
 }
 
+function truncateText(ctx, text, maxWidth) {
+  const s = String(text == null ? "" : text);
+  if (!s) return "";
+  if (ctx.measureText(s).width <= maxWidth) return s;
+  let t = s;
+  while (t.length > 0 && ctx.measureText(t + "…").width > maxWidth) {
+    t = t.slice(0, -1);
+  }
+  return t + "…";
+}
+
 function canvasPolygonCentroid(points) {
   if (!points || points.length < 3) return null;
   let twiceArea = 0;
@@ -565,11 +576,11 @@ export function useKrokiGenerator() {
     ctx.font = "700 15px Vazirmatn, Tahoma, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(t.org, W / 2, 16);
+    ctx.fillText(truncateText(ctx, t.org, W - 24), W / 2, 16);
     ctx.font = "500 11px Vazirmatn, Tahoma, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.fillText(
-      (form.title || "کروکی") + " — تاریخ برداشت: " + (form.date || "—"),
+      truncateText(ctx, (form.title || "کروکی") + " — تاریخ برداشت: " + (form.date || "—"), W - 24),
       W / 2,
       34,
     );
@@ -577,15 +588,24 @@ export function useKrokiGenerator() {
 
   function drawTitleBlock(ctx, W, H, t, form, extra) {
     if (t.titleBlock === "technical") {
-      ctx.fillStyle = "#666";
-      ctx.font = "11px Vazirmatn, Tahoma, sans-serif";
-      ctx.textAlign = "center";
+      const bh = 30;
+      const bx = 22,
+        by = H - bh - 24,
+        bw = W - 44;
+      ctx.fillStyle = "#f4f6fa";
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = "#b9c2d0";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, bw, bh);
+      ctx.fillStyle = "#444";
+      ctx.font = "600 11px Vazirmatn, Tahoma, sans-serif";
+      ctx.textAlign = "right";
       ctx.textBaseline = "middle";
-      ctx.fillText(
-        "کروکی وضعیت موجود — " + (form.title || "") + " — " + (form.date || ""),
-        W / 2,
-        H - 12,
-      );
+      ctx.fillText(truncateText(ctx, "کارفرما: " + (form.client || "—"), bw * 0.4), bx + 8, by + 15);
+      ctx.textAlign = "center";
+      ctx.fillText("مقیاس: " + extra.scaleText, bx + bw / 2, by + 15);
+      ctx.textAlign = "left";
+      ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), bw * 0.3), bx + bw - 8, by + 15);
       return;
     }
     if (t.titleBlock === "hand") {
@@ -593,14 +613,14 @@ export function useKrokiGenerator() {
       ctx.font = "11px Vazirmatn, Tahoma, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("کروکی توصیفی دستی — " + (form.title || ""), W / 2, H - 12);
+      ctx.fillText("کروکی توصیفی دستی — " + (form.title || ""), W / 2, H - 28);
       return;
     }
     if (t.titleBlock !== "official") return;
-    const bh = 72;
-    const bx = 22,
-      by = H - bh - 16,
-      bw = W - 44;
+    const bh = 96;
+    const bx = 24,
+      by = H - bh - 22,
+      bw = W - 48;
     ctx.strokeStyle = t.headerColor;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(bx, by, bw, bh);
@@ -610,26 +630,48 @@ export function useKrokiGenerator() {
     ctx.font = "600 11px Vazirmatn, Tahoma, sans-serif";
     ctx.textBaseline = "middle";
     ctx.textAlign = "right";
-    ctx.fillText(form.client || "کارفرما: —", bx + 8, by + 12);
+    ctx.fillText(truncateText(ctx, "کارفرما: " + (form.client || "—"), bw * 0.38), bx + 10, by + 12);
     ctx.textAlign = "center";
     ctx.fillText("مقیاس: " + extra.scaleText, bx + bw / 2, by + 12);
     ctx.textAlign = "left";
-    ctx.fillText(form.date || "تاریخ: —", bx + bw - 8, by + 12);
+    ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), bw * 0.28), bx + bw - 10, by + 12);
+
+    const rowH = (bh - 24) / 3;
     ctx.fillStyle = "#333";
     ctx.font = "600 10px Vazirmatn, Tahoma, sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(
-      "سیستم مختصات: WGS84 / UTM — Zone " + (extra.zone || "—"),
-      bx + 8,
-      by + 40,
+      truncateText(ctx, "سیستم مختصات: WGS84 / UTM — Zone " + (extra.zone || "—"), bw * 0.46),
+      bx + 10,
+      by + 24 + rowH * 0.5,
     );
-    ctx.textAlign = "center";
-    ctx.fillText("مساحت: " + extra.area, bx + bw / 2, by + 40);
     ctx.textAlign = "left";
-    ctx.fillText("کارشناس: " + (form.surveyor || "__________"), bx + bw - 8, by + 40);
+    ctx.fillText(
+      truncateText(ctx, "مساحت: " + extra.area, bw * 0.46),
+      bx + bw - 10,
+      by + 24 + rowH * 0.5,
+    );
+
+    ctx.textAlign = "right";
+    ctx.fillText(
+      truncateText(ctx, "کارشناس: " + (form.surveyor || "———"), bw * 0.46),
+      bx + 10,
+      by + 24 + rowH * 1.5,
+    );
+    ctx.textAlign = "left";
+    ctx.fillText(
+      truncateText(ctx, "پلاک ثبتی: " + (form.plaque || "—"), bw * 0.46),
+      bx + bw - 10,
+      by + 24 + rowH * 1.5,
+    );
+
     ctx.fillStyle = "#555";
     ctx.textAlign = "right";
-    ctx.fillText("نشانی: " + (form.address || "—"), bx + 8, by + 58);
+    ctx.fillText(
+      truncateText(ctx, "نشانی: " + (form.address || "—"), bw - 20),
+      bx + 10,
+      by + 24 + rowH * 2.5,
+    );
   }
 
   function drawGrid(ctx, minX, minY, maxX, maxY, effScale, pad, drawTop, drawBottom, W) {
@@ -680,7 +722,8 @@ export function useKrokiGenerator() {
     const spanX = Math.max(maxX - minX, 0.001);
     const spanY = Math.max(maxY - minY, 0.001);
 
-    const titleBlockH = t.titleBlock === "official" ? 72 + 16 : 24;
+    const titleBlockH =
+      t.titleBlock === "official" ? 118 : t.titleBlock === "technical" ? 54 : 30;
     const drawTop = headerH + pad + 30;
     const drawBottom = H - pad - titleBlockH - 14;
     const effScale = Math.min((W - 2 * pad) / spanX, (drawBottom - drawTop) / spanY);

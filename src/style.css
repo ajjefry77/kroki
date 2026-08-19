@@ -21,15 +21,15 @@
   --border: #e2e7f0;
   --border-strong: #c9d2e3;
 
-  --accent: #b8912f;
-  --accent-soft: #a37f24;
-  --accent-dim: #7a5e18;
-  --accent-glow: rgba(184, 145, 47, 0.1);
-  --accent-glow-strong: rgba(184, 145, 47, 0.18);
+  --accent: #e07b39;
+  --accent-soft: #c8682a;
+  --accent-dim: #93471a;
+  --accent-glow: rgba(224, 123, 57, 0.1);
+  --accent-glow-strong: rgba(224, 123, 57, 0.18);
 
-  --accent-rgb: 184 145 47;
-  --accent-soft-rgb: 163 127 36;
-  --accent-dim-rgb: 122 94 24;
+  --accent-rgb: 224 123 57;
+  --accent-soft-rgb: 200 104 42;
+  --accent-dim-rgb: 147 71 26;
   --text: #1b2536;
   --text-muted: #5c6b84;
   --text-faint: #93a0b5;
@@ -80,7 +80,7 @@ html {
 
 body {
   background:
-    radial-gradient(circle at 12% 0%, rgba(184, 145, 47, 0.08), transparent 42%),
+    radial-gradient(circle at 12% 0%, rgba(224, 123, 57, 0.08), transparent 42%),
     radial-gradient(circle at 88% 12%, rgba(29, 58, 110, 0.05), transparent 48%),
     radial-gradient(circle at 50% 100%, rgba(47, 111, 208, 0.04), transparent 45%),
     var(--bg);
@@ -179,7 +179,7 @@ button {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #c79a36, #e0bc62);
+  background: linear-gradient(135deg, #e0702f, #f59a5a);
   color: #241a05;
   box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }

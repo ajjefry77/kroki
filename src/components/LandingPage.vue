@@ -287,9 +287,9 @@ onMounted(() => {
 <style scoped>
 .hero-bg {
   background:
-    radial-gradient(circle at 20% 20%, rgba(184, 145, 47, 0.1), transparent 45%),
+    radial-gradient(circle at 20% 20%, rgba(224, 123, 57, 0.1), transparent 45%),
     radial-gradient(circle at 80% 30%, rgba(29, 58, 110, 0.07), transparent 50%),
-    radial-gradient(circle at 50% 90%, rgba(184, 145, 47, 0.07), transparent 45%);
+    radial-gradient(circle at 50% 90%, rgba(224, 123, 57, 0.07), transparent 45%);
 }
 
 .feature-card {
