@@ -162,12 +162,22 @@ await page.waitForFunction(() => document.body.innerText.includes("کروکی ش
 });
 await sleep(1200);
 const downloadPage = await page.evaluate(() => document.body.innerText);
+const hiddenCanvasCheck = await page.evaluate(() => {
+  const c = document.querySelector('canvas[class*="hidden"]');
+  if (!c) return { ok: false, err: "no hidden canvas" };
+  return {
+    ok: c.width > 300 && c.height > 300,
+    width: c.width,
+    height: c.height,
+  };
+});
 console.log("download page:", {
   hasTitle: downloadPage.includes("مشخصات سفارش"),
   hasPng: downloadPage.includes("دانلود PNG"),
   hasPdf: downloadPage.includes("PDF / چاپ"),
   hasNew: downloadPage.includes("سفارش جدید"),
 });
+console.log("hidden sketch canvas:", JSON.stringify(hiddenCanvasCheck));
 
 console.log("== 7) Console errors ==");
 const errors = logs.filter(

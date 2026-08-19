@@ -86,7 +86,7 @@
       </div>
 
       <!-- کانواس مخفی برای خروجی -->
-      <canvas ref="hiddenCanvasRef" class="hidden"></canvas>
+      <canvas ref="hiddenCanvasRef" class="hidden" :width="canvasW" :height="canvasH"></canvas>
 
       <div class="card !rounded-2xl border-[var(--warning)]/40 bg-[var(--warning-glow)] mb-6">
         <div class="flex items-start gap-3 text-xs leading-6">
@@ -127,9 +127,24 @@ const props = defineProps({
 const emit = defineEmits(["restart", "home"]);
 
 const hiddenCanvasRef = ref(null);
+const canvasW = ref(700);
+const canvasH = ref(700);
 const currentTemplate = getTemplate(props.templateId);
 
+function sizeCanvas() {
+  const pts = props.gen.state.utmPoints;
+  if (!pts.length) return;
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 1);
+  const spanY = Math.max(Math.max(...ys) - Math.min(...ys), 1);
+  const { w, h } = props.gen.computeCanvasSize(spanX, spanY);
+  canvasW.value = w;
+  canvasH.value = h;
+}
+
 onMounted(() => {
+  sizeCanvas();
   nextTick(() => {
     props.gen.renderSketch(hiddenCanvasRef.value);
   });

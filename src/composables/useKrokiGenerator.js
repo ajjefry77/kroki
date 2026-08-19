@@ -1134,17 +1134,44 @@ export function useKrokiGenerator() {
     doc.close();
 
     setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) {
-        logger.error("print", "خطا در چاپ", e.message);
-      }
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
+      const iw = iframe.contentWindow;
+      const idoc = iframe.contentDocument;
+      if (!iw || !idoc) return;
+      const sheet = idoc.querySelector(".sheet");
+      const images = Array.from(idoc.images);
+      Promise.all(
+        images.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise((res) => {
+                  img.onload = img.onerror = res;
+                }),
+        ),
+      ).then(() => {
+        try {
+          // 190mm x 277mm = عرض/ارتفاع قابل چاپ A4 با حاشیه 10mm (در 96dpi)
+          const pageW = (190 * 96) / 25.4;
+          const pageH = (277 * 96) / 25.4;
+          const sheetW = sheet.scrollWidth;
+          const sheetH = sheet.scrollHeight;
+          const scale = Math.min(pageW / sheetW, pageH / sheetH, 1);
+          if (scale < 1) {
+            sheet.style.transformOrigin = "top left";
+            sheet.style.transform = `scale(${scale})`;
+            sheet.style.width = `${sheetW * scale}px`;
+          }
+          iw.focus();
+          iw.print();
+        } catch (e) {
+          logger.error("print", "خطا در چاپ", e.message);
         }
-      }, 1000);
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      });
     }, 450);
   }
 
@@ -1152,7 +1179,7 @@ export function useKrokiGenerator() {
     return `
 * { box-sizing: border-box; }
 body { font-family: Tahoma, 'Vazirmatn', sans-serif; margin: 0; padding: 0; color: #222; }
-.sheet { max-width: 900px; margin: 0 auto; padding: 24px; }
+.sheet { width: 176mm; margin: 0 auto; padding: 24px; }
 .head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px; }
 .head-title { font-size: 20px; font-weight: 700; }
 .head-sub { font-size: 12px; color: #555; }
