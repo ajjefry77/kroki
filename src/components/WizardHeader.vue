@@ -51,10 +51,24 @@
       </div>
     </nav>
 
-    <!-- نشان اعتبار -->
+    <!-- نشان اعتبار + گزارش -->
     <div class="hidden md:flex items-center gap-2 text-[11px] text-[var(--text-muted)] px-2 flex-shrink-0">
-      <i class="fas fa-shield-halved text-[var(--success)]"></i>
-      <span>پرداخت امن</span>
+      <span class="flex items-center gap-1.5">
+        <i class="fas fa-shield-halved text-[var(--success)]"></i>
+        <span>پرداخت امن</span>
+      </span>
+      <button
+        class="relative flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text)] transition"
+        title="گزارش سیستم"
+        @click="$emit('toggleLog')"
+      >
+        <i class="fas fa-bug text-[var(--accent)]"></i>
+        <span>گزارش</span>
+        <span
+          v-if="logCount"
+          class="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[var(--danger)] text-white text-[9px] font-bold flex items-center justify-center"
+        >{{ logCount }}</span>
+      </button>
     </div>
   </header>
 </template>
@@ -66,9 +80,10 @@ const props = defineProps({
   steps: { type: Array, required: true },
   current: { type: String, required: true },
   reachedIndex: { type: Number, default: 0 },
+  logCount: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(["navigate"]);
+const emit = defineEmits(["navigate", "toggleLog"]);
 
 const currentIndex = computed(() =>
   Math.max(0, props.steps.findIndex((s) => s.id === props.current)),
@@ -94,16 +109,16 @@ function dotClass(i, id) {
   background: linear-gradient(135deg, var(--accent), var(--accent-soft));
   border-color: transparent;
   color: #241a05;
-  box-shadow: 0 0 0 4px var(--accent-glow), 0 2px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 4px var(--accent-glow), 0 2px 8px rgba(23, 43, 77, 0.15);
 }
 .step-done {
   background: var(--surface3);
-  border-color: rgb(var(--accent-rgb) / 0.6);
-  color: var(--accent-soft);
+  border-color: rgb(var(--accent-rgb) / 0.55);
+  color: var(--accent-dim);
 }
 .step-pending {
   background: var(--surface2);
-  border-color: var(--border-strong);
+  border-color: var(--border);
   color: var(--text-faint);
 }
 </style>

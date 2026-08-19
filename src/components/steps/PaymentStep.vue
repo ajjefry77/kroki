@@ -83,7 +83,8 @@
               </button>
             </div>
 
-            <div class="space-y-4">
+            <!-- درگاه آنلاین -->
+            <div v-if="method === 'online'" class="space-y-4">
               <div>
                 <label class="block mb-1.5 text-xs font-medium">شماره کارت</label>
                 <input
@@ -119,6 +120,46 @@
                     maxlength="4"
                   />
                 </div>
+              </div>
+              <div>
+                <label class="block mb-1.5 text-xs font-medium">توضیحات پرداخت (اختیاری)</label>
+                <input v-model="card.note" type="text" class="input" placeholder="کد پیگیری یا توضیحات" />
+              </div>
+            </div>
+
+            <!-- کارت به کارت -->
+            <div v-else class="space-y-4">
+              <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4">
+                <div class="text-xs font-semibold text-[var(--text-muted)] mb-3 flex items-center gap-1.5">
+                  <i class="fas fa-money-bill-transfer text-[var(--accent)]"></i>
+                  مبلغ را به این کارت واریز کنید
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-lg font-extrabold tracking-widest text-center" dir="ltr">{{ bankCard }}</div>
+                    <div class="text-[11px] text-[var(--text-muted)] mt-1 text-center">بانک ملت — به نام سامانه کروکی</div>
+                  </div>
+                  <button class="btn btn-ghost btn-xs flex-shrink-0" @click="copyCard">
+                    <i class="fas mr-1" :class="copied ? 'fa-check' : 'fa-copy'"></i>
+                    {{ copied ? 'کپی شد' : 'کپی' }}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
+                <input
+                  v-model="card.paymentId"
+                  type="text"
+                  class="input text-center tracking-widest"
+                  placeholder="شناسه ۱۶ رقمی پیامک شده"
+                  dir="ltr"
+                  maxlength="16"
+                  @input="formatPaymentId"
+                />
+                <p class="text-[10px] text-[var(--text-faint)] mt-1.5">
+                  <i class="fas fa-circle-info ml-1"></i>
+                  پس از واریز، شناسه پرداخت درج‌شده در پیامک تأیید بانک را وارد کنید.
+                </p>
               </div>
               <div>
                 <label class="block mb-1.5 text-xs font-medium">توضیحات پرداخت (اختیاری)</label>
@@ -174,8 +215,10 @@ const processing = ref(false);
 const success = ref(false);
 const trackingCode = ref("");
 const price = 150000;
+const bankCard = "6037-9977-1234-5678";
+const copied = ref(false);
 
-const card = reactive({ number: "", expiry: "", cvv: "", note: "" });
+const card = reactive({ number: "", expiry: "", cvv: "", note: "", paymentId: "" });
 
 const methods = [
   { id: "online", label: "درگاه آنلاین", icon: "fa-credit-card" },
@@ -186,6 +229,9 @@ const currentTemplate = computed(() => getTemplate(props.templateId));
 const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 
 const cardValid = computed(() => {
+  if (method.value === "card") {
+    return card.paymentId.replace(/\D/g, "").length === 16;
+  }
   if (card.number.replace(/[\s-]/g, "").length < 16) return false;
   if (card.expiry.length < 5) return false;
   if (card.cvv.length < 3) return false;
@@ -195,6 +241,18 @@ const cardValid = computed(() => {
 function formatCard() {
   let digits = card.number.replace(/[^\d]/g, "").slice(0, 16);
   card.number = digits.replace(/(\d{4})(?=\d)/g, "$1-");
+}
+
+function formatPaymentId() {
+  card.paymentId = card.paymentId.replace(/[^\d]/g, "").slice(0, 16);
+}
+
+async function copyCard() {
+  try {
+    await navigator.clipboard.writeText(bankCard);
+    copied.value = true;
+    setTimeout(() => (copied.value = false), 1800);
+  } catch (e) {}
 }
 
 function formatPrice(v) {
@@ -207,6 +265,7 @@ function pay() {
     method: method.value,
     amount: price,
     template: props.templateId,
+    paymentId: method.value === "card" ? card.paymentId : undefined,
   });
   setTimeout(() => {
     processing.value = false;

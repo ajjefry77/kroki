@@ -17,10 +17,20 @@
           <a href="#how" class="hover:text-[var(--text)] transition">مراحل کار</a>
           <a href="#templates" class="hover:text-[var(--text)] transition">قالب‌ها</a>
         </div>
-        <button class="btn btn-primary" @click="$emit('start')">
-          <i class="fas fa-play ml-1"></i>
-          شروع
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            class="flex items-center gap-1.5 px-2.5 h-9 rounded-lg border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text)] text-xs transition"
+            title="گزارش سیستم"
+            @click="$emit('toggleLog')"
+          >
+            <i class="fas fa-bug text-[var(--accent)]"></i>
+            <span>گزارش</span>
+          </button>
+          <button class="btn btn-primary" @click="$emit('start')">
+            <i class="fas fa-play ml-1"></i>
+            شروع
+          </button>
+        </div>
       </div>
     </header>
 
@@ -226,7 +236,7 @@
 import { onMounted } from "vue";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS } from "../utils/templates";
 
-defineEmits(["start"]);
+defineEmits(["start", "toggleLog"]);
 
 const features = [
   { icon: "fa-map-marked-alt", title: "ترسیم تعاملی روی نقشه", desc: "خط، پلی‌گان، دایره و نقاط چندگانه را مستقیم روی تصویر ماهواره‌ای ترسیم کنید." },
@@ -277,9 +287,9 @@ onMounted(() => {
 <style scoped>
 .hero-bg {
   background:
-    radial-gradient(circle at 20% 20%, rgba(224, 179, 80, 0.08), transparent 45%),
-    radial-gradient(circle at 80% 30%, rgba(29, 58, 110, 0.28), transparent 50%),
-    radial-gradient(circle at 50% 90%, rgba(224, 179, 80, 0.05), transparent 45%);
+    radial-gradient(circle at 20% 20%, rgba(184, 145, 47, 0.1), transparent 45%),
+    radial-gradient(circle at 80% 30%, rgba(29, 58, 110, 0.07), transparent 50%),
+    radial-gradient(circle at 50% 90%, rgba(184, 145, 47, 0.07), transparent 45%);
 }
 
 .feature-card {
@@ -292,7 +302,7 @@ onMounted(() => {
 .feature-card:hover {
   transform: translateY(-4px);
   border-color: rgb(var(--accent-rgb) / 0.45);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 32px rgba(23, 43, 77, 0.12);
 }
 
 .reveal {

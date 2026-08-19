@@ -1,9 +1,9 @@
 <template>
-  <div class="fixed bottom-4 left-4 z-[3000] flex flex-col items-end gap-2">
+  <Teleport to="body">
     <Transition name="log-panel">
       <div
-        v-if="open"
-        class="log-panel w-[430px] max-w-[calc(100vw-32px)] max-h-[70vh] flex flex-col rounded-xl shadow-2xl border border-[var(--border-strong)] bg-[var(--surface)] overflow-hidden"
+        v-if="modelValue"
+        class="fixed top-16 right-4 z-[3000] w-[430px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-96px)] flex flex-col rounded-xl shadow-2xl border border-[var(--border-strong)] bg-[var(--surface)] overflow-hidden"
       >
         <!-- هدر -->
         <div class="flex items-center justify-between px-3 py-2.5 bg-[var(--surface2)] border-b border-[var(--border)]">
@@ -24,7 +24,7 @@
             <button class="log-btn" title="پاک کردن گزارش" @click="clearLogs">
               <i class="fas fa-trash-alt"></i>
             </button>
-            <button class="log-btn" title="بستن" @click="open = false">
+            <button class="log-btn" title="بستن" @click="close">
               <i class="fas fa-times"></i>
             </button>
           </div>
@@ -88,31 +88,20 @@
         </div>
       </div>
     </Transition>
-
-    <!-- دکمه شناور -->
-    <button
-      class="flex items-center gap-2 px-3 h-10 rounded-full shadow-lg bg-[var(--surface)] border border-[var(--border-strong)] hover:bg-[var(--surface2)] transition"
-      title="گزارش سیستم"
-      @click="open = !open"
-    >
-      <span class="relative">
-        <i class="fas fa-bug text-[var(--accent)]"></i>
-        <span
-          v-if="stats.error"
-          class="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[var(--danger)] text-white text-[9px] font-bold flex items-center justify-center"
-        >{{ stats.error }}</span>
-      </span>
-      <span class="text-[11px] font-medium">{{ open ? 'بستن گزارش' : 'گزارش سیستم' }}</span>
-    </button>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { logger, downloadLogFile, LOG_LEVELS } from "../utils/logger";
 
+const props = defineProps({
+  modelValue: { type: Boolean, default: false },
+});
+
+const emit = defineEmits(["update:modelValue"]);
+
 const MAX = 600;
-const open = ref(false);
 const filter = ref("all");
 const search = ref("");
 const listRef = ref(null);
@@ -120,6 +109,10 @@ const entries = ref([]);
 const sessionId = logger.sessionId;
 
 let unsub = null;
+
+function close() {
+  emit("update:modelValue", false);
+}
 
 onMounted(() => {
   entries.value = [...logger.entries];
@@ -138,7 +131,7 @@ onUnmounted(() => {
 });
 
 function scrollToBottom() {
-  if (open.value && listRef.value) {
+  if (props.modelValue && listRef.value) {
     listRef.value.scrollTop = listRef.value.scrollHeight;
   }
 }
@@ -224,23 +217,23 @@ function download(format) {
   border-color: var(--border-strong);
 }
 .log-filter.active-debug {
-  background: rgba(139, 147, 167, 0.2);
-  color: #c3c9da;
+  background: rgba(139, 147, 167, 0.18);
+  color: #5f6c84;
   border-color: #8b93a7;
 }
 .log-filter.active-info {
-  background: rgba(79, 131, 204, 0.22);
-  color: #8fbdff;
+  background: rgba(47, 111, 208, 0.14);
+  color: #2f6fd0;
   border-color: #4f83cc;
 }
 .log-filter.active-warn {
-  background: rgba(201, 162, 39, 0.22);
-  color: #f0cf7a;
+  background: rgba(192, 138, 30, 0.16);
+  color: #a87c14;
   border-color: #c9a227;
 }
 .log-filter.active-error {
-  background: rgba(226, 84, 91, 0.22);
-  color: #ff9a9e;
+  background: rgba(214, 69, 80, 0.14);
+  color: #d64550;
   border-color: #e2545b;
 }
 
@@ -273,7 +266,7 @@ function download(format) {
   color: #c9a227;
 }
 .text-error {
-  color: #ff9a9e;
+  color: #d64550;
 }
 
 .log-data {

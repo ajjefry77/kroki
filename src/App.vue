@@ -1,15 +1,17 @@
 <template>
   <div class="h-screen flex flex-col overflow-hidden bg-[var(--bg)]">
-    <LogPanel />
+    <LogPanel v-model="logOpen" />
 
-    <LandingPage v-if="step === 'landing'" @start="start" />
+    <LandingPage v-if="step === 'landing'" @start="start" @toggleLog="logOpen = !logOpen" />
 
     <template v-else>
       <WizardHeader
         :steps="steps"
         :current="step"
         :reached-index="reachedIndex"
+        :log-count="logStats.error"
         @navigate="navigate"
+        @toggleLog="logOpen = !logOpen"
       />
 
       <div class="flex-1 min-h-0 flex flex-col">
@@ -71,7 +73,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from "vue";
+import { ref, reactive, watch, computed } from "vue";
 import { useKrokiGenerator, getTodayJalali } from "./composables/useKrokiGenerator";
 import { logger } from "./utils/logger";
 
@@ -98,6 +100,8 @@ const pins = reactive([]);
 const map = ref(null);
 const templateId = ref("technical");
 const trackingCode = ref("");
+const logOpen = ref(false);
+const logStats = computed(() => logger.getStats());
 
 const gen = useKrokiGenerator();
 

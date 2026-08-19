@@ -47,8 +47,19 @@ const clickCanvas = async (relX, relY) => {
 };
 
 console.log("== 1) Landing ==");
-const landing = await page.evaluate(() => document.body.innerText.includes("کروکی نقشه ملک"));
-console.log("landing hero visible:", landing);
+const landing = await page.evaluate(() => {
+  const bg = getComputedStyle(document.body).backgroundColor;
+  const isLightish =
+    (bg.match(/rgb\((\d+)/) === null ? false : Number(bg.match(/rgb\((\d+)/)[1])) > 200;
+  return {
+    hero: document.body.innerText.includes("کروکی نقشه ملک"),
+    reportBtn: !!Array.from(document.querySelectorAll("button")).find((b) =>
+      b.textContent.includes("گزارش"),
+    ),
+    isLight: isLightish,
+  };
+});
+console.log("landing state:", JSON.stringify(landing));
 await clickByText("button", "ساخت کروکی");
 const onDraw = await page.evaluate(() => document.body.innerText.includes("ترسیم‌های روی نقشه"));
 console.log("draw step reached:", onDraw);
@@ -106,29 +117,28 @@ await clickByText("button", "ادامه به پرداخت");
 const onPay = await page.evaluate(() => document.body.innerText.includes("پرداخت هزینه کروکی"));
 console.log("payment step reached:", onPay);
 
+// تست تب کارت به کارت
+await clickByText("button", "کارت به کارت");
+await sleep(400);
+const cardTab = await page.evaluate(() => ({
+  bankCard: document.body.innerText.includes("6037-9977-1234-5678"),
+  paymentIdField: !!Array.from(document.querySelectorAll("input")).find((i) =>
+    i.placeholder.includes("شناسه"),
+  ),
+}));
+console.log("card-to-card tab:", JSON.stringify(cardTab));
+
 await page.evaluate(() => {
-  const inputs = Array.from(document.querySelectorAll('input[placeholder*="0000"]'));
-  const exps = Array.from(document.querySelectorAll('input[placeholder="MM/YY"]'));
-  const cvvs = Array.from(document.querySelectorAll('input[placeholder="•••"]'));
-  const set = (el, v) => {
-    const proto = Object.getPrototypeOf(el);
+  const inputs = Array.from(document.querySelectorAll("input"));
+  const target = inputs.find((i) => i.placeholder.includes("شناسه"));
+  if (target) {
+    const proto = Object.getPrototypeOf(target);
     const desc = Object.getOwnPropertyDescriptor(proto, "value");
-    desc.set.call(el, v);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  };
-  if (inputs[0]) set(inputs[0], "6037-9977-1234-5678");
-  if (exps[0]) set(exps[0], "12/29");
-  if (cvvs[0]) set(cvvs[0], "123");
+    desc.set.call(target, "1234567890123456");
+    target.dispatchEvent(new Event("input", { bubbles: true }));
+  }
 });
 await sleep(400);
-const allBtns = await page.evaluate(() =>
-  Array.from(document.querySelectorAll("button")).map((b, i) => ({
-    i,
-    txt: b.textContent.replace(/\s+/g, " ").trim().slice(0, 50),
-    dis: b.disabled,
-  })),
-);
-console.log("ALL BUTTONS:", JSON.stringify(allBtns));
 const clickRes = await page.evaluate(() => {
   const b = Array.from(document.querySelectorAll("button")).find((x) =>
     x.textContent.includes("تومان"),

@@ -13,50 +13,50 @@
 }
 
 :root {
-  --bg: #0a1120;
-  --bg-elevated: #0e1728;
-  --surface: #101c33;
-  --surface2: #15233d;
-  --surface3: #1c2f4f;
-  --border: #1d2f4e;
-  --border-strong: #2b4470;
+  --bg: #f3f5fa;
+  --bg-elevated: #eef1f8;
+  --surface: #ffffff;
+  --surface2: #f7f9fd;
+  --surface3: #eef1f7;
+  --border: #e2e7f0;
+  --border-strong: #c9d2e3;
 
-  --accent: #e0b350;
-  --accent-soft: #edc978;
-  --accent-dim: #8f6a1f;
-  --accent-glow: rgba(224, 179, 80, 0.09);
-  --accent-glow-strong: rgba(224, 179, 80, 0.18);
+  --accent: #b8912f;
+  --accent-soft: #a37f24;
+  --accent-dim: #7a5e18;
+  --accent-glow: rgba(184, 145, 47, 0.1);
+  --accent-glow-strong: rgba(184, 145, 47, 0.18);
 
-  --accent-rgb: 224 179 80;
-  --accent-soft-rgb: 237 201 120;
-  --accent-dim-rgb: 143 106 31;
-  --text: #e9eef8;
-  --text-muted: #8a96b5;
-  --text-faint: #5f6c8c;
-  --danger: #f0616d;
-  --danger-glow: rgba(240, 97, 109, 0.14);
-  --success: #4ade80;
-  --success-glow: rgba(74, 222, 128, 0.12);
-  --warning: #f0c75e;
-  --warning-glow: rgba(240, 199, 94, 0.12);
-  --info: #6ea8ff;
-  --info-glow: rgba(110, 168, 255, 0.12);
+  --accent-rgb: 184 145 47;
+  --accent-soft-rgb: 163 127 36;
+  --accent-dim-rgb: 122 94 24;
+  --text: #1b2536;
+  --text-muted: #5c6b84;
+  --text-faint: #93a0b5;
+  --danger: #d64550;
+  --danger-glow: rgba(214, 69, 80, 0.1);
+  --success: #1fa15c;
+  --success-glow: rgba(31, 161, 92, 0.1);
+  --warning: #c08a1e;
+  --warning-glow: rgba(192, 138, 30, 0.1);
+  --info: #2f6fd0;
+  --info-glow: rgba(47, 111, 208, 0.1);
 
   --radius: 10px;
   --radius-sm: 8px;
   --radius-lg: 14px;
   --radius-xl: 20px;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(23, 43, 77, 0.06);
+  --shadow-md: 0 4px 16px rgba(23, 43, 77, 0.08);
+  --shadow-lg: 0 12px 32px rgba(23, 43, 77, 0.1);
+  --shadow-xl: 0 20px 48px rgba(23, 43, 77, 0.12);
 
   --font: 'Vazirmatn', 'Vazir', system-ui, sans-serif;
   --top: 50px;
 
-  --card-bg-rgb: 16, 28, 51;
-  --border-rgb: 29, 47, 78;
+  --card-bg-rgb: 255, 255, 255;
+  --border-rgb: 226, 231, 240;
 
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -66,7 +66,7 @@
   font-family: var(--font);
   line-height: 1.6;
   font-weight: 400;
-  color-scheme: dark;
+  color-scheme: light;
   color: var(--text);
   background-color: var(--bg);
   direction: rtl;
@@ -80,9 +80,9 @@ html {
 
 body {
   background:
-    radial-gradient(circle at 12% 0%, rgba(224, 179, 80, 0.06), transparent 42%),
-    radial-gradient(circle at 88% 12%, rgba(29, 58, 110, 0.45), transparent 48%),
-    radial-gradient(circle at 50% 100%, rgba(110, 168, 255, 0.05), transparent 45%),
+    radial-gradient(circle at 12% 0%, rgba(184, 145, 47, 0.08), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(29, 58, 110, 0.05), transparent 48%),
+    radial-gradient(circle at 50% 100%, rgba(47, 111, 208, 0.04), transparent 45%),
     var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -179,14 +179,14 @@ button {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #d9a63c, #e8c36a);
+  background: linear-gradient(135deg, #c79a36, #e0bc62);
   color: #241a05;
-  box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.07);
-  box-shadow: 0 6px 22px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  filter: brightness(1.05);
+  box-shadow: 0 6px 22px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   transform: translateY(-1px);
 }
 
