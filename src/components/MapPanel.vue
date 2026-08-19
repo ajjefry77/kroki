@@ -117,6 +117,7 @@ import Loading from "./Loading.vue";
 import { useDrawing } from "../composables/useDrawing";
 import { kmlToGeoJSON, parseKMLCoords, readKmlText } from "../utils/kml";
 import { registerLayersForSource, bringDrawingsToFront } from "../utils/layerOrder";
+import { renderPinOnMap } from "../utils/pinRenderer";
 
 const props = defineProps({
   pins: { type: Object, required: true },
@@ -320,6 +321,11 @@ function initMap() {
 
   map.on("load", () => {
     drawing.value = reactive(useDrawing(map, props.pins));
+    for (const p of props.pins || []) {
+      if (p.shape && p.shape.type && p.type === "draw") {
+        renderPinOnMap(map, p);
+      }
+    }
     emit("mapReady", { map, drawing: drawing.value });
   });
 

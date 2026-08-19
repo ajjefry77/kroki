@@ -1,129 +1,209 @@
 <template>
-  <div class="flex flex-col h-screen bg-[var(--bg)]">
-    <!-- هدر -->
-    <header class="h-12 flex items-center justify-between px-4 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0">
-      <div class="flex items-center gap-2">
-        <i class="fas fa-drafting-compass text-accent text-lg"></i>
-        <h1 class="text-sm font-bold">تولید کروکی نقشه</h1>
+  <div class="h-screen flex flex-col overflow-hidden bg-[var(--bg)]">
+    <LogPanel />
+
+    <LandingPage v-if="step === 'landing'" @start="start" />
+
+    <template v-else>
+      <WizardHeader
+        :steps="steps"
+        :current="step"
+        :reached-index="reachedIndex"
+        @navigate="navigate"
+      />
+
+      <div class="flex-1 min-h-0 flex flex-col">
+        <Transition name="step" mode="out-in">
+          <DrawStep
+            v-if="step === 'draw'"
+            key="draw"
+            :pins="pins"
+            @mapReady="onMapReady"
+            @removePin="removePin"
+            @submit="onDrawSubmit"
+            @back="go('landing')"
+          />
+
+          <InfoStep
+            v-else-if="step === 'info'"
+            key="info"
+            :pins="pins"
+            :form="krokiForm"
+            v-model="templateId"
+            @submit="onInfoSubmit"
+            @back="go('draw')"
+          />
+
+          <PreviewStep
+            v-else-if="step === 'preview'"
+            key="preview"
+            :gen="gen"
+            :template-id="templateId"
+            @back="go('info')"
+            @pay="go('payment')"
+          />
+
+          <PaymentStep
+            v-else-if="step === 'payment'"
+            key="payment"
+            :gen="gen"
+            :pins="pins"
+            :form="krokiForm"
+            :template-id="templateId"
+            @back="go('preview')"
+            @done="onPaymentDone"
+          />
+
+          <DownloadStep
+            v-else-if="step === 'done'"
+            key="done"
+            :gen="gen"
+            :form="krokiForm"
+            :template-id="templateId"
+            :tracking-code="trackingCode"
+            @restart="restart"
+            @home="go('landing')"
+          />
+        </Transition>
       </div>
-      <div class="flex items-center gap-2">
-      </div>
-    </header>
-
-    <!-- بدنه: نقشه بالا + اطلاعات پایین -->
-    <main class="flex-1 min-h-0 flex flex-col">
-      <section class="relative h-[55%] min-h-[280px] border-b border-[var(--border)]">
-        <MapPanel ref="mapPanelRef" :pins="pins" @mapReady="onMapReady" @openKroki="openKroki" />
-      </section>
-
-      <section class="flex-1 min-h-[220px] overflow-y-auto bg-[var(--bg)]">
-        <InfoPanel :pins="pins" :form="krokiForm" @openKroki="openKroki" @removePin="removePin" />
-      </section>
-    </main>
-
-    <KrokiDialog ref="krokiDialogRef" :map="map" :pins="pins" :form="krokiForm" />
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from "vue";
-import MapPanel from "./components/MapPanel.vue";
-import InfoPanel from "./components/InfoPanel.vue";
-import KrokiDialog from "./components/KrokiDialog.vue";
+import { ref, reactive, watch } from "vue";
+import { useKrokiGenerator, getTodayJalali } from "./composables/useKrokiGenerator";
+import { logger } from "./utils/logger";
 
+import LandingPage from "./components/LandingPage.vue";
+import WizardHeader from "./components/WizardHeader.vue";
+import LogPanel from "./components/LogPanel.vue";
+import DrawStep from "./components/steps/DrawStep.vue";
+import InfoStep from "./components/steps/InfoStep.vue";
+import PreviewStep from "./components/steps/PreviewStep.vue";
+import PaymentStep from "./components/steps/PaymentStep.vue";
+import DownloadStep from "./components/steps/DownloadStep.vue";
+
+const steps = [
+  { id: "draw", label: "ترسیم نقشه" },
+  { id: "info", label: "اطلاعات و قالب" },
+  { id: "preview", label: "پیش‌نمایش" },
+  { id: "payment", label: "پرداخت" },
+  { id: "done", label: "دانلود" },
+];
+
+const step = ref("landing");
+const reachedIndex = ref(0);
 const pins = reactive([]);
 const map = ref(null);
-const mapPanelRef = ref(null);
-const krokiDialogRef = ref(null);
+const templateId = ref("technical");
+const trackingCode = ref("");
 
-function toJalali(gy, gm, gd) {
-  const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-  const gy2 = gm > 2 ? gy + 1 : gy;
-  let days =
-    355666 +
-    365 * gy +
-    Math.floor((gy2 + 3) / 4) -
-    Math.floor((gy2 + 99) / 100) +
-    Math.floor((gy2 + 399) / 400) +
-    gd +
-    g_d_m[gm - 1];
-  let jy = -1595 + 33 * Math.floor(days / 12053);
-  days %= 12053;
-  jy += 4 * Math.floor(days / 1461);
-  days %= 1461;
-  if (days > 365) {
-    jy += Math.floor((days - 1) / 365);
-    days = (days - 1) % 365;
-  }
-  const jm = days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
-  const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${jy}/${pad(jm)}/${pad(jd)}`;
-}
+const gen = useKrokiGenerator();
 
 const krokiForm = reactive({
   title: "پلان وضعیت موجود",
   client: "",
   address: "",
-  date: toJalali(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()),
+  date: getTodayJalali(),
+  surveyor: "",
+  plaque: "",
+  description: "",
 });
+
+watch(step, (s) => {
+  logger.info("step", "تغییر مرحله", { step: s });
+});
+
+function go(id) {
+  const idx = steps.findIndex((s) => s.id === id);
+  if (idx !== -1) {
+    reachedIndex.value = Math.max(reachedIndex.value, idx);
+  }
+  step.value = id;
+}
+
+function navigate(id) {
+  go(id);
+}
+
+function start() {
+  logger.info("step", "شروع فرآیند ساخت کروکی از صفحه اصلی");
+  reachedIndex.value = 0;
+  step.value = "draw";
+}
 
 function onMapReady({ map: m }) {
   map.value = m;
-}
-
-function flatten(list) {
-  const out = [];
-  for (const p of list || []) {
-    if (p.type === "group" && Array.isArray(p.children)) {
-      out.push(...flatten(p.children));
-    } else {
-      out.push(p);
-    }
-  }
-  return out;
-}
-
-const hasEligibleDrawings = computed(() =>
-  flatten(pins).some(
-    (p) =>
-      p.type === "draw" &&
-      p.shape &&
-      ["polygon", "polyline"].includes(p.shape.type) &&
-      Array.isArray(p.shape.positions) &&
-      p.shape.positions.length >= 2,
-  ),
-);
-
-function openKroki() {
-  if (!map.value) return;
-  krokiDialogRef.value?.open();
-}
-
-function removeLayersForSource(sourceId) {
-  if (!map.value || !sourceId) return;
-  const layers = map.value.getStyle().layers || [];
-  layers
-    .filter((l) => l.source === sourceId)
-    .forEach((l) => {
-      try {
-        map.value.removeLayer(l.id);
-      } catch (e) {}
-    });
-  try {
-    map.value.removeSource(sourceId);
-  } catch (e) {}
 }
 
 function removePin(pin) {
   const idx = pins.findIndex((x) => x.id === pin.id);
   if (idx !== -1) pins.splice(idx, 1);
 
-  if (!map.value) return;
+  const m = map.value;
+  if (!m) return;
+  const removeSource = (sid) => {
+    if (!sid) return;
+    const layers = m.getStyle().layers || [];
+    layers
+      .filter((l) => l.source === sid)
+      .forEach((l) => {
+        try {
+          m.removeLayer(l.id);
+        } catch (e) {}
+      });
+    try {
+      m.removeSource(sid);
+    } catch (e) {}
+  };
   if (pin.shape?._sourceIds?.length) {
-    pin.shape._sourceIds.forEach((sid) => removeLayersForSource(sid));
+    pin.shape._sourceIds.forEach((sid) => removeSource(sid));
   } else if (pin.shape) {
-    removeLayersForSource("draw-pin-" + pin.id);
+    removeSource("draw-pin-" + pin.id);
   }
+  logger.info("draw", "حذف ترسیم", { name: pin.name, id: pin.id });
+}
+
+async function onDrawSubmit() {
+  const geom = gen.buildGeometry(pins);
+  if (!geom) return;
+  try {
+    gen.state.mapImage = await gen.captureMapImage(map.value, pins, geom.allPositions);
+    logger.info("draw", "ثبت ترسیم‌ها و برداشت تصویر نقشه", {
+      shapes: geom.metas.length,
+      points: geom.allPositions.length,
+    });
+  } catch (e) {
+    logger.error("draw", "خطا در برداشت تصویر نقشه", e.message);
+  }
+  go("info");
+}
+
+async function onInfoSubmit() {
+  gen.setTemplate(templateId.value);
+  const ok = await gen.computeGeometry(pins, krokiForm);
+  if (ok) go("preview");
+}
+
+function onPaymentDone(code) {
+  trackingCode.value = code || "KRK-" + Date.now().toString(36).toUpperCase().slice(-8);
+  go("done");
+}
+
+function restart() {
+  pins.splice(0, pins.length);
+  templateId.value = "technical";
+  trackingCode.value = "";
+  krokiForm.title = "پلان وضعیت موجود";
+  krokiForm.client = "";
+  krokiForm.address = "";
+  krokiForm.surveyor = "";
+  krokiForm.plaque = "";
+  krokiForm.description = "";
+  krokiForm.date = getTodayJalali();
+  reachedIndex.value = 0;
+  step.value = "landing";
+  logger.info("system", "شروع سفارش جدید — بازنشانی وضعیت");
 }
 </script>

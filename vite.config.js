@@ -7,4 +7,15 @@ export default defineConfig({
     host: true,
     port: 5174,
   },
+  build: {
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "mapbox": ["mapbox-gl"],
+          "vendor": ["vue", "proj4"],
+        },
+      },
+    },
+  },
 })

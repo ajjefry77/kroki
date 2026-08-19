@@ -1,0 +1,237 @@
+<template>
+  <div class="flex-1 min-h-0 overflow-y-auto bg-[var(--bg)]">
+    <div class="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
+      <!-- نوار خلاصه ترسیم -->
+      <div class="flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)]">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface)] border border-[var(--border)]">
+          <i class="fas fa-map-marked-alt text-[var(--accent)]"></i>
+          {{ eligibleCount }} ترسیم معتبر روی نقشه ثبت شده است
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface)] border border-[var(--border)]">
+          <i class="fas fa-arrows-up-down text-[var(--accent)]"></i>
+          مساحت تخمینی: {{ areaPreview }}
+        </span>
+      </div>
+
+      <!-- اطلاعات -->
+      <section class="card !rounded-2xl">
+        <div class="flex items-center gap-2 mb-5">
+          <div class="w-9 h-9 rounded-lg bg-[var(--accent-glow)] border border-[var(--accent)]/30 flex items-center justify-center">
+            <i class="fas fa-file-signature text-[var(--accent)]"></i>
+          </div>
+          <div>
+            <h2 class="font-bold text-sm">اطلاعات کروکی</h2>
+            <p class="text-[11px] text-[var(--text-muted)]">مشخصات ملک و کارفرما را وارد کنید</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="lg:col-span-2">
+            <label class="block mb-1.5 font-medium text-xs">عنوان نقشه *</label>
+            <input v-model="form.title" type="text" class="input" placeholder="مثلاً پلان وضعیت موجود ملک" />
+          </div>
+          <div>
+            <label class="block mb-1.5 font-medium text-xs">تاریخ برداشت *</label>
+            <input
+              v-model="form.date"
+              type="text"
+              class="input text-center"
+              placeholder="1404/01/01"
+              dir="ltr"
+              @input="form.date = form.date.replace(/[^\d/]/g, '')"
+            />
+          </div>
+          <div>
+            <label class="block mb-1.5 font-medium text-xs">کارفرما / درخواست‌کننده *</label>
+            <input v-model="form.client" type="text" class="input" placeholder="نام کارفرما" />
+          </div>
+          <div>
+            <label class="block mb-1.5 font-medium text-xs">کارشناس / نقشه‌بردار</label>
+            <input v-model="form.surveyor" type="text" class="input" placeholder="نام کارشناس (اختیاری)" />
+          </div>
+          <div>
+            <label class="block mb-1.5 font-medium text-xs">شماره پلاک ثبتی</label>
+            <input v-model="form.plaque" type="text" class="input" placeholder="اصلی / فرعی (اختیاری)" />
+          </div>
+          <div class="lg:col-span-2">
+            <label class="block mb-1.5 font-medium text-xs">نشانی ملک</label>
+            <input v-model="form.address" type="text" class="input" placeholder="استان، شهر، خیابان، کوچه، پلاک" />
+          </div>
+          <div class="lg:col-span-3">
+            <label class="block mb-1.5 font-medium text-xs">توضیحات تکمیلی</label>
+            <textarea
+              v-model="form.description"
+              rows="2"
+              class="input resize-none"
+              placeholder="توضیحات اختیاری درباره ملک، عوارض و…"
+            ></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- قالب کروکی -->
+      <section class="card !rounded-2xl">
+        <div class="flex items-start gap-2 mb-5">
+          <div class="w-9 h-9 rounded-lg bg-[var(--accent-glow)] border border-[var(--accent)]/30 flex items-center justify-center">
+            <i class="fas fa-layers text-[var(--accent)]"></i>
+          </div>
+          <div>
+            <h2 class="font-bold text-sm">قالب کروکی</h2>
+            <p class="text-[11px] text-[var(--text-muted)]">
+              مدل و قالب خروجی را انتخاب کنید — ۶ قالب استاندارد بر اساس رویه‌های سازمان‌های مختلف
+            </p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+            v-for="t in templates"
+            :key="t.id"
+            class="relative rounded-2xl border-2 transition-all duration-300 cursor-pointer overflow-hidden group"
+            :class="
+              selected === t.id
+                ? 'border-[var(--accent)] bg-[var(--accent-glow)] shadow-lg shadow-[var(--accent-glow-strong)]'
+                : 'border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border-strong)]'
+            "
+            @click="select(t.id)"
+          >
+            <div v-if="selected === t.id" class="absolute top-2 left-2 z-10 w-6 h-6 rounded-full bg-[var(--accent)] text-[#241a05] flex items-center justify-center text-xs font-bold shadow">
+              <i class="fas fa-check"></i>
+            </div>
+
+            <!-- پیش‌نمایش SVG -->
+            <div class="bg-white p-3 border-b border-[var(--border)]" :style="{ background: t.paper }">
+              <svg viewBox="0 0 200 150" class="w-full h-auto">
+                <rect :x="t.frame === 'official' ? 4 : 6" :y="t.frame === 'official' ? 4 : 6" :width="t.frame === 'official' ? 192 : 188" :height="t.frame === 'official' ? 142 : 138" fill="none" :stroke="t.headerColor" :stroke-width="t.frame === 'bonyad' ? 3 : t.frame === 'official' || t.frame === 'color' ? 2.5 : 1.5" />
+                <rect v-if="t.frame === 'official' || t.frame === 'color'" x="9" y="9" width="182" height="132" fill="none" :stroke="t.headerColor" stroke-width="0.7" stroke-opacity="0.4" />
+                <rect v-if="t.titleBlock === 'official'" x="0" y="0" width="200" height="16" :fill="t.headerColor" />
+                <g v-if="t.grid" stroke="#1d3a6e" stroke-width="0.4" opacity="0.25">
+                  <line v-for="gx in [40, 80, 120, 160]" :key="'gx'+gx" :x1="gx" :y1="22" :x2="gx" :y2="112" />
+                  <line v-for="gy in [45, 65, 85]" :key="'gy'+gy" x1="10" :y1="gy" x2="190" :y2="gy" />
+                </g>
+                <polygon
+                  :points="polyPts"
+                  :fill="t.colorful ? 'rgba(194,65,12,0.18)' : 'rgba(122,31,31,0.07)'"
+                  :stroke="t.polygonColor"
+                  stroke-width="1.6"
+                />
+                <circle v-for="(p, i) in polyVerts" :key="'v'+i" :cx="p[0]" :cy="p[1]" r="2" :fill="t.polygonColor" />
+                <text
+                  v-for="(p, i) in polyVerts"
+                  :key="'l'+i"
+                  :x="p[0]" :y="p[1] - 6"
+                  fill="#333" font-size="7" font-weight="700" font-family="Tahoma" text-anchor="middle"
+                >{{ vertexLabel(t.vertexLabels, i) }}</text>
+                <g v-if="t.northArrow" stroke="#333" stroke-width="1">
+                  <line x1="185" y1="24" x2="185" y2="42" />
+                  <path d="M185 40 L182.5 46 L187.5 46 Z" fill="#333" stroke="none" />
+                </g>
+                <g v-if="t.scaleBar" stroke="#333" stroke-width="1.2">
+                  <line x1="14" y1="122" x2="54" y2="122" />
+                  <line x1="14" y1="120" x2="14" y2="124" />
+                  <line x1="54" y1="120" x2="54" y2="124" />
+                </g>
+                <rect v-if="t.titleBlock === 'official'" x="10" y="128" width="180" height="14" fill="none" :stroke="t.headerColor" stroke-width="0.7" />
+                <rect v-if="t.titleBlock === 'official'" x="10" y="128" width="180" height="5" :fill="t.headerColor" />
+              </svg>
+            </div>
+
+            <div class="p-3.5">
+              <div class="flex items-center justify-between mb-1">
+                <div class="font-bold text-sm">{{ t.name }}</div>
+                <i class="fas text-xs" :class="t.icon + ' text-[var(--accent)]'"></i>
+              </div>
+              <div class="text-[11px] text-[var(--accent-soft)] font-medium mb-1.5">{{ t.subtitle }}</div>
+              <p class="text-[11px] text-[var(--text-muted)] leading-5">{{ t.description }}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- نوار پیمایش -->
+      <div class="sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-[var(--bg)]/90 backdrop-blur-md border-t border-[var(--border)]">
+        <div class="flex items-center justify-between gap-3 max-w-6xl mx-auto">
+          <button class="btn btn-ghost" @click="$emit('back')">
+            <i class="fas fa-arrow-right ml-1"></i>
+            بازگشت به نقشه
+          </button>
+          <div class="flex items-center gap-3">
+            <span class="text-[11px] text-[var(--text-muted)]">
+              <i class="fas fa-layers ml-1 text-[var(--accent)]"></i>
+              قالب: {{ currentTemplate?.name }}
+            </span>
+            <button class="btn btn-primary" :disabled="!valid" @click="submit">
+              <i class="fas fa-eye ml-1"></i>
+              ثبت و پیش‌نمایش
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from "vue";
+import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel } from "../../utils/templates";
+import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
+import { logger } from "../../utils/logger";
+
+const props = defineProps({
+  pins: { type: Object, required: true },
+  form: { type: Object, required: true },
+  modelValue: { type: String, default: "technical" },
+});
+
+const emit = defineEmits(["update:modelValue", "submit", "back"]);
+
+const templates = SKETCH_TEMPLATES.map((t) => ({
+  ...t,
+  icon: TEMPLATE_ICONS[t.id] || "fa-drafting-compass",
+  paper: t.handDrawn ? "#fffdf5" : "#ffffff",
+}));
+
+const selected = computed({
+  get: () => props.modelValue,
+  set: (v) => emit("update:modelValue", v),
+});
+
+const currentTemplate = computed(() => templates.find((t) => t.id === selected.value));
+
+const polyPts = "70,55 110,40 135,70 100,92 60,80";
+const polyVerts = [
+  [70, 55],
+  [110, 40],
+  [135, 70],
+  [100, 92],
+  [60, 80],
+];
+
+const valid = computed(() => {
+  const f = props.form;
+  return Boolean(
+    f.title.trim() &&
+      f.client.trim() &&
+      f.date.trim() &&
+      eligiblePinsOf(props.pins).length,
+  );
+});
+
+const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
+
+const areaPreview = computed(() => {
+  const sel = eligiblePinsOf(props.pins).filter((p) => p.shape?.type === "polygon");
+  return sel.length ? "—" : "۰ m²";
+});
+
+function select(id) {
+  selected.value = id;
+  logger.info("template", "انتخاب قالب", { id });
+}
+
+function submit() {
+  if (!valid.value) return;
+  logger.info("step", "ثبت اطلاعات و انتخاب قالب", { template: selected.value });
+  emit("submit");
+}
+</script>

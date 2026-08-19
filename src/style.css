@@ -13,33 +13,34 @@
 }
 
 :root {
-  --bg: #0f1117;
-  --bg-elevated: #14161f;
-  --surface: #1a1d27;
-  --surface2: #22263a;
-  --surface3: #2b3047;
-  --border: #2e3348;
-  --border-strong: #3a4060;
-  --accent: #e8843c;
-  --accent-soft: #ffa15c;
-  --accent-dim: #8a4514;
-  --accent-glow: rgba(232, 132, 60, 0.08);
-  --accent-glow-strong: rgba(232, 132, 60, 0.16);
+  --bg: #0a1120;
+  --bg-elevated: #0e1728;
+  --surface: #101c33;
+  --surface2: #15233d;
+  --surface3: #1c2f4f;
+  --border: #1d2f4e;
+  --border-strong: #2b4470;
 
-  --accent-rgb: 232 132 60;
-  --accent-soft-rgb: 255 161 92;
-  --accent-dim-rgb: 138 69 20;
-  --text: #e8eaf0;
-  --text-muted: #7b82a0;
-  --text-faint: #5a6080;
-  --danger: #ff5572;
-  --danger-glow: rgba(255, 85, 114, 0.12);
-  --success: #3ecf8e;
-  --success-glow: rgba(62, 207, 142, 0.12);
-  --warning: #d4a24a;
-  --warning-glow: rgba(212, 162, 74, 0.12);
-  --info: #5ea3ff;
-  --info-glow: rgba(94, 163, 255, 0.12);
+  --accent: #e0b350;
+  --accent-soft: #edc978;
+  --accent-dim: #8f6a1f;
+  --accent-glow: rgba(224, 179, 80, 0.09);
+  --accent-glow-strong: rgba(224, 179, 80, 0.18);
+
+  --accent-rgb: 224 179 80;
+  --accent-soft-rgb: 237 201 120;
+  --accent-dim-rgb: 143 106 31;
+  --text: #e9eef8;
+  --text-muted: #8a96b5;
+  --text-faint: #5f6c8c;
+  --danger: #f0616d;
+  --danger-glow: rgba(240, 97, 109, 0.14);
+  --success: #4ade80;
+  --success-glow: rgba(74, 222, 128, 0.12);
+  --warning: #f0c75e;
+  --warning-glow: rgba(240, 199, 94, 0.12);
+  --info: #6ea8ff;
+  --info-glow: rgba(110, 168, 255, 0.12);
 
   --radius: 10px;
   --radius-sm: 8px;
@@ -54,8 +55,8 @@
   --font: 'Vazirmatn', 'Vazir', system-ui, sans-serif;
   --top: 50px;
 
-  --card-bg-rgb: 26, 29, 39;
-  --border-rgb: 46, 51, 72;
+  --card-bg-rgb: 16, 28, 51;
+  --border-rgb: 29, 47, 78;
 
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -79,9 +80,9 @@ html {
 
 body {
   background:
-    radial-gradient(circle at 15% 0%, rgba(232, 132, 60, 0.04), transparent 40%),
-    radial-gradient(circle at 85% 15%, rgba(62, 207, 142, 0.03), transparent 40%),
-    radial-gradient(circle at 50% 100%, rgba(94, 163, 255, 0.03), transparent 45%),
+    radial-gradient(circle at 12% 0%, rgba(224, 179, 80, 0.06), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(29, 58, 110, 0.45), transparent 48%),
+    radial-gradient(circle at 50% 100%, rgba(110, 168, 255, 0.05), transparent 45%),
     var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -178,13 +179,14 @@ button {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-  color: #fff;
-  box-shadow: 0 4px 14px var(--accent-glow);
+  background: linear-gradient(135deg, #d9a63c, #e8c36a);
+  color: #241a05;
+  box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
+
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-  box-shadow: 0 6px 22px var(--accent-glow-strong);
+  filter: brightness(1.07);
+  box-shadow: 0 6px 22px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
 }
 
@@ -312,6 +314,20 @@ tbody tr:hover {
 .modal-leave-to > div {
   opacity: 0;
   transform: translateY(14px) scale(0.96);
+}
+
+/* Step transitions (wizard) */
+.step-enter-active,
+.step-leave-active {
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+}
+.step-enter-from {
+  opacity: 0;
+  transform: translateY(16px);
+}
+.step-leave-to {
+  opacity: 0;
+  transform: translateY(-12px);
 }
 
 } /* end @layer components */
