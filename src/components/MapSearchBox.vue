@@ -385,18 +385,40 @@ async function performSearch() {
   }
 }
 
-const flyToLocation = (item) => {
+function clearSearchMarker() {
+  if (searchMarker) {
+    try {
+      searchMarker.remove();
+    } catch (e) {}
+    searchMarker = null;
+  }
+}
+
+function clearCoordMarker() {
+  if (coordMarker) {
+    try {
+      coordMarker.remove();
+    } catch (e) {}
+    coordMarker = null;
+  }
+}
+
+function flyToLocation(item) {
   if (!props.map || !item.geom) return;
   const [lng, lat] = item.geom.coordinates;
   props.map.flyTo({ center: [lng, lat], zoom: 16, essential: true });
-  if (searchMarker) searchMarker.remove();
+  clearSearchMarker();
   searchMarker = new mapboxgl.Marker({ color: "#e07b39" })
     .setLngLat([lng, lat])
     .setPopup(new mapboxgl.Popup().setText(item.title || "مکان انتخاب شده"))
     .addTo(props.map);
 };
 
-const closePanel = () => emit("update:open", false);
+const closePanel = () => {
+  clearSearchMarker();
+  clearCoordMarker();
+  emit("update:open", false);
+};
 const clearSearch = () => {
   searchText.value = "";
   results.value = [];
@@ -411,7 +433,7 @@ const clearResults = () => {
 
 function placeCoordMarker(lon, lat) {
   if (!props.map) return;
-  if (coordMarker) coordMarker.remove();
+  clearCoordMarker();
   coordMarker = new mapboxgl.Marker({ color: "#ea580c" })
     .setLngLat([lon, lat])
     .addTo(props.map);

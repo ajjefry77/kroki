@@ -238,7 +238,15 @@ async function onKmlChange(e) {
           const ring = single.coordinates[0];
           if (!ring || ring.length < 3) continue;
           shapeType = "polygon";
-          positions = ring.map((c) => ({ lon: c[0], lat: c[1], height: 0 }));
+          const pts = ring.map((c) => ({ lon: c[0], lat: c[1], height: 0 }));
+          if (
+            pts.length > 2 &&
+            pts[0].lon === pts[pts.length - 1].lon &&
+            pts[0].lat === pts[pts.length - 1].lat
+          ) {
+            pts.pop();
+          }
+          positions = pts;
         } else {
           if (!single.coordinates || single.coordinates.length < 2) continue;
           shapeType = "polyline";

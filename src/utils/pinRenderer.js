@@ -11,6 +11,7 @@ export function renderPinOnMap(map, pin) {
 
   if (s.type === "polyline" || s.type === "polygon") {
     const coords = s.positions.map((p) => [p.lon, p.lat]);
+    if (s.type === "polygon") coords.push(coords[0]);
     map.addSource(sourceId, {
       type: "geojson",
       data: {

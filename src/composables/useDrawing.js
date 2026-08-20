@@ -837,7 +837,6 @@ export function useDrawing(map, pins) {
       };
     } else if (draw === "polygon") {
       const coords = pos.map((p) => ({ lon: p.lng, lat: p.lat, height: 0 }));
-      coords.push(coords[0]);
       shape.value = {
         type: "polygon",
         positions: coords,
