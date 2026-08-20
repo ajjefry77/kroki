@@ -26,6 +26,83 @@
             <i class="fas fa-bug text-[var(--accent)]"></i>
             <span>گزارش</span>
           </button>
+
+          <template v-if="authed">
+            <div class="relative">
+              <button
+                class="flex items-center gap-2 h-10 rounded-full border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] transition"
+                title="حساب کاربری"
+                @click.stop="menuOpen = !menuOpen"
+              >
+                <span
+                  class="w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] text-[#241a05] font-extrabold text-sm shadow-md shadow-[var(--accent-glow)]"
+                >
+                  <span v-if="avatarChar">{{ avatarChar }}</span>
+                  <i v-else class="fas fa-user text-xs"></i>
+                </span>
+                <i class="fas fa-chevron-down text-[10px] text-[var(--text-muted)] transition" :class="menuOpen ? 'rotate-180' : ''"></i>
+              </button>
+
+              <Transition name="drop">
+                <div
+                  v-if="menuOpen"
+                  class="absolute left-0 mt-2 w-64 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden profile-menu"
+                >
+                  <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50">
+                    <div class="flex items-center gap-3">
+                      <span class="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] text-[#241a05] font-extrabold text-base">
+                        <span v-if="avatarChar">{{ avatarChar }}</span>
+                        <i v-else class="fas fa-user text-sm"></i>
+                      </span>
+                      <div class="min-w-0">
+                        <div class="text-sm font-bold truncate">{{ userName }}</div>
+                        <div class="text-[11px] text-[var(--text-muted)] mt-0.5">اعتبار حساب</div>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+                      <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2">
+                        <div class="text-[10px] text-[var(--text-muted)] mb-0.5 flex items-center gap-1">
+                          <i class="fas fa-wallet text-[var(--success)]"></i> کیف پول
+                        </div>
+                        <div class="font-extrabold text-[var(--success)]" dir="ltr">{{ fmtMoney(wallet) }} <span class="text-[10px] font-medium text-[var(--text-muted)]">تومان</span></div>
+                      </div>
+                      <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2">
+                        <div class="text-[10px] text-[var(--text-muted)] mb-0.5 flex items-center gap-1">
+                          <i class="fas fa-gift text-[var(--info)]"></i> رایگان
+                        </div>
+                        <div class="font-extrabold text-[var(--info)]">{{ free }} <span class="text-[10px] font-medium text-[var(--text-muted)]">کروکی</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button class="menu-item" @click="$emit('panel'); menuOpen = false">
+                    <i class="fas fa-user text-[var(--accent)]"></i>
+                    پنل کاربری
+                  </button>
+                  <button class="menu-item" @click="$emit('panel'); menuOpen = false">
+                    <i class="fas fa-money-bill-wave text-[var(--success)]"></i>
+                    اعتبار حساب
+                  </button>
+                  <button v-if="isAdmin" class="menu-item" @click="$emit('admin'); menuOpen = false">
+                    <i class="fas fa-shield-halved text-[var(--accent)]"></i>
+                    پنل مدیریت
+                  </button>
+
+                  <div class="border-t border-[var(--border)]"></div>
+                  <button class="menu-item !text-[var(--danger)]" @click="$emit('logout')">
+                    <i class="fas fa-right-from-bracket"></i>
+                    خروج
+                  </button>
+                </div>
+              </Transition>
+            </div>
+          </template>
+
+          <button v-else class="btn btn-ghost h-9" @click="$emit('login')">
+            <i class="fas fa-right-to-bracket ml-1"></i>
+            ورود / ثبت‌نام
+          </button>
+
           <button class="btn btn-primary" @click="$emit('start')">
             <i class="fas fa-play ml-1"></i>
             شروع
@@ -168,6 +245,19 @@
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div
+            v-for="t in customCards"
+            :key="t.id"
+            class="rounded-xl border-2 p-4 text-center transition reveal"
+            :style="{ borderColor: t.headerColor + '66' }"
+            title="قالب شخصی شما"
+          >
+            <div class="w-10 h-10 mx-auto rounded-lg mb-3 flex items-center justify-center" style="background: rgba(224, 123, 57, 0.14); color: var(--accent)">
+              <i class="fas fa-crown"></i>
+            </div>
+            <div class="text-sm font-bold">{{ t.name }}</div>
+            <div class="text-[10px] text-[var(--text-muted)] mt-1">{{ t.subtitle }}</div>
+          </div>
+          <div
             v-for="t in templates"
             :key="t.id"
             class="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-center hover:border-[var(--accent)]/50 transition reveal"
@@ -233,10 +323,19 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue";
-import { SKETCH_TEMPLATES, TEMPLATE_ICONS } from "../utils/templates";
+import { computed, ref, onMounted, onBeforeUnmount } from "vue";
+import { SKETCH_TEMPLATES, TEMPLATE_ICONS, getUserTemplates } from "../utils/templates";
+import { fmtMoney } from "../stores/auth";
 
-defineEmits(["start", "toggleLog"]);
+const props = defineProps({
+  authed: { type: Boolean, default: false },
+  userName: { type: String, default: "" },
+  isAdmin: { type: Boolean, default: false },
+  wallet: { type: Number, default: 0 },
+  free: { type: Number, default: 0 },
+});
+
+defineEmits(["start", "toggleLog", "login", "panel", "admin", "logout"]);
 
 const features = [
   { icon: "fa-map-marked-alt", title: "ترسیم تعاملی روی نقشه", desc: "خط، پلی‌گان، دایره و نقاط چندگانه را مستقیم روی تصویر ماهواره‌ای ترسیم کنید." },
@@ -263,6 +362,21 @@ const templates = SKETCH_TEMPLATES.map((t) => ({
   icon: TEMPLATE_ICONS[t.id] || "fa-drafting-compass",
 }));
 
+const customCards = computed(() => getUserTemplates());
+
+const menuOpen = ref(false);
+const avatarChar = computed(() => {
+  const n = (props.userName || "").trim();
+  return n ? n[0] : "";
+});
+
+function onDocClick() {
+  menuOpen.value = false;
+}
+function onEscape(e) {
+  if (e.key === "Escape") menuOpen.value = false;
+}
+
 function hexToRgb(hex) {
   const h = hex.replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
@@ -272,6 +386,8 @@ function hexToRgb(hex) {
 }
 
 onMounted(() => {
+  document.addEventListener("click", onDocClick);
+  document.addEventListener("keydown", onEscape);
   const io = new IntersectionObserver(
     (entries) => {
       entries.forEach((e) => {
@@ -281,6 +397,11 @@ onMounted(() => {
     { threshold: 0.12 },
   );
   document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocClick);
+  document.removeEventListener("keydown", onEscape);
 });
 </script>
 
@@ -313,5 +434,47 @@ onMounted(() => {
 .reveal.visible {
   opacity: 1;
   transform: none;
+}
+
+.menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-align: right;
+}
+.menu-item i {
+  width: 1rem;
+  text-align: center;
+}
+.menu-item:hover {
+  background: var(--surface2);
+}
+
+.profile-menu {
+  animation: menu-in 0.18s var(--ease-out);
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.drop-enter-active {
+  animation: menu-in 0.18s var(--ease-out);
+}
+.drop-leave-active {
+  animation: menu-out 0.15s ease-in;
+}
+@keyframes menu-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-6px) scale(0.98); }
 }
 </style>

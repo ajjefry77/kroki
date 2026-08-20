@@ -2,72 +2,93 @@
   <div class="h-screen flex flex-col overflow-hidden bg-[var(--bg)]">
     <LogPanel v-model="logOpen" />
 
-    <LandingPage v-if="step === 'landing'" @start="start" @toggleLog="logOpen = !logOpen" />
+    <AuthView v-if="page === 'auth'" @back="goHome" @success="onAuthSuccess" />
+
+    <UserPanel v-else-if="page === 'panel'" @home="goHome" />
+
+    <AdminPanel v-else-if="page === 'admin'" @home="goHome" />
 
     <template v-else>
-      <WizardHeader
-        :steps="steps"
-        :current="step"
-        :reached-index="reachedIndex"
-        :log-count="logStats.error"
-        @navigate="navigate"
+      <LandingPage
+        v-if="step === 'landing'"
+        :authed="auth.isAuthenticated.value"
+        :user-name="auth.state.user?.name"
+        :is-admin="auth.isAdmin.value"
+        :wallet="auth.walletOf()"
+        :free="auth.freeOf()"
+        @start="start"
         @toggleLog="logOpen = !logOpen"
+        @login="openAuth('landing')"
+        @panel="openPanel"
+        @admin="openAdmin"
+        @logout="logout"
       />
 
-      <div class="flex-1 min-h-0 flex flex-col">
-        <Transition name="step" mode="out-in">
-          <DrawStep
-            v-if="step === 'draw'"
-            key="draw"
-            :pins="pins"
-            @mapReady="onMapReady"
-            @removePin="removePin"
-            @submit="onDrawSubmit"
-            @back="go('landing')"
-          />
+      <template v-else>
+        <WizardHeader
+          :steps="steps"
+          :current="step"
+          :reached-index="reachedIndex"
+          :log-count="logStats.error"
+          @navigate="navigate"
+          @toggleLog="logOpen = !logOpen"
+        />
 
-          <InfoStep
-            v-else-if="step === 'info'"
-            key="info"
-            :pins="pins"
-            :form="krokiForm"
-            v-model="templateId"
-            @submit="onInfoSubmit"
-            @back="go('draw')"
-          />
+        <div class="flex-1 min-h-0 flex flex-col">
+          <Transition name="step" mode="out-in">
+            <DrawStep
+              v-if="step === 'draw'"
+              key="draw"
+              :pins="pins"
+              @mapReady="onMapReady"
+              @removePin="removePin"
+              @submit="onDrawSubmit"
+              @back="go('landing')"
+            />
 
-          <PreviewStep
-            v-else-if="step === 'preview'"
-            key="preview"
-            :gen="gen"
-            :template-id="templateId"
-            @back="go('info')"
-            @pay="go('payment')"
-          />
+            <InfoStep
+              v-else-if="step === 'info'"
+              key="info"
+              :pins="pins"
+              :form="krokiForm"
+              v-model="templateId"
+              @submit="onInfoSubmit"
+              @back="go('draw')"
+            />
 
-          <PaymentStep
-            v-else-if="step === 'payment'"
-            key="payment"
-            :gen="gen"
-            :pins="pins"
-            :form="krokiForm"
-            :template-id="templateId"
-            @back="go('preview')"
-            @done="onPaymentDone"
-          />
+            <PreviewStep
+              v-else-if="step === 'preview'"
+              key="preview"
+              :gen="gen"
+              :template-id="templateId"
+              @back="go('info')"
+              @pay="go('payment')"
+            />
 
-          <DownloadStep
-            v-else-if="step === 'done'"
-            key="done"
-            :gen="gen"
-            :form="krokiForm"
-            :template-id="templateId"
-            :tracking-code="trackingCode"
-            @restart="restart"
-            @home="go('landing')"
-          />
-        </Transition>
-      </div>
+            <PaymentStep
+              v-else-if="step === 'payment'"
+              key="payment"
+              :gen="gen"
+              :pins="pins"
+              :form="krokiForm"
+              :template-id="templateId"
+              @back="go('preview')"
+              @done="onPaymentDone"
+            />
+
+            <DownloadStep
+              v-else-if="step === 'done'"
+              key="done"
+              :gen="gen"
+              :form="krokiForm"
+              :template-id="templateId"
+              :tracking-code="trackingCode"
+              @restart="restart"
+              @home="go('landing')"
+            />
+          </Transition>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -76,10 +97,14 @@
 import { ref, reactive, watch, computed } from "vue";
 import { useKrokiGenerator, getTodayJalali } from "./composables/useKrokiGenerator";
 import { logger } from "./utils/logger";
+import { auth } from "./stores/auth";
 
 import LandingPage from "./components/LandingPage.vue";
 import WizardHeader from "./components/WizardHeader.vue";
 import LogPanel from "./components/LogPanel.vue";
+import AuthView from "./components/AuthView.vue";
+import UserPanel from "./components/UserPanel.vue";
+import AdminPanel from "./components/AdminPanel.vue";
 import DrawStep from "./components/steps/DrawStep.vue";
 import InfoStep from "./components/steps/InfoStep.vue";
 import PreviewStep from "./components/steps/PreviewStep.vue";
@@ -94,8 +119,11 @@ const steps = [
   { id: "done", label: "دانلود" },
 ];
 
+const page = ref("app");
 const step = ref("landing");
 const reachedIndex = ref(0);
+const authReturn = ref("landing");
+
 const pins = reactive([]);
 const map = ref(null);
 const templateId = ref("technical");
@@ -133,8 +161,46 @@ function navigate(id) {
   go(id);
 }
 
+/* ---------- احراز هویت و صفحات ---------- */
+function goHome() {
+  page.value = "app";
+  step.value = "landing";
+}
+
+function openAuth(returnTo) {
+  authReturn.value = returnTo;
+  page.value = "auth";
+}
+
+function onAuthSuccess() {
+  if (authReturn.value === "start") {
+    page.value = "app";
+    start();
+  } else {
+    goHome();
+  }
+}
+
+function openPanel() {
+  page.value = "panel";
+}
+
+function openAdmin() {
+  page.value = auth.isAdmin.value ? "admin" : "panel";
+}
+
+function logout() {
+  auth.logout();
+  logger.info("auth", "خروج از حساب کاربری");
+  restart();
+}
+
 function start() {
-  logger.info("step", "شروع فرآیند ساخت کروکی از صفحه اصلی");
+  if (!auth.isAuthenticated.value) {
+    openAuth("start");
+    return;
+  }
+  logger.info("step", "شروع فرآیند ساخت کروکی");
   reachedIndex.value = 0;
   step.value = "draw";
 }

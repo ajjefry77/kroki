@@ -104,7 +104,7 @@
           <div>
             <h2 class="font-bold text-sm">قالب کروکی</h2>
             <p class="text-[11px] text-[var(--text-muted)]">
-              مدل و قالب خروجی را انتخاب کنید — ۶ قالب استاندارد بر اساس رویه‌های سازمان‌های مختلف
+              قالب استاندارد یا قالب شخصی‌تان را انتخاب کنید — قالب‌های شخصی از پنل کاربری ساخته می‌شوند
             </p>
           </div>
         </div>
@@ -199,7 +199,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
-import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel } from "../../utils/templates";
+import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel, getUserTemplates } from "../../utils/templates";
 import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
 
@@ -211,11 +211,19 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "submit", "back"]);
 
-const templates = SKETCH_TEMPLATES.map((t) => ({
-  ...t,
-  icon: TEMPLATE_ICONS[t.id] || "fa-drafting-compass",
-  paper: t.handDrawn ? "#fffdf5" : "#ffffff",
-}));
+const templates = computed(() => {
+  const builtin = SKETCH_TEMPLATES.map((t) => ({
+    ...t,
+    icon: TEMPLATE_ICONS[t.id] || "fa-drafting-compass",
+    paper: t.handDrawn ? "#fffdf5" : "#ffffff",
+  }));
+  const custom = getUserTemplates().map((t) => ({
+    ...t,
+    icon: "fa-crown",
+    paper: t.handDrawn ? "#fffdf5" : "#ffffff",
+  }));
+  return [...custom, ...builtin];
+});
 
 const selected = computed({
   get: () => props.modelValue,
@@ -242,7 +250,7 @@ function onLogoChange(e) {
   reader.readAsDataURL(file);
 }
 
-const currentTemplate = computed(() => templates.find((t) => t.id === selected.value));
+const currentTemplate = computed(() => templates.value.find((t) => t.id === selected.value));
 
 const polyPts = "70,55 110,40 135,70 100,92 60,80";
 const polyVerts = [

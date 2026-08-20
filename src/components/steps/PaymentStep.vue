@@ -13,6 +13,9 @@
           </p>
           <p class="text-xs text-[var(--text-muted)] mb-8">
             کروکی شما آماده دانلود است.
+            <span v-if="payMode === 'free'" class="block mt-1 text-[var(--info)]">
+              <i class="fas fa-gift ml-1"></i>از کروکی رایگان شما استفاده شد ({{ remainingFree }} عدد باقی‌مانده)
+            </span>
           </p>
           <button class="btn btn-primary !px-10 !py-3.5 !text-base !rounded-xl" @click="$emit('done')">
             <i class="fas fa-download ml-2"></i>
@@ -24,12 +27,11 @@
       <!-- پرداخت -->
       <template v-if="!success">
         <div class="text-center mb-8">
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--success)]/30 bg-[var(--success-glow)] text-[var(--success)] text-xs font-medium mb-3">
-            <i class="fas fa-lock"></i>
-            درگاه پرداخت امن — نمادین
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent-glow)] text-[var(--accent-soft)] text-xs font-medium mb-3">
+            <i class="fas fa-wallet"></i>
+            پرداخت از کیف پول
           </div>
           <h2 class="font-extrabold text-2xl">پرداخت هزینه کروکی</h2>
-          <p class="text-xs text-[var(--text-muted)] mt-2">این مرحله صرفاً برای نمایش گردش‌کار است و پرداخت واقعی انجام نمی‌شود.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-5 gap-5">
@@ -52,134 +54,135 @@
                 <span class="text-[var(--text-muted)]">تعداد ترسیم</span>
                 <span class="font-medium">{{ eligibleCount }} مورد</span>
               </div>
-              <div class="flex items-center justify-between text-xs">
-                <span class="text-[var(--text-muted)]">مساحت</span>
-                <span class="font-medium">{{ gen.state.areaM2.toFixed(2) }} m²</span>
-              </div>
               <div class="border-t border-[var(--border)] pt-3 flex items-center justify-between">
-                <span class="text-xs text-[var(--text-muted)]">مبلغ قابل پرداخت</span>
+                <span class="text-xs text-[var(--text-muted)]">مبلغ هر کروکی</span>
                 <span class="font-extrabold text-[var(--accent-soft)] text-lg">{{ formatPrice(price) }}</span>
               </div>
             </div>
           </div>
 
-          <!-- فرم پرداخت -->
+          <!-- پرداخت -->
           <div class="md:col-span-3 card !rounded-2xl">
             <div class="font-bold text-sm mb-4 flex items-center gap-2">
               <i class="fas fa-credit-card text-[var(--accent)]"></i>
-              اطلاعات پرداخت
+              روش پرداخت
             </div>
 
-            <div class="grid grid-cols-2 gap-3 mb-5">
-              <button
-                v-for="m in methods"
-                :key="m.id"
-                class="rounded-xl border-2 p-3 text-center transition"
-                :class="method === m.id ? 'border-[var(--accent)] bg-[var(--accent-glow)]' : 'border-[var(--border)] hover:border-[var(--border-strong)]'"
-                @click="method = m.id"
-              >
-                <i class="fas text-xl" :class="m.icon + ' ' + (method === m.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]')"></i>
-                <div class="text-xs font-medium mt-1.5">{{ m.label }}</div>
-              </button>
-            </div>
+            <!-- کروکی رایگان -->
+            <label
+              class="rounded-xl border-2 p-4 mb-3 flex items-start gap-3 cursor-pointer transition"
+              :class="freeKroki > 0 && payMode === 'free' ? 'border-[var(--success)] bg-[var(--success-glow)]' : 'border-[var(--border)]'"
+            >
+              <input type="radio" value="free" v-model="payMode" :disabled="freeKroki <= 0" class="mt-1" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <i class="fas fa-gift text-[var(--success)]"></i>
+                  <strong class="text-sm">استفاده از کروکی رایگان</strong>
+                  <span class="px-2 py-0.5 rounded-full bg-[var(--success-glow)] border border-[var(--success)]/30 text-[var(--success)] text-[10px] font-bold">{{ freeKroki }} عدد باقی‌مانده</span>
+                </div>
+                <p class="text-[11px] text-[var(--text-muted)] mt-1">هزینه کروکی از سهمیه رایگان شما کسر می‌شود.</p>
+              </div>
+            </label>
 
-            <!-- درگاه آنلاین -->
-            <div v-if="method === 'online'" class="space-y-4">
-              <div>
-                <label class="block mb-1.5 text-xs font-medium">شماره کارت</label>
-                <input
-                  v-model="card.number"
-                  type="text"
-                  class="input text-center tracking-widest"
-                  placeholder="0000-0000-0000-0000"
-                  dir="ltr"
-                  maxlength="19"
-                  @input="formatCard"
-                />
-              </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block mb-1.5 text-xs font-medium">تاریخ انقضا</label>
-                  <input
-                    v-model="card.expiry"
-                    type="text"
-                    class="input text-center"
-                    placeholder="MM/YY"
-                    dir="ltr"
-                    maxlength="5"
-                  />
+            <!-- کیف پول -->
+            <label
+              class="rounded-xl border-2 p-4 mb-3 flex items-start gap-3 cursor-pointer transition"
+              :class="payMode === 'wallet' ? 'border-[var(--accent)] bg-[var(--accent-glow)]' : 'border-[var(--border)]'"
+            >
+              <input type="radio" value="wallet" v-model="payMode" :disabled="freeKroki > 0" class="mt-1" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <i class="fas fa-wallet text-[var(--accent)]"></i>
+                  <strong class="text-sm">پرداخت از کیف پول</strong>
                 </div>
-                <div>
-                  <label class="block mb-1.5 text-xs font-medium">CVV2</label>
-                  <input
-                    v-model="card.cvv"
-                    type="password"
-                    class="input text-center"
-                    placeholder="•••"
-                    dir="ltr"
-                    maxlength="4"
-                  />
+                <p class="text-[11px] text-[var(--text-muted)] mt-1">موجودی فعلی کیف پول شما:</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="font-extrabold text-xl" :class="wallet >= price ? 'text-[var(--success)]' : 'text-[var(--danger)]'" dir="ltr">{{ formatPrice(wallet) }}</span>
+                  <span v-if="wallet < price" class="text-[11px] font-semibold text-[var(--danger)]">— کافی نیست (کمبود {{ formatPrice(price - wallet) }})</span>
                 </div>
               </div>
-              <div>
-                <label class="block mb-1.5 text-xs font-medium">توضیحات پرداخت (اختیاری)</label>
-                <input v-model="card.note" type="text" class="input" placeholder="کد پیگیری یا توضیحات" />
-              </div>
-            </div>
+            </label>
 
-            <!-- کارت به کارت -->
-            <div v-else class="space-y-4">
-              <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4">
-                <div class="text-xs font-semibold text-[var(--text-muted)] mb-3 flex items-center gap-1.5">
-                  <i class="fas fa-money-bill-transfer text-[var(--accent)]"></i>
-                  مبلغ را به این کارت واریز کنید
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <div class="text-lg font-extrabold tracking-widest text-center" dir="ltr">{{ bankCard }}</div>
-                    <div class="text-[11px] text-[var(--text-muted)] mt-1 text-center">بانک ملت — به نام سامانه کروکی</div>
+            <!-- شارژ سریع -->
+            <button
+              v-if="wallet < price"
+              class="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--accent)]/50 bg-[var(--accent-glow)] py-3 text-xs font-bold text-[var(--accent-soft)] transition hover:bg-[var(--accent-glow-strong)] mb-3"
+              @click="chargeOpen = true"
+            >
+              <i class="fas fa-arrow-up-right-from-square"></i>
+              افزایش موجودی کیف پول
+            </button>
+
+            <!-- مودال شارژ -->
+            <Transition name="modal">
+              <Teleport to="body">
+                <div v-if="chargeOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="chargeOpen = false">
+                  <div class="card !rounded-2xl max-w-md w-full modal max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between mb-4">
+                      <h3 class="font-bold text-sm flex items-center gap-2">
+                        <i class="fas fa-money-bill-wave text-[var(--accent)]"></i> افزایش موجودی
+                      </h3>
+                      <button class="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)]" @click="chargeOpen = false">
+                        <i class="fas fa-xmark text-xs"></i>
+                      </button>
+                    </div>
+
+                    <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4 mb-4">
+                      <div class="text-xs font-semibold text-[var(--text-muted)] mb-2 flex items-center gap-1.5">
+                        <i class="fas fa-money-bill-transfer text-[var(--accent)]"></i>
+                        مبلغ را به این کارت واریز کنید
+                      </div>
+                      <div class="flex items-center justify-between gap-3">
+                        <div>
+                          <div class="text-lg font-extrabold tracking-widest text-center" dir="ltr">{{ bankCard }}</div>
+                          <div class="text-[11px] text-[var(--text-muted)] mt-1 text-center">{{ cardOwner }}</div>
+                        </div>
+                        <button class="btn btn-ghost btn-xs shrink-0" @click="copyCard">
+                          <i class="fas mr-0.5" :class="copied ? 'fa-check' : 'fa-copy'"></i>
+                          {{ copied ? "کپی شد" : "کپی" }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <label class="block mb-1.5 text-xs font-medium">مبلغ (تومان)</label>
+                    <input v-model.number="charge.amount" type="number" min="10000" step="10000" class="input mb-3" dir="ltr" placeholder="مبلغ دلخواه" />
+
+                    <label class="block mb-1.5 text-xs font-medium">شماره کارت مبدأ *</label>
+                    <input v-model="charge.card" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" maxlength="19" placeholder="0000-0000-0000-0000" @input="formatCard" />
+
+                    <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
+                    <input v-model="charge.paymentId" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" maxlength="16" placeholder="شناسه ۱۶ رقمی پیامک شده" @input="formatPaymentId" />
+
+                    <button class="btn btn-primary w-full !py-2.5" :disabled="!chargeValid" @click="submitCharge">
+                      <i class="fas fa-paper-plane ml-1"></i> ثبت درخواست شارژ
+                    </button>
+                    <p class="text-[11px] text-[var(--text-faint)] mt-3 leading-5 text-center">
+                      درخواست شما برای مدیر ارسال می‌شود. پس از تأیید، موجودی به صورت خودکار قابل مشاهده است.
+                    </p>
+
+                    <Transition name="modal">
+                      <div v-if="chargeMsg" class="mt-3 rounded-xl px-4 py-3 text-sm font-medium" :class="chargeMsgOk ? 'bg-[var(--success-glow)] border border-[var(--success)]/30 text-[var(--success)]' : 'bg-[var(--danger-glow)] border border-[var(--danger)]/30 text-[var(--danger)]'">
+                        <i class="fas ml-1" :class="chargeMsgOk ? 'fa-circle-check' : 'fa-circle-xmark'"></i>{{ chargeMsg }}
+                      </div>
+                    </Transition>
                   </div>
-                  <button class="btn btn-ghost btn-xs flex-shrink-0" @click="copyCard">
-                    <i class="fas mr-1" :class="copied ? 'fa-check' : 'fa-copy'"></i>
-                    {{ copied ? 'کپی شد' : 'کپی' }}
-                  </button>
                 </div>
-              </div>
-              <div>
-                <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
-                <input
-                  v-model="card.paymentId"
-                  type="text"
-                  class="input text-center tracking-widest"
-                  placeholder="شناسه ۱۶ رقمی پیامک شده"
-                  dir="ltr"
-                  maxlength="16"
-                  @input="formatPaymentId"
-                />
-                <p class="text-[10px] text-[var(--text-faint)] mt-1.5">
-                  <i class="fas fa-circle-info ml-1"></i>
-                  پس از واریز، شناسه پرداخت درج‌شده در پیامک تأیید بانک را وارد کنید.
-                </p>
-              </div>
-              <div>
-                <label class="block mb-1.5 text-xs font-medium">توضیحات پرداخت (اختیاری)</label>
-                <input v-model="card.note" type="text" class="input" placeholder="کد پیگیری یا توضیحات" />
-              </div>
-            </div>
+              </Teleport>
+            </Transition>
 
             <div v-if="processing" class="mt-6 py-4 flex flex-col items-center gap-3">
               <i class="fas fa-circle-notch fa-spin text-2xl text-[var(--accent)]"></i>
-              <span class="text-xs text-[var(--text-muted)]">در حال اتصال به درگاه بانکی…</span>
+              <span class="text-xs text-[var(--text-muted)]">در حال پردازش پرداخت…</span>
             </div>
 
             <button
               v-else
-              class="btn btn-primary w-full !py-3.5 mt-6 !text-base"
-              :disabled="!cardValid"
+              class="btn btn-primary w-full !py-3.5 mt-4 !text-base"
+              :disabled="!canPay(payMode)"
               @click="pay"
             >
               <i class="fas fa-lock ml-2"></i>
-              پرداخت {{ formatPrice(price) }}
+              {{ payMode === 'free' ? 'استفاده از کروکی رایگان' : 'پرداخت ' + formatPrice(price) }}
             </button>
           </div>
         </div>
@@ -200,6 +203,7 @@ import { ref, reactive, computed, onMounted } from "vue";
 import { getTemplate } from "../../utils/templates";
 import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
+import { auth, fmtMoney } from "../../stores/auth";
 
 const props = defineProps({
   gen: { type: Object, required: true },
@@ -210,41 +214,44 @@ const props = defineProps({
 
 const emit = defineEmits(["back", "done"]);
 
-const method = ref("online");
+const price = auth.KROKI_PRICE;
+const bankCard = auth.WALLET_CARD;
+const cardOwner = auth.CARD_OWNER;
+
 const processing = ref(false);
 const success = ref(false);
 const trackingCode = ref("");
-const price = 150000;
-const bankCard = "6037-9977-1234-5678";
+const payMode = ref("wallet");
+const chargeOpen = ref(false);
+const chargeMsg = ref("");
+const chargeMsgOk = ref(true);
 const copied = ref(false);
 
-const card = reactive({ number: "", expiry: "", cvv: "", note: "", paymentId: "" });
+const charge = reactive({ amount: price, card: "", paymentId: "" });
 
-const methods = [
-  { id: "online", label: "درگاه آنلاین", icon: "fa-credit-card" },
-  { id: "card", label: "کارت به کارت", icon: "fa-money-bill-transfer" },
-];
+const freeKroki = computed(() => auth.freeOf());
+const wallet = computed(() => auth.walletOf());
 
 const currentTemplate = computed(() => getTemplate(props.templateId));
 const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 
-const cardValid = computed(() => {
-  if (method.value === "card") {
-    return card.paymentId.replace(/\D/g, "").length === 16;
-  }
-  if (card.number.replace(/[\s-]/g, "").length < 16) return false;
-  if (card.expiry.length < 5) return false;
-  if (card.cvv.length < 3) return false;
-  return true;
-});
+const chargeValid = computed(() => Number(charge.amount) >= 10000 && String(charge.paymentId).replace(/\D/g, "").length >= 8 && charge.card.replace(/[\s-]/g, "").length >= 16);
 
-function formatCard() {
-  let digits = card.number.replace(/[^\d]/g, "").slice(0, 16);
-  card.number = digits.replace(/(\d{4})(?=\d)/g, "$1-");
+function canPay(mode) {
+  if (mode === "free") return freeKroki.value > 0;
+  return wallet.value >= price;
 }
 
+function formatPrice(v) {
+  return fmtMoney(v) + " تومان";
+}
+
+function formatCard() {
+  const digits = charge.card.replace(/[^\d]/g, "").slice(0, 16);
+  charge.card = digits.replace(/(\d{4})(?=\d)/g, "$1-");
+}
 function formatPaymentId() {
-  card.paymentId = card.paymentId.replace(/[^\d]/g, "").slice(0, 16);
+  charge.paymentId = charge.paymentId.replace(/[^\d]/g, "").slice(0, 16);
 }
 
 async function copyCard() {
@@ -252,31 +259,40 @@ async function copyCard() {
     await navigator.clipboard.writeText(bankCard);
     copied.value = true;
     setTimeout(() => (copied.value = false), 1800);
-  } catch (e) {}
+  } catch {}
 }
 
-function formatPrice(v) {
-  return v.toLocaleString("fa-IR") + " تومان";
+function submitCharge() {
+  const res = auth.requestCharge({ amount: charge.amount, card: charge.card, paymentId: charge.paymentId });
+  chargeMsgOk.value = res.success;
+  chargeMsg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
+  if (res.success) {
+    charge.card = "";
+    charge.paymentId = "";
+    charge.amount = price;
+  }
 }
 
 function pay() {
   processing.value = true;
-  logger.info("payment", "شروع پرداخت (نمادین)", {
-    method: method.value,
-    amount: price,
-    template: props.templateId,
-    paymentId: method.value === "card" ? card.paymentId : undefined,
-  });
   setTimeout(() => {
+    const res = auth.payForKroki();
     processing.value = false;
+    if (!res.success) {
+      alert((res.error || "پرداخت انجام نشد") + (res.need ? " — کمبود " + formatPrice(res.need) : ""));
+      if (res.error && res.error.includes("وارد")) window.location.reload();
+      return;
+    }
+    payMode.value = res.mode;
     success.value = true;
     trackingCode.value = "KRK-" + Date.now().toString(36).toUpperCase().slice(-8);
-    logger.info("payment", "پرداخت با موفقیت انجام شد", { code: trackingCode.value });
-  }, 2200);
+    logger.info("payment", "پرداخت کروکی انجام شد", { mode: res.mode, code: trackingCode.value });
+  }, 1200);
 }
 
 onMounted(() => {
-  logger.info("step", "ورود به صفحه پرداخت", { amount: price });
+  if (freeKroki.value > 0) payMode.value = "free";
+  logger.info("step", "ورود به صفحه پرداخت", { amount: price, wallet: wallet.value, free: freeKroki.value });
 });
 </script>
 

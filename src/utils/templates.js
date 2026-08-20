@@ -134,7 +134,25 @@ export const SKETCH_TEMPLATES = [
 ];
 
 export function getTemplate(id) {
-  return SKETCH_TEMPLATES.find((t) => t.id === id) || SKETCH_TEMPLATES[0];
+  const builtin = SKETCH_TEMPLATES.find((t) => t.id === id);
+  if (builtin) return builtin;
+  const custom = getUserTemplates().find((t) => t.id === id);
+  return custom || SKETCH_TEMPLATES[0];
+}
+
+export function getUserTemplates() {
+  try {
+    const uid = localStorage.getItem("kroki_session");
+    if (!uid) return [];
+    const list = JSON.parse(localStorage.getItem("kroki_tpl_" + uid) || "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function customTemplateId() {
+  return "custom_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
 export const TEMPLATE_ICONS = {

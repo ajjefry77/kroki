@@ -1,0 +1,346 @@
+<template>
+  <div class="min-h-screen flex flex-col bg-[var(--bg)]">
+    <!-- سربرگ -->
+    <header class="sticky top-0 z-40 bg-[var(--surface)] border-b border-[var(--border)] backdrop-blur-md">
+      <div class="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow-strong)]">
+            <i class="fas fa-drafting-compass text-[#241a05] text-lg"></i>
+          </div>
+          <div>
+            <div class="font-extrabold text-sm leading-tight">پنل کاربری</div>
+            <div class="text-[11px] text-[var(--text-muted)]">{{ user?.name }} — {{ user?.username }}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-ghost btn-sm" @click="$emit('home')">
+            <i class="fas fa-house ml-1"></i> صفحه اصلی
+          </button>
+          <button class="btn btn-ghost btn-sm" @click="logout">
+            <i class="fas fa-right-from-bracket ml-1"></i> خروج
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-5xl w-full mx-auto px-5 py-6">
+      <!-- آمار -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="card !rounded-2xl flex items-center gap-4">
+          <div class="w-11 h-11 rounded-xl bg-[var(--accent-glow)] border border-[var(--accent)]/30 flex items-center justify-center">
+            <i class="fas fa-wallet text-[var(--accent)]"></i>
+          </div>
+          <div>
+            <div class="text-[11px] text-[var(--text-muted)]">موجودی کیف پول</div>
+            <div class="font-extrabold text-lg" dir="ltr">{{ fmtMoney(wallet) }} <span class="text-[11px] font-medium text-[var(--text-muted)]">تومان</span></div>
+          </div>
+        </div>
+        <div class="card !rounded-2xl flex items-center gap-4">
+          <div class="w-11 h-11 rounded-xl bg-[var(--info-glow)] border border-[var(--info)]/30 flex items-center justify-center">
+            <i class="fas fa-gift text-[var(--info)]"></i>
+          </div>
+          <div>
+            <div class="text-[11px] text-[var(--text-muted)]">کروکی رایگان</div>
+            <div class="font-extrabold text-lg">{{ freeKroki }} عدد</div>
+          </div>
+        </div>
+        <div class="card !rounded-2xl flex items-center gap-4">
+          <div class="w-11 h-11 rounded-xl bg-[var(--warning-glow)] border border-[var(--warning)]/30 flex items-center justify-center">
+            <i class="fas fa-hourglass-half text-[var(--warning)]"></i>
+          </div>
+          <div>
+            <div class="text-[11px] text-[var(--text-muted)]">شارژ در انتظار تأیید</div>
+            <div class="font-extrabold text-lg">{{ pending.length }} مورد</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- تب‌ها -->
+      <div class="flex gap-1 p-1 rounded-xl border border-[var(--border)] bg-[var(--surface2)] mb-6 overflow-x-auto">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="py-2.5 px-4 rounded-lg text-sm font-semibold transition whitespace-nowrap"
+          :class="activeTab === tab.id ? 'bg-[var(--accent)] text-[#241a05] shadow' : 'text-[var(--text-muted)] hover:text-[var(--text)]'"
+          @click="activeTab = tab.id"
+        >
+          <i class="fas ml-1" :class="tab.icon"></i>{{ tab.label }}
+        </button>
+      </div>
+
+      <!-- شارژ / تاریخچه -->
+      <section v-if="activeTab === 'wallet'" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="card !rounded-2xl">
+          <div class="font-bold text-sm mb-4 flex items-center gap-2">
+            <i class="fas fa-money-bill-wave text-[var(--accent)]"></i> افزایش موجودی
+          </div>
+
+          <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4 mb-4">
+            <div class="text-xs font-semibold text-[var(--text-muted)] mb-3 flex items-center gap-1.5">
+              <i class="fas fa-money-bill-transfer text-[var(--accent)]"></i>
+              مبلغ را به این کارت واریز کنید
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-lg font-extrabold tracking-widest text-center" dir="ltr">{{ bankCard }}</div>
+                <div class="text-[11px] text-[var(--text-muted)] mt-1 text-center">{{ cardOwner }}</div>
+              </div>
+              <button class="btn btn-ghost btn-xs shrink-0" @click="copyCard">
+                <i class="fas mr-0.5" :class="copied ? 'fa-check' : 'fa-copy'"></i>
+                {{ copied ? "کپی شد" : "کپی" }}
+              </button>
+            </div>
+          </div>
+
+          <label class="block mb-1.5 text-xs font-medium">مبلغ (تومان)</label>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <button
+              v-for="p in presets"
+              :key="p"
+              class="px-3 py-1.5 rounded-lg border text-xs font-medium transition"
+              :class="amount === p ? 'border-[var(--accent)] bg-[var(--accent-glow)] text-[var(--accent-soft)]' : 'border-[var(--border)] bg-[var(--surface2)] text-[var(--text-muted)]'"
+              @click="amount = p"
+            >
+              {{ fmtMoney(p) }}
+            </button>
+          </div>
+          <input v-model.number="amount" type="number" min="10000" step="10000" class="input mb-4" dir="ltr" placeholder="مبلغ دلخواه" />
+
+          <label class="block mb-1.5 text-xs font-medium">شماره کارت مبدأ *</label>
+          <input v-model="card" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="0000-0000-0000-0000" maxlength="19" @input="formatCard" />
+
+          <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
+          <input v-model="paymentId" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="شناسه ۱۶ رقمی پیامک شده" maxlength="16" @input="formatPaymentId" />
+
+          <label class="block mb-1.5 text-xs font-medium">توضیحات (اختیاری)</label>
+          <input v-model="note" type="text" class="input mb-4" placeholder="کد پیگیری یا توضیحات" />
+
+          <button class="btn btn-primary w-full !py-3" :disabled="!validCharge" @click="submitCharge">
+            <i class="fas fa-paper-plane ml-1"></i> ثبت درخواست شارژ
+          </button>
+          <p class="text-[11px] text-[var(--text-faint)] mt-3 leading-5 text-center">
+            پس از واریز، درخواست شما برای مدیر ارسال می‌شود و پس از تأیید بلافاصله به کیف پول شما افزوده می‌شود.
+          </p>
+
+          <Transition name="modal">
+            <div v-if="msg" class="mt-4 rounded-xl px-4 py-3 text-sm font-medium" :class="msgOk ? 'bg-[var(--success-glow)] border border-[var(--success)]/30 text-[var(--success)]' : 'bg-[var(--danger-glow)] border border-[var(--danger)]/30 text-[var(--danger)]'">
+              <i class="fas ml-1" :class="msgOk ? 'fa-circle-check' : 'fa-circle-xmark'"></i>{{ msg }}
+            </div>
+          </Transition>
+        </div>
+
+        <div class="card !rounded-2xl h-fit">
+          <div class="font-bold text-sm mb-4 flex items-center gap-2">
+            <i class="fas fa-clock-rotate-left text-[var(--accent)]"></i> تاریخچه کیف پول
+          </div>
+          <div v-if="!transactions.length" class="text-center text-[var(--text-faint)] text-sm py-10">
+            هنوز تراکنشی ثبت نشده است
+          </div>
+          <ul v-else class="space-y-3">
+            <li v-for="tx in transactions" :key="tx.id" class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold">{{ tx.typeLabel }}</span>
+                <span class="text-xs font-extrabold" :class="txColor(tx)">{{ txSign(tx) }} {{ fmtMoney(tx.amount) }}</span>
+              </div>
+              <div class="flex items-center justify-between gap-2 mt-1.5">
+                <span class="text-[10px] text-[var(--text-faint)]">{{ fmtDate(tx.at) }}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold" :class="statusClass(tx.status)">{{ statusLabel(tx.status) }}</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- قالب‌ها -->
+      <section v-else-if="activeTab === 'templates'">
+        <div v-if="designing" class="card !rounded-2xl">
+          <TemplateDesigner :model-value="editingTpl" :is-new="isNewTpl" @save="onTplSave" @cancel="designing = false" @update:model-value="editingTpl = $event" />
+        </div>
+
+        <template v-else>
+          <div class="flex items-center justify-between mb-4">
+            <div class="font-bold text-sm flex items-center gap-2">
+              <i class="fas fa-layers text-[var(--accent)]"></i> قالب‌های من
+            </div>
+            <button class="btn btn-primary btn-sm" @click="startNew">
+              <i class="fas fa-plus ml-1"></i> ساخت قالب شخصی
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- قالب شخصی -->
+            <div v-for="t in customTemplates" :key="t.id" class="card !rounded-2xl p-4 relative border-2" :style="{ borderColor: t.headerColor + '55' }">
+              <div class="absolute top-3 left-3 flex items-center gap-1">
+                <button class="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition" title="ویرایش" @click="edit(t)">
+                  <i class="fas fa-pen text-xs"></i>
+                </button>
+                <button class="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--danger)] transition" title="حذف" @click="remove(t.id)">
+                  <i class="fas fa-trash text-xs"></i>
+                </button>
+              </div>
+              <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center mb-3">
+                <i class="fas fa-crown text-[#241a05] text-sm"></i>
+              </div>
+              <div class="font-bold text-sm">{{ t.name }}</div>
+              <div class="text-[11px] text-[var(--accent-soft)] font-medium mt-0.5">{{ t.subtitle }}</div>
+              <p class="text-[11px] text-[var(--text-muted)] leading-5 mt-1.5">{{ t.description }}</p>
+            </div>
+
+            <!-- قالب استاندارد -->
+            <div v-for="t in builtinCards" :key="t.id" class="card !rounded-2xl p-4">
+              <div class="w-9 h-9 rounded-lg mb-3 flex items-center justify-center" :style="{ background: 'rgba(' + hexToRgb(t.headerColor) + ',0.14)', color: t.headerColor }">
+                <i class="fas" :class="t.icon"></i>
+              </div>
+              <div class="font-bold text-sm">{{ t.name }}</div>
+              <div class="text-[11px] text-[var(--text-muted)] font-medium mt-0.5">{{ t.subtitle }}</div>
+              <p class="text-[11px] text-[var(--text-muted)] leading-5 mt-1.5">{{ t.description }}</p>
+              <span class="inline-block mt-2.5 px-2 py-0.5 rounded-full bg-[var(--surface3)] border border-[var(--border)] text-[10px] text-[var(--text-faint)]">استاندارد سامانه</span>
+            </div>
+          </div>
+        </template>
+      </section>
+    </main>
+
+    <footer class="border-t border-[var(--border)] py-4 text-center text-[11px] text-[var(--text-faint)] bg-[var(--bg-elevated)]/60">
+      سامانه تولید کروکی نقشه — پنل کاربری
+    </footer>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, watch } from "vue";
+import { auth, fmtMoney, fmtDate } from "../stores/auth";
+import { SKETCH_TEMPLATES, TEMPLATE_ICONS } from "../utils/templates";
+import TemplateDesigner from "./TemplateDesigner.vue";
+
+defineEmits(["home"]);
+
+const user = computed(() => auth.state.user);
+const wallet = computed(() => auth.walletOf());
+const freeKroki = computed(() => auth.freeOf());
+const transactions = ref([]);
+const pending = computed(() => auth.pendingOf(user.value?.id || "none"));
+
+const activeTab = ref("wallet");
+const tabs = [
+  { id: "wallet", label: "کیف پول", icon: "fa-wallet" },
+  { id: "templates", label: "قالب‌های من", icon: "fa-layers" },
+];
+
+const bankCard = auth.WALLET_CARD;
+const cardOwner = auth.CARD_OWNER;
+const copied = ref(false);
+const presets = [50000, 100000, 200000, 500000, 1000000];
+
+const amount = ref(100000);
+const card = ref("");
+const paymentId = ref("");
+const note = ref("");
+const msg = ref("");
+const msgOk = ref(true);
+
+const validCharge = computed(() => Number(amount.value) >= 10000 && String(paymentId.value).replace(/\D/g, "").length >= 8 && card.value.replace(/[\s-]/g, "").length >= 16);
+
+function formatCard() {
+  const digits = card.value.replace(/[^\d]/g, "").slice(0, 16);
+  card.value = digits.replace(/(\d{4})(?=\d)/g, "$1-");
+}
+function formatPaymentId() {
+  paymentId.value = paymentId.value.replace(/[^\d]/g, "").slice(0, 16);
+}
+
+async function copyCard() {
+  try {
+    await navigator.clipboard.writeText(bankCard);
+    copied.value = true;
+    setTimeout(() => (copied.value = false), 1800);
+  } catch {}
+}
+
+function submitCharge() {
+  const res = auth.requestCharge({ amount: amount.value, card: card.value, paymentId: paymentId.value, note: note.value });
+  msgOk.value = res.success;
+  msg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
+  if (res.success) {
+    amount.value = 100000;
+    card.value = "";
+    paymentId.value = "";
+    note.value = "";
+  }
+}
+
+function txSign(tx) {
+  if (tx.status === "rejected") return "—";
+  if (tx.type === "charge" || tx.type === "charge_request") return "+";
+  if (tx.type === "spend") return "−";
+  if (tx.type === "free") return "0";
+  return "+";
+}
+function txColor(tx) {
+  if (tx.status === "rejected") return "text-[var(--danger)]";
+  if (tx.type === "spend") return "text-[var(--danger)]";
+  if (tx.type === "free") return "text-[var(--info)]";
+  return "text-[var(--success)]";
+}
+function statusClass(s) {
+  if (s === "success" || s === "approved") return "bg-[var(--success-glow)] text-[var(--success)]";
+  if (s === "pending") return "bg-[var(--warning-glow)] text-[var(--warning)]";
+  if (s === "rejected") return "bg-[var(--danger-glow)] text-[var(--danger)]";
+  return "bg-[var(--surface3)] text-[var(--text-muted)]";
+}
+function statusLabel(s) {
+  if (s === "success" || s === "approved") return "موفق";
+  if (s === "pending") return "در انتظار";
+  if (s === "rejected") return "رد شده";
+  return s || "موفق";
+}
+
+function loadTx() {
+  transactions.value = auth.txList(user.value?.id);
+}
+
+// قالب‌ها
+const customTemplates = computed(() => auth.userTemplates(user.value?.id));
+const builtinCards = computed(() => SKETCH_TEMPLATES.map((t) => ({ ...t, icon: TEMPLATE_ICONS[t.id] || "fa-drafting-compass" })));
+
+const designing = ref(false);
+const isNewTpl = ref(true);
+const editingTpl = ref(null);
+
+function startNew() {
+  isNewTpl.value = true;
+  designing.value = true;
+}
+function edit(t) {
+  editingTpl.value = { ...t };
+  isNewTpl.value = false;
+  designing.value = true;
+}
+function onTplSave(t) {
+  auth.saveUserTemplate(t);
+  designing.value = false;
+  editingTpl.value = null;
+}
+function remove(id) {
+  auth.deleteUserTemplate(id);
+}
+
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
+function logout() {
+  auth.logout();
+  location.reload();
+}
+
+watch(activeTab, () => {
+  if (activeTab.value === "wallet") loadTx();
+});
+
+onMounted(() => loadTx());
+</script>
