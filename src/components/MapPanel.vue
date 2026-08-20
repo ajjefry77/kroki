@@ -37,10 +37,15 @@
       ref="toolbarComponent"
       :map="map"
       :drawMode="drawing?.drawMode || ''"
+      :searchActive="searchOpen"
       @toggleMeasure="drawing.toggleMeasure()"
       @setDrawMode="drawing.setDrawMode($event)"
       @openKroki="$emit('openKroki')"
+      @toggleSearch="searchOpen = !searchOpen"
     />
+
+    <!-- جستجوی آدرس / مختصات -->
+    <MapSearchBox :map="mapProxy" v-model:open="searchOpen" />
 
     <!-- فرم ذخیره ترسیم -->
     <Transition name="modal">
@@ -113,6 +118,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, reactive } from "vue";
 import mapboxgl from "mapbox-gl";
 import DrawToolbar from "./DrawToolbar.vue";
+import MapSearchBox from "./MapSearchBox.vue";
 import Loading from "./Loading.vue";
 import { useDrawing } from "../composables/useDrawing";
 import { kmlToGeoJSON, parseKMLCoords, readKmlText } from "../utils/kml";
@@ -130,6 +136,8 @@ const kmlInput = ref(null);
 const loading = ref(false);
 
 let map = null;
+const mapProxy = ref(null);
+const searchOpen = ref(false);
 const drawing = ref(null);
 
 const drawHint = computed(() => {
@@ -320,6 +328,7 @@ function initMap() {
   });
 
   map.on("load", () => {
+    mapProxy.value = map;
     drawing.value = reactive(useDrawing(map, props.pins));
     for (const p of props.pins || []) {
       if (p.shape && p.shape.type && p.type === "draw") {

@@ -70,6 +70,29 @@ function flattenPins(list) {
   return out;
 }
 
+let logoImageCache = { src: "", img: null };
+
+function loadLogoImage(src) {
+  return new Promise((resolve) => {
+    if (!src) {
+      logoImageCache = { src: "", img: null };
+      resolve(null);
+      return;
+    }
+    if (logoImageCache.src === src && logoImageCache.img) {
+      resolve(logoImageCache.img);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      logoImageCache = { src, img };
+      resolve(img);
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 export function isKrokiEligible(p) {
   return (
     p.type === "draw" &&
@@ -412,6 +435,7 @@ export function useKrokiGenerator() {
     }
     last.form = { ...form };
     last.pins = pins;
+    loadLogoImage(last.form.logo);
 
     state.generating = true;
     try {
@@ -568,6 +592,8 @@ export function useKrokiGenerator() {
   function drawHeaderBand(ctx, W, t, form) {
     if (t.titleBlock !== "official") return;
     const h = 46;
+    const hasLogo = !!logoImageCache?.img && !!form.logo;
+    const textW = hasLogo ? W - 132 : W - 24;
     ctx.fillStyle = t.headerColor;
     ctx.fillRect(0, 0, W, h);
     ctx.fillStyle = "rgba(255,255,255,0.28)";
@@ -576,14 +602,20 @@ export function useKrokiGenerator() {
     ctx.font = "700 15px Vazirmatn, Tahoma, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(truncateText(ctx, t.org, W - 24), W / 2, 16);
+    ctx.fillText(truncateText(ctx, t.org, textW), W / 2, 16);
     ctx.font = "500 11px Vazirmatn, Tahoma, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.fillText(
-      truncateText(ctx, (form.title || "کروکی") + " — تاریخ برداشت: " + (form.date || "—"), W - 24),
+      truncateText(ctx, (form.title || "کروکی") + " — تاریخ برداشت: " + (form.date || "—"), textW),
       W / 2,
       34,
     );
+    if (hasLogo) {
+      const s = 38;
+      try {
+        ctx.drawImage(logoImageCache.img, 16, (h - s) / 2, s, s);
+      } catch (e) {}
+    }
   }
 
   function drawTitleBlock(ctx, W, H, t, form, extra) {
@@ -668,8 +700,14 @@ export function useKrokiGenerator() {
     ctx.fillStyle = "#555";
     ctx.textAlign = "right";
     ctx.fillText(
-      truncateText(ctx, "نشانی: " + (form.address || "—"), bw - 20),
+      truncateText(ctx, "نشانی: " + (form.address || "—"), bw * 0.52),
       bx + 10,
+      by + 24 + rowH * 2.5,
+    );
+    ctx.textAlign = "left";
+    ctx.fillText(
+      truncateText(ctx, "عرض معبر: " + (form.streetWidth || "—"), bw * 0.36),
+      bx + bw - 10,
       by + 24 + rowH * 2.5,
     );
   }
@@ -889,16 +927,19 @@ export function useKrokiGenerator() {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      const addr = state.shapeCentroids[m]?.address || "";
-      if (addr && !t.handDrawn) {
+      const cent = state.shapeCentroids[m]?.utm || null;
+      if (cent && !t.handDrawn) {
         ctx.font = "600 12px Vazirmatn, Tahoma, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        const maxW = 230;
-        const lines = wrapCanvasText(ctx, addr, maxW);
+        const maxW = 210;
+        const lines = [
+          "X: " + cent.x.toFixed(2),
+          "Y: " + cent.y.toFixed(2),
+        ];
         const lineH = 17;
         const padV = 3;
-        const padH = 6;
+        const padH = 8;
         let boxW = 0;
         for (const line of lines) boxW = Math.max(boxW, ctx.measureText(line).width);
         boxW = Math.min(boxW + padH * 2, W - 12);
@@ -908,8 +949,11 @@ export function useKrokiGenerator() {
         let by = cp.y + 12;
         if (by + boxH > H - 8) by = cp.y - boxH - 14;
 
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
         ctx.fillRect(bx - boxW / 2, by - padV, boxW, boxH);
+        ctx.strokeStyle = "rgba(0,0,0,0.25)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx - boxW / 2, by - padV, boxW, boxH);
         ctx.fillStyle = t.centerColor;
         lines.forEach((line, i) => {
           ctx.fillText(line, bx, by + i * lineH);
@@ -1013,7 +1057,14 @@ export function useKrokiGenerator() {
       html: `
     <div class="sheet">
       <div class="head" style="border-bottom-color:${t.headerColor}">
-        <div class="head-title">${escapeHtml(last.form.title) || "کروکی وضعیت موجود"}</div>
+        <div class="head-logo-title">
+          ${
+            last.form.logo
+              ? `<img class="head-logo" src="${last.form.logo}" alt="" />`
+              : ""
+          }
+          <div class="head-title">${escapeHtml(last.form.title) || "کروکی وضعیت موجود"}</div>
+        </div>
         <div class="head-sub">قالب: ${escapeHtml(t.name)} — تاریخ برداشت: ${escapeHtml(last.form.date)}</div>
       </div>
 
@@ -1029,6 +1080,10 @@ export function useKrokiGenerator() {
         <tr>
           <td>سازمان / مرجع</td><td>${escapeHtml(t.org)}</td>
           <td>کارشناس</td><td>${escapeHtml(last.form.surveyor)}</td>
+        </tr>
+        <tr>
+          <td>عرض معبر</td><td>${escapeHtml(last.form.streetWidth) || "—"} متر</td>
+          <td>شماره پلاک ثبتی</td><td>${escapeHtml(last.form.plaque) || "—"}</td>
         </tr>
       </table>
 
@@ -1098,6 +1153,18 @@ export function useKrokiGenerator() {
 
       <div class="disclaimer">
         کلیه حدود بر اساس اظهارات و ارائه مالک برداشت شده است و نقشه‌بردار هیچ مسئولیتی در قبال تعدی به املاک مجاور و حریم‌های موجود ندارد.
+      </div>
+
+      <div class="sign-row">
+        <div class="sign-box">
+          <div class="sign-label">تاریخ: ${getTodayJalali()}</div>
+        </div>
+        <div class="sign-box">
+          <div class="sign-label">مهر و امضای کارشناس / نقشه‌بردار</div>
+        </div>
+        <div class="sign-box">
+          <div class="sign-label">امضای کارفرما / مالک</div>
+        </div>
       </div>
     </div>
   `,
@@ -1180,7 +1247,9 @@ export function useKrokiGenerator() {
 * { box-sizing: border-box; }
 body { font-family: Tahoma, 'Vazirmatn', sans-serif; margin: 0; padding: 0; color: #222; }
 .sheet { width: 176mm; margin: 0 auto; padding: 24px; }
-.head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px; }
+.head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px; }
+.head-logo-title { display: flex; align-items: center; gap: 10px; }
+.head-logo { width: 42px; height: 42px; object-fit: contain; }
 .head-title { font-size: 20px; font-weight: 700; }
 .head-sub { font-size: 12px; color: #555; }
 table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
@@ -1193,11 +1262,14 @@ figure { flex: 1; margin: 0; border: 1px solid #bbb; padding: 6px; text-align: c
 figure img { width: 100%; height: auto; display: block; }
 figcaption { font-size: 12px; color: #444; margin-top: 6px; font-weight: 600; }
 .disclaimer { font-size: 11px; color: #666; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 8px; }
+.sign-row { display: flex; gap: 12px; margin-top: 30px; page-break-inside: avoid; }
+.sign-box { flex: 1; border: 1px solid #bbb; min-height: 74px; border-radius: 6px; padding: 10px 12px; }
+.sign-label { font-size: 12px; color: #555; font-weight: 600; }
 @page { size: A4 portrait; margin: 10mm; }
 @media print {
   .sheet { padding: 0; }
   html, body { margin: 0; }
-  figure, table { page-break-inside: avoid; }
+  figure, table, .sign-row { page-break-inside: avoid; }
 }
 `;
   }

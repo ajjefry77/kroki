@@ -57,6 +57,10 @@
             <label class="block mb-1.5 font-medium text-xs">نشانی ملک</label>
             <input v-model="form.address" type="text" class="input" placeholder="استان، شهر، خیابان، کوچه، پلاک" />
           </div>
+          <div>
+            <label class="block mb-1.5 font-medium text-xs">عرض معبر</label>
+            <input v-model="form.streetWidth" type="text" class="input" placeholder="مثلاً ۱۲ متر" />
+          </div>
           <div class="lg:col-span-3">
             <label class="block mb-1.5 font-medium text-xs">توضیحات تکمیلی</label>
             <textarea
@@ -65,6 +69,28 @@
               class="input resize-none"
               placeholder="توضیحات اختیاری درباره ملک، عوارض و…"
             ></textarea>
+          </div>
+        </div>
+
+        <!-- لوگو -->
+        <div class="mt-5 pt-4 border-t border-[var(--border)] flex items-center gap-4">
+          <div class="w-16 h-16 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface2)] flex items-center justify-center overflow-hidden">
+            <img v-if="form.logo" :src="form.logo" class="w-full h-full object-contain" alt="لوگو" />
+            <i v-else class="fas fa-image text-xl text-[var(--text-faint)]"></i>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center gap-2">
+              <input ref="logoInput" type="file" accept="image/*" class="hidden" @change="onLogoChange" />
+              <button type="button" class="btn btn-ghost btn-xs" @click="logoInput?.click()">
+                <i class="fas fa-upload ml-1"></i> بارگذاری لوگو
+              </button>
+              <button v-if="form.logo" type="button" class="btn btn-ghost btn-xs !text-[var(--danger)]" @click="form.logo = ''">
+                <i class="fas fa-trash ml-1"></i> حذف
+              </button>
+            </div>
+            <span class="text-[10px] text-[var(--text-faint)] leading-4">
+              تصویر لوگو در سربرگ کروکی و هدر خروجی PDF قرار می‌گیرد. فرمت PNG با پس‌زمینه شفاف توصیه می‌شود.
+            </span>
           </div>
         </div>
       </section>
@@ -172,7 +198,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel } from "../../utils/templates";
 import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
@@ -195,6 +221,26 @@ const selected = computed({
   get: () => props.modelValue,
   set: (v) => emit("update:modelValue", v),
 });
+
+const logoInput = ref(null);
+
+function onLogoChange(e) {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  if (!file.type.startsWith("image/")) return;
+  if (file.size > 2 * 1024 * 1024) {
+    alert("حجم تصویر لوگو حداکثر ۲ مگابایت باشد.");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    props.form.logo = reader.result;
+    logger.info("form", "بارگذاری لوگو", { size: Math.round(file.size / 1024) + "KB" });
+  };
+  reader.onerror = () => logger.error("form", "خطا در خواندن تصویر لوگو");
+  reader.readAsDataURL(file);
+}
 
 const currentTemplate = computed(() => templates.find((t) => t.id === selected.value));
 

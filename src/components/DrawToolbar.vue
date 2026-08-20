@@ -68,6 +68,20 @@
 
       <div class="w-full border-t border-[var(--border)] my-1"></div>
 
+      <!-- جستجو -->
+      <button
+        @click="$emit('toggleSearch')"
+        :class="[
+          'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
+          searchActive
+            ? 'text-white bg-accent'
+            : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)]',
+        ]"
+        title="جستجوی آدرس / مختصات"
+      >
+        <i class="fas fa-search text-sm"></i>
+      </button>
+
       <!-- زوم -->
       <button
         @click="map?.zoomIn({ duration: 200 })"
@@ -95,9 +109,10 @@ const toolbarEl = ref(null);
 defineProps({
   map: { type: Object, default: null },
   drawMode: { type: String, default: "" },
+  searchActive: { type: Boolean, default: false },
 });
 
-defineEmits(["toggleMeasure", "setDrawMode", "openKroki"]);
+defineEmits(["toggleMeasure", "setDrawMode", "openKroki", "toggleSearch"]);
 
 defineExpose({ toolbarEl });
 </script>
