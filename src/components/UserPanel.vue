@@ -106,9 +106,6 @@
           </div>
           <input v-model.number="amount" type="number" min="10000" step="10000" class="input mb-4" dir="ltr" placeholder="مبلغ دلخواه" />
 
-          <label class="block mb-1.5 text-xs font-medium">شماره کارت مبدأ *</label>
-          <input v-model="card" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="0000-0000-0000-0000" maxlength="19" @input="formatCard" />
-
           <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
           <input v-model="paymentId" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="شناسه ۱۶ رقمی پیامک شده" maxlength="16" @input="formatPaymentId" />
 
@@ -233,18 +230,13 @@ const copied = ref(false);
 const presets = [50000, 100000, 200000, 500000, 1000000];
 
 const amount = ref(100000);
-const card = ref("");
 const paymentId = ref("");
 const note = ref("");
 const msg = ref("");
 const msgOk = ref(true);
 
-const validCharge = computed(() => Number(amount.value) >= 10000 && String(paymentId.value).replace(/\D/g, "").length >= 8 && card.value.replace(/[\s-]/g, "").length >= 16);
+const validCharge = computed(() => Number(amount.value) >= 10000 && String(paymentId.value).replace(/\D/g, "").length >= 8);
 
-function formatCard() {
-  const digits = card.value.replace(/[^\d]/g, "").slice(0, 16);
-  card.value = digits.replace(/(\d{4})(?=\d)/g, "$1-");
-}
 function formatPaymentId() {
   paymentId.value = paymentId.value.replace(/[^\d]/g, "").slice(0, 16);
 }
@@ -258,12 +250,11 @@ async function copyCard() {
 }
 
 function submitCharge() {
-  const res = auth.requestCharge({ amount: amount.value, card: card.value, paymentId: paymentId.value, note: note.value });
+  const res = auth.requestCharge({ amount: amount.value, paymentId: paymentId.value, note: note.value });
   msgOk.value = res.success;
   msg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
   if (res.success) {
     amount.value = 100000;
-    card.value = "";
     paymentId.value = "";
     note.value = "";
   }

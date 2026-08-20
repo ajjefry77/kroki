@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col overflow-hidden bg-[var(--bg)]">
+  <div class="min-h-screen flex flex-col overflow-x-hidden bg-[var(--bg)]">
     <LogPanel v-model="logOpen" />
 
     <AuthView v-if="page === 'auth'" @back="goHome" @success="onAuthSuccess" />

@@ -147,9 +147,6 @@
                     <label class="block mb-1.5 text-xs font-medium">مبلغ (تومان)</label>
                     <input v-model.number="charge.amount" type="number" min="10000" step="10000" class="input mb-3" dir="ltr" placeholder="مبلغ دلخواه" />
 
-                    <label class="block mb-1.5 text-xs font-medium">شماره کارت مبدأ *</label>
-                    <input v-model="charge.card" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" maxlength="19" placeholder="0000-0000-0000-0000" @input="formatCard" />
-
                     <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
                     <input v-model="charge.paymentId" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" maxlength="16" placeholder="شناسه ۱۶ رقمی پیامک شده" @input="formatPaymentId" />
 
@@ -227,7 +224,7 @@ const chargeMsg = ref("");
 const chargeMsgOk = ref(true);
 const copied = ref(false);
 
-const charge = reactive({ amount: price, card: "", paymentId: "" });
+const charge = reactive({ amount: price, paymentId: "" });
 
 const freeKroki = computed(() => auth.freeOf());
 const wallet = computed(() => auth.walletOf());
@@ -235,7 +232,7 @@ const wallet = computed(() => auth.walletOf());
 const currentTemplate = computed(() => getTemplate(props.templateId));
 const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 
-const chargeValid = computed(() => Number(charge.amount) >= 10000 && String(charge.paymentId).replace(/\D/g, "").length >= 8 && charge.card.replace(/[\s-]/g, "").length >= 16);
+const chargeValid = computed(() => Number(charge.amount) >= 10000 && String(charge.paymentId).replace(/\D/g, "").length >= 8);
 
 function canPay(mode) {
   if (mode === "free") return freeKroki.value > 0;
@@ -246,10 +243,6 @@ function formatPrice(v) {
   return fmtMoney(v) + " تومان";
 }
 
-function formatCard() {
-  const digits = charge.card.replace(/[^\d]/g, "").slice(0, 16);
-  charge.card = digits.replace(/(\d{4})(?=\d)/g, "$1-");
-}
 function formatPaymentId() {
   charge.paymentId = charge.paymentId.replace(/[^\d]/g, "").slice(0, 16);
 }
@@ -263,11 +256,10 @@ async function copyCard() {
 }
 
 function submitCharge() {
-  const res = auth.requestCharge({ amount: charge.amount, card: charge.card, paymentId: charge.paymentId });
+  const res = auth.requestCharge({ amount: charge.amount, paymentId: charge.paymentId });
   chargeMsgOk.value = res.success;
   chargeMsg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
   if (res.success) {
-    charge.card = "";
     charge.paymentId = "";
     charge.amount = price;
   }

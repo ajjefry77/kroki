@@ -66,7 +66,6 @@
                 <tr>
                   <th>کاربر</th>
                   <th>مبلغ</th>
-                  <th>شماره کارت مبدأ</th>
                   <th>شناسه پرداخت</th>
                   <th>تاریخ</th>
                   <th>وضعیت</th>
@@ -75,7 +74,7 @@
               </thead>
               <tbody>
                 <tr v-if="pendingRequests.length === 0">
-                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">درخواست شارژ در انتظار وجود ندارد</td>
+                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">درخواست شارژ در انتظار وجود ندارد</td>
                 </tr>
                 <tr v-for="r in pendingRequests" :key="r.id">
                   <td>
@@ -83,7 +82,6 @@
                     <div class="text-[10px] text-[var(--text-muted)]">{{ r.username }}</div>
                   </td>
                   <td class="font-extrabold" dir="ltr">{{ fmtMoney(r.amount) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></td>
-                  <td class="text-xs" dir="ltr">{{ maskedCard(r.card) }}</td>
                   <td class="text-xs" dir="ltr">{{ r.paymentId }}</td>
                   <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.at) }}</td>
                   <td>
@@ -244,7 +242,6 @@
             <dl class="space-y-2.5 text-xs">
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کاربر</dt><dd class="font-semibold">{{ detail.name || detail.username }} ({{ detail.username }})</dd></div>
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">مبلغ</dt><dd class="font-extrabold" dir="ltr">{{ fmtMoney(detail.amount) }} تومان</dd></div>
-              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کارت مبدأ</dt><dd class="font-mono" dir="ltr">{{ detail.card || "—" }}</dd></div>
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">شناسه پرداخت</dt><dd class="font-mono" dir="ltr">{{ detail.paymentId }}</dd></div>
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">توضیحات</dt><dd>{{ detail.note || "—" }}</dd></div>
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">تاریخ درخواست</dt><dd>{{ fmtDate(detail.at) }}</dd></div>
@@ -295,11 +292,6 @@ const filteredUsers = computed(() => {
   return auth.state.users.filter((u) => (u.name || "").toLowerCase().includes(needle) || (u.username || "").toLowerCase().includes(needle));
 });
 
-function maskedCard(c) {
-  const s = String(c || "");
-  if (s.length < 8) return s;
-  return s.slice(0, 4) + "••••••••" + s.slice(-4);
-}
 function showNote(r) {
   detail.value = r;
 }

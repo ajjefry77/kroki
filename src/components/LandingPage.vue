@@ -18,90 +18,72 @@
           <a href="#templates" class="hover:text-[var(--text)] transition">قالب‌ها</a>
         </div>
         <div class="flex items-center gap-2">
-          <button
-            class="flex items-center gap-1.5 px-2.5 h-9 rounded-lg border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text)] text-xs transition"
-            title="گزارش سیستم"
-            @click="$emit('toggleLog')"
-          >
-            <i class="fas fa-bug text-[var(--accent)]"></i>
-            <span>گزارش</span>
-          </button>
-
-          <template v-if="authed">
-            <div class="relative">
-              <button
-                class="flex items-center gap-2 h-10 rounded-full border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] transition"
-                title="حساب کاربری"
-                @click.stop="menuOpen = !menuOpen"
-              >
-                <span
-                  class="w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] text-[#241a05] font-extrabold text-sm shadow-md shadow-[var(--accent-glow)]"
-                >
-                  <span v-if="avatarChar">{{ avatarChar }}</span>
-                  <i v-else class="fas fa-user text-xs"></i>
-                </span>
-                <i class="fas fa-chevron-down text-[10px] text-[var(--text-muted)] transition" :class="menuOpen ? 'rotate-180' : ''"></i>
-              </button>
-
-              <Transition name="drop">
-                <div
-                  v-if="menuOpen"
-                  class="absolute left-0 mt-2 w-64 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden profile-menu"
-                >
-                  <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50">
-                    <div class="flex items-center gap-3">
-                      <span class="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] text-[#241a05] font-extrabold text-base">
-                        <span v-if="avatarChar">{{ avatarChar }}</span>
-                        <i v-else class="fas fa-user text-sm"></i>
-                      </span>
-                      <div class="min-w-0">
-                        <div class="text-sm font-bold truncate">{{ userName }}</div>
-                        <div class="text-[11px] text-[var(--text-muted)] mt-0.5">اعتبار حساب</div>
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
-                      <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2">
-                        <div class="text-[10px] text-[var(--text-muted)] mb-0.5 flex items-center gap-1">
-                          <i class="fas fa-wallet text-[var(--success)]"></i> کیف پول
-                        </div>
-                        <div class="font-extrabold text-[var(--success)]" dir="ltr">{{ fmtMoney(wallet) }} <span class="text-[10px] font-medium text-[var(--text-muted)]">تومان</span></div>
-                      </div>
-                      <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2">
-                        <div class="text-[10px] text-[var(--text-muted)] mb-0.5 flex items-center gap-1">
-                          <i class="fas fa-gift text-[var(--info)]"></i> رایگان
-                        </div>
-                        <div class="font-extrabold text-[var(--info)]">{{ free }} <span class="text-[10px] font-medium text-[var(--text-muted)]">کروکی</span></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button class="menu-item" @click="$emit('panel'); menuOpen = false">
-                    <i class="fas fa-user text-[var(--accent)]"></i>
-                    پنل کاربری
-                  </button>
-                  <button class="menu-item" @click="$emit('panel'); menuOpen = false">
-                    <i class="fas fa-money-bill-wave text-[var(--success)]"></i>
-                    اعتبار حساب
-                  </button>
-                  <button v-if="isAdmin" class="menu-item" @click="$emit('admin'); menuOpen = false">
-                    <i class="fas fa-shield-halved text-[var(--accent)]"></i>
-                    پنل مدیریت
-                  </button>
-
-                  <div class="border-t border-[var(--border)]"></div>
-                  <button class="menu-item !text-[var(--danger)]" @click="$emit('logout')">
-                    <i class="fas fa-right-from-bracket"></i>
-                    خروج
-                  </button>
-                </div>
-              </Transition>
-            </div>
-          </template>
-
-          <button v-else class="btn btn-ghost h-9" @click="$emit('login')">
+          <button v-if="!authed" class="btn btn-ghost h-9" @click="$emit('login')">
             <i class="fas fa-right-to-bracket ml-1"></i>
             ورود / ثبت‌نام
           </button>
+
+          <div v-if="authed" class="relative order-last">
+            <button
+              class="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition"
+              title="حساب کاربری"
+              @click.stop="menuOpen = !menuOpen"
+            >
+              <i class="fas fa-user text-sm"></i>
+            </button>
+
+            <Transition name="drop">
+              <div
+                v-if="menuOpen"
+                class="absolute left-0 mt-2 w-64 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden profile-menu"
+              >
+                <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50">
+                  <div class="flex items-center gap-3">
+                    <span class="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[var(--accent)]">
+                      <i class="fas fa-user"></i>
+                    </span>
+                    <div class="min-w-0">
+                      <div class="text-sm font-bold truncate">{{ userName }}</div>
+                      <div class="text-[11px] text-[var(--text-muted)] mt-0.5">اعتبار حساب</div>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+                    <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2">
+                      <div class="text-[10px] text-[var(--text-muted)] mb-0.5 flex items-center gap-1">
+                        <i class="fas fa-wallet text-[var(--success)]"></i> کیف پول
+                      </div>
+                      <div class="font-extrabold text-[var(--success)]" dir="ltr">{{ fmtMoney(wallet) }} <span class="text-[10px] font-medium text-[var(--text-muted)]">تومان</span></div>
+                    </div>
+                    <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2">
+                      <div class="text-[10px] text-[var(--text-muted)] mb-0.5 flex items-center gap-1">
+                        <i class="fas fa-gift text-[var(--info)]"></i> رایگان
+                      </div>
+                      <div class="font-extrabold text-[var(--info)]">{{ free }} <span class="text-[10px] font-medium text-[var(--text-muted)]">کروکی</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="menu-item" @click="$emit('panel'); menuOpen = false">
+                  <i class="fas fa-user text-[var(--accent)]"></i>
+                  پنل کاربری
+                </button>
+                <button class="menu-item" @click="$emit('panel'); menuOpen = false">
+                  <i class="fas fa-money-bill-wave text-[var(--success)]"></i>
+                  اعتبار حساب
+                </button>
+                <button v-if="isAdmin" class="menu-item" @click="$emit('admin'); menuOpen = false">
+                  <i class="fas fa-shield-halved text-[var(--accent)]"></i>
+                  پنل مدیریت
+                </button>
+
+                <div class="border-t border-[var(--border)]"></div>
+                <button class="menu-item !text-[var(--danger)]" @click="$emit('logout')">
+                  <i class="fas fa-right-from-bracket"></i>
+                  خروج
+                </button>
+              </div>
+            </Transition>
+          </div>
 
           <button class="btn btn-primary" @click="$emit('start')">
             <i class="fas fa-play ml-1"></i>
@@ -110,6 +92,15 @@
         </div>
       </div>
     </header>
+
+    <!-- دکمه گزارش (شناور پایین-چپ) -->
+    <button
+      class="fixed bottom-5 left-5 z-40 w-10 h-10 rounded-full border border-[var(--border)] bg-[var(--surface)] shadow-lg hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition"
+      title="گزارش سیستم"
+      @click="$emit('toggleLog')"
+    >
+      <i class="fas fa-bug text-[var(--accent)]"></i>
+    </button>
 
     <!-- هیرو -->
     <section class="relative flex-1 flex items-center justify-center py-16 md:py-24">
@@ -365,10 +356,6 @@ const templates = SKETCH_TEMPLATES.map((t) => ({
 const customCards = computed(() => getUserTemplates());
 
 const menuOpen = ref(false);
-const avatarChar = computed(() => {
-  const n = (props.userName || "").trim();
-  return n ? n[0] : "";
-});
 
 function onDocClick() {
   menuOpen.value = false;
