@@ -13,7 +13,10 @@
           </p>
           <p class="text-xs text-[var(--text-muted)] mb-8">
             کروکی شما آماده دانلود است.
-            <span v-if="payMode === 'free'" class="block mt-1 text-[var(--info)]">
+            <span v-if="payMode === 'admin'" class="block mt-1 text-[var(--accent-soft)]">
+              <i class="fas fa-shield-halved ml-1"></i>کروکی بدون پرداخت برای مدیر صادر شد
+            </span>
+            <span v-else-if="payMode === 'free'" class="block mt-1 text-[var(--info)]">
               <i class="fas fa-gift ml-1"></i>از کروکی رایگان شما استفاده شد ({{ remainingFree }} عدد باقی‌مانده)
             </span>
           </p>
@@ -28,8 +31,8 @@
       <template v-if="!success">
         <div class="text-center mb-8">
           <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent-glow)] text-[var(--accent-soft)] text-xs font-medium mb-3">
-            <i class="fas fa-wallet"></i>
-            پرداخت از کیف پول
+            <i :class="isAdmin ? 'fas fa-shield-halved' : 'fas fa-wallet'"></i>
+            {{ isAdmin ? 'دسترسی ویژه مدیر' : 'پرداخت از کیف پول' }}
           </div>
           <h2 class="font-extrabold text-2xl">پرداخت هزینه کروکی</h2>
         </div>
@@ -70,6 +73,7 @@
 
             <!-- کروکی رایگان -->
             <label
+              v-if="!isAdmin"
               class="rounded-xl border-2 p-4 mb-3 flex items-start gap-3 cursor-pointer transition"
               :class="freeKroki > 0 && payMode === 'free' ? 'border-[var(--success)] bg-[var(--success-glow)]' : 'border-[var(--border)]'"
             >
@@ -84,8 +88,25 @@
               </div>
             </label>
 
+            <!-- دسترسی ویژه ادمین -->
+            <label
+              v-if="isAdmin"
+              class="rounded-xl border-2 p-4 mb-3 flex items-start gap-3 cursor-pointer transition border-[var(--accent)] bg-[var(--accent-glow)]"
+            >
+              <input type="radio" value="admin" v-model="payMode" class="mt-1" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <i class="fas fa-shield-halved text-[var(--accent)]"></i>
+                  <strong class="text-sm">دسترسی ویژه مدیر</strong>
+                  <span class="px-2 py-0.5 rounded-full bg-[var(--accent-glow)] border border-[var(--accent)]/30 text-[var(--accent-soft)] text-[10px] font-bold">رایگان</span>
+                </div>
+                <p class="text-[11px] text-[var(--text-muted)] mt-1">حساب مدیر بدون نیاز به پرداخت یا کروکی رایگان.</p>
+              </div>
+            </label>
+
             <!-- کیف پول -->
             <label
+              v-if="!isAdmin"
               class="rounded-xl border-2 p-4 mb-3 flex items-start gap-3 cursor-pointer transition"
               :class="payMode === 'wallet' ? 'border-[var(--accent)] bg-[var(--accent-glow)]' : 'border-[var(--border)]'"
             >
@@ -105,7 +126,7 @@
 
             <!-- شارژ سریع -->
             <button
-              v-if="wallet < price"
+              v-if="!isAdmin && wallet < price"
               class="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--accent)]/50 bg-[var(--accent-glow)] py-3 text-xs font-bold text-[var(--accent-soft)] transition hover:bg-[var(--accent-glow-strong)] mb-3"
               @click="chargeOpen = true"
             >
@@ -178,8 +199,8 @@
               :disabled="!canPay(payMode)"
               @click="pay"
             >
-              <i class="fas fa-lock ml-2"></i>
-              {{ payMode === 'free' ? 'استفاده از کروکی رایگان' : 'پرداخت ' + formatPrice(price) }}
+              <i :class="isAdmin ? 'fas fa-shield-halved ml-2' : 'fas fa-lock ml-2'"></i>
+              {{ payMode === 'admin' ? 'تأیید و دریافت کروکی' : payMode === 'free' ? 'استفاده از کروکی رایگان' : 'پرداخت ' + formatPrice(price) }}
             </button>
           </div>
         </div>
@@ -218,11 +239,13 @@ const cardOwner = auth.CARD_OWNER;
 const processing = ref(false);
 const success = ref(false);
 const trackingCode = ref("");
-const payMode = ref("wallet");
 const chargeOpen = ref(false);
 const chargeMsg = ref("");
 const chargeMsgOk = ref(true);
 const copied = ref(false);
+
+const isAdmin = computed(() => auth.isAdmin.value);
+const payMode = ref(isAdmin.value ? "admin" : "wallet");
 
 const charge = reactive({ amount: price, paymentId: "" });
 
@@ -235,6 +258,7 @@ const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 const chargeValid = computed(() => Number(charge.amount) >= 10000 && String(charge.paymentId).replace(/\D/g, "").length >= 8);
 
 function canPay(mode) {
+  if (mode === "admin") return true;
   if (mode === "free") return freeKroki.value > 0;
   return wallet.value >= price;
 }
@@ -279,12 +303,13 @@ function pay() {
     success.value = true;
     trackingCode.value = "KRK-" + Date.now().toString(36).toUpperCase().slice(-8);
     logger.info("payment", "پرداخت کروکی انجام شد", { mode: res.mode, code: trackingCode.value });
-  }, 1200);
+  }, isAdmin.value ? 400 : 1200);
 }
 
 onMounted(() => {
-  if (freeKroki.value > 0) payMode.value = "free";
-  logger.info("step", "ورود به صفحه پرداخت", { amount: price, wallet: wallet.value, free: freeKroki.value });
+  if (isAdmin.value) payMode.value = "admin";
+  else if (freeKroki.value > 0) payMode.value = "free";
+  logger.info("step", "ورود به صفحه پرداخت", { amount: price, wallet: wallet.value, free: freeKroki.value, admin: isAdmin.value });
 });
 </script>
 

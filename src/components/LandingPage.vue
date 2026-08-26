@@ -410,7 +410,7 @@ onBeforeUnmount(() => {
 .feature-card:hover {
   transform: translateY(-4px);
   border-color: rgb(var(--accent-rgb) / 0.45);
-  box-shadow: 0 12px 32px rgba(23, 43, 77, 0.12);
+  box-shadow: 0 12px 36px rgba(23, 43, 77, 0.1);
 }
 
 .reveal {

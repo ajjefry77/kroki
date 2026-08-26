@@ -109,12 +109,13 @@ function dotClass(i, id) {
   background: linear-gradient(135deg, var(--accent), var(--accent-soft));
   border-color: transparent;
   color: #241a05;
-  box-shadow: 0 0 0 4px var(--accent-glow), 0 2px 8px rgba(23, 43, 77, 0.15);
+  box-shadow: 0 0 0 4px var(--accent-glow), 0 3px 10px rgba(224, 123, 57, 0.18);
+  transform: scale(1.05);
 }
 .step-done {
-  background: var(--surface3);
-  border-color: rgb(var(--accent-rgb) / 0.55);
-  color: var(--accent-dim);
+  background: var(--accent-glow);
+  border-color: rgb(var(--accent-rgb) / 0.45);
+  color: var(--accent);
 }
 .step-pending {
   background: var(--surface2);

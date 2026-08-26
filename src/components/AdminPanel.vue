@@ -45,16 +45,22 @@
       </div>
 
       <!-- تب‌ها -->
-      <div class="flex gap-1 p-1 rounded-xl border border-[var(--border)] bg-[var(--surface2)] mb-6 overflow-x-auto">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="py-2.5 px-4 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-          :class="activeTab === tab.id ? 'bg-[var(--accent)] text-[#241a05] shadow' : 'text-[var(--text-muted)] hover:text-[var(--text)]'"
-          @click="activeTab = tab.id"
-        >
-          <i class="fas ml-1" :class="tab.icon"></i>{{ tab.label }}
-        </button>
+      <div class="tabs-container mb-6">
+        <div class="tabs-wrapper">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="tab-btn"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id"
+          >
+            <span class="tab-icon-wrap">
+              <i class="fas" :class="tab.icon"></i>
+            </span>
+            <span class="tab-label">{{ tab.label }}</span>
+            <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- درخواست‌های شارژ -->
@@ -185,16 +191,28 @@
                     </select>
                   </td>
                   <td>
-                    <div class="flex items-center gap-1.5">
-                      <input :value="u.wallet" type="number" min="0" step="10000" class="input !py-1.5 !px-2 text-xs w-28" dir="ltr" @change="onWallet(u, $event)" />
-                      <button class="btn btn-ghost btn-xs" @click="addWalletPrompt(u)" title="افزودن مبلغ (شارژ دستی)">
-                        <i class="fas fa-plus text-xs"></i>
+                    <div class="field-card wallet-field">
+                      <div class="field-icon-wrap wallet-icon">
+                        <i class="fas fa-wallet"></i>
+                      </div>
+                      <div class="field-content">
+                        <input :value="u.wallet" type="number" min="0" step="10000" class="field-input" dir="ltr" @change="onWallet(u, $event)" />
+                        <span class="field-unit">تومان</span>
+                      </div>
+                      <button class="field-action-btn wallet-action" @click="showAddWallet(u)" title="افزودن مبلغ (شارژ دستی)">
+                        <i class="fas fa-plus"></i>
                       </button>
                     </div>
                   </td>
                   <td>
-                    <div class="flex items-center gap-1.5">
-                      <input :value="u.freeKroki" type="number" min="0" class="input !py-1.5 !px-2 text-xs w-20" @change="onFree(u, $event)" />
+                    <div class="field-card freekroki-field">
+                      <div class="field-icon-wrap freekroki-icon">
+                        <i class="fas fa-drafting-compass"></i>
+                      </div>
+                      <div class="field-content">
+                        <input :value="u.freeKroki" type="number" min="0" class="field-input" @change="onFree(u, $event)" />
+                        <span class="field-unit">عدد</span>
+                      </div>
                     </div>
                   </td>
                   <td>
@@ -208,10 +226,10 @@
                   </td>
                   <td>
                     <div class="flex items-center gap-1.5">
-                      <button class="btn btn-ghost btn-xs" @click="editUser(u)" title="تغییر رمز و نام">
+                      <button class="btn btn-ghost btn-xs" @click="showEditUser(u)" title="تغییر رمز و نام">
                         <i class="fas fa-pen text-xs"></i>
                       </button>
-                      <button v-if="u.id !== user?.id" class="btn btn-ghost btn-xs !text-[var(--danger)]" @click="removeUser(u)" title="حذف کاربر">
+                      <button v-if="u.id !== user?.id" class="btn btn-ghost btn-xs !text-[var(--danger)]" @click="showRemoveUser(u)" title="حذف کاربر">
                         <i class="fas fa-trash text-xs"></i>
                       </button>
                     </div>
@@ -258,6 +276,137 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- مودال ویرایش کاربر -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="editModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="editModal = null">
+          <div class="card !rounded-2xl max-w-md w-full modal">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--info)] to-[var(--info-glow)] flex items-center justify-center">
+                  <i class="fas fa-user-pen text-white text-sm"></i>
+                </div>
+                <h3 class="font-bold text-sm">ویرایش کاربر</h3>
+              </div>
+              <button class="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)]" @click="editModal = null">
+                <i class="fas fa-xmark text-xs"></i>
+              </button>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">نام کاربر</label>
+                <input v-model="editModal.name" type="text" class="input" placeholder="نام کامل" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">رمز عبور جدید</label>
+                <input v-model="editModal.password" type="password" class="input" placeholder="خالی = بدون تغییر" />
+              </div>
+              <div v-if="editModal.error" class="text-xs text-[var(--danger)] bg-[var(--danger-glow)] px-3 py-2 rounded-lg">
+                {{ editModal.error }}
+              </div>
+            </div>
+            <div class="flex gap-2 mt-5">
+              <button class="btn btn-primary flex-1" :disabled="editModal.saving" @click="saveEditUser">
+                <i v-if="editModal.saving" class="fas fa-circle-notch fa-spin ml-1"></i>
+                <i v-else class="fas fa-check ml-1"></i>
+                {{ editModal.saving ? 'در حال ذخیره...' : 'ذخیره تغییرات' }}
+              </button>
+              <button class="btn btn-ghost flex-1" @click="editModal = null">انصراف</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- مودال حذف کاربر -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="removeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="removeModal = null">
+          <div class="card !rounded-2xl max-w-sm w-full modal">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--danger)] to-[var(--danger-glow)] flex items-center justify-center">
+                  <i class="fas fa-trash-can text-white text-sm"></i>
+                </div>
+                <h3 class="font-bold text-sm">حذف کاربر</h3>
+              </div>
+              <button class="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)]" @click="removeModal = null">
+                <i class="fas fa-xmark text-xs"></i>
+              </button>
+            </div>
+            <p class="text-xs text-[var(--text-muted)] mb-1">
+              آیا از حذف کاربر <strong class="text-[var(--text)]">{{ removeModal.user.name }}</strong> اطمینان دارید؟
+            </p>
+            <p class="text-[10px] text-[var(--danger)] mb-5">
+              <i class="fas fa-exclamation-triangle ml-1"></i>
+              این عمل قابل بازگشت نیست و تمام اطلاعات کاربر حذف خواهد شد.
+            </p>
+            <div class="flex gap-2">
+              <button class="btn flex-1 !bg-[var(--danger)] !text-white !border-[var(--danger)]" :disabled="removeModal.saving" @click="confirmRemoveUser">
+                <i v-if="removeModal.saving" class="fas fa-circle-notch fa-spin ml-1"></i>
+                <i v-else class="fas fa-trash ml-1"></i>
+                {{ removeModal.saving ? 'در حال حذف...' : 'بله، حذف شود' }}
+              </button>
+              <button class="btn btn-ghost flex-1" @click="removeModal = null">انصراف</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- مودال شارژ دستی کیف پول -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="addWalletModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="addWalletModal = null">
+          <div class="card !rounded-2xl max-w-sm w-full modal">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--success)] to-[var(--success-glow)] flex items-center justify-center">
+                  <i class="fas fa-coins text-white text-sm"></i>
+                </div>
+                <h3 class="font-bold text-sm">شارژ دستی کیف پول</h3>
+              </div>
+              <button class="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)]" @click="addWalletModal = null">
+                <i class="fas fa-xmark text-xs"></i>
+              </button>
+            </div>
+            <p class="text-xs text-[var(--text-muted)] mb-4">
+              مبلغی که می‌خواهید به کیف پول <strong class="text-[var(--text)]">{{ addWalletModal.user.name }}</strong> اضافه شود:
+            </p>
+            <div class="relative">
+              <input v-model="addWalletModal.amount" type="number" min="0" step="10000" class="input !text-lg !font-bold !py-3 !pr-4 !pl-20" dir="ltr" placeholder="0" />
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--text-muted)]">تومان</span>
+            </div>
+            <p class="text-[10px] text-[var(--text-faint)] mt-2">
+              موجودی فعلی: <strong dir="ltr">{{ fmtMoney(addWalletModal.user.wallet) }}</strong> تومان
+            </p>
+            <div class="flex gap-2 mt-5">
+              <button class="btn btn-primary flex-1" :disabled="!addWalletModal.amount || Number(addWalletModal.amount) <= 0" @click="confirmAddWallet">
+                <i class="fas fa-plus ml-1"></i>
+                افزودن مبلغ
+              </button>
+              <button class="btn btn-ghost flex-1" @click="addWalletModal = null">انصراف</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- نوتیفیکیشن -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="toast" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.3)" @click.self="toast = null">
+          <div class="card !rounded-2xl max-w-xs w-full modal text-center">
+            <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" :class="toast.type === 'success' ? 'bg-[var(--success-glow)]' : 'bg-[var(--danger-glow)]'">
+              <i class="fas text-xl" :class="toast.type === 'success' ? 'fa-check text-[var(--success)]' : 'fa-xmark text-[var(--danger)]'"></i>
+            </div>
+            <p class="text-sm font-semibold mb-4">{{ toast.message }}</p>
+            <button class="btn btn-primary w-full" @click="toast = null">بستن</button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -270,12 +419,18 @@ defineEmits(["home"]);
 const user = computed(() => auth.state.user);
 const activeTab = ref("requests");
 const usersLoading = ref(false);
-const tabs = [
-  { id: "requests", label: "شارژها", icon: "fa-money-bill-wave" },
-  { id: "users", label: "کاربران", icon: "fa-users" },
-];
+const tabs = computed(() => [
+  { id: "requests", label: "شارژها", icon: "fa-money-bill-wave", badge: pendingCount.value || null },
+  { id: "users", label: "کاربران", icon: "fa-users", badge: null },
+]);
 const q = ref("");
 const detail = ref(null);
+const editModal = ref(null);
+const removeModal = ref(null);
+const addWalletModal = ref(null);
+const toast = ref(null);
+
+const pendingCount = computed(() => auth.state.requests.filter((r) => r.status === "pending").length);
 
 const stats = computed(() => ({
   users: auth.state.users.length,
@@ -292,6 +447,10 @@ const filteredUsers = computed(() => {
   return auth.state.users.filter((u) => (u.name || "").toLowerCase().includes(needle) || (u.username || "").toLowerCase().includes(needle));
 });
 
+function showToast(message, type = "success") {
+  toast.value = { message, type };
+}
+
 function showNote(r) {
   detail.value = r;
 }
@@ -299,7 +458,7 @@ function approve(r) {
   const res = auth.approveRequest(r.id);
   if (res.success) {
     detail.value = null;
-    alert("شارژ تأیید شد و به کیف پول کاربر افزوده شد.");
+    showToast("شارژ تأیید شد و به کیف پول کاربر افزوده شد.");
   }
 }
 function reject(r) {
@@ -309,35 +468,58 @@ function reject(r) {
 
 function onRole(u) {
   auth.setRole(u.id, u.role).then((res) => {
-    if (!res.success) alert(res.error || "خطا در تغییر نقش کاربر");
+    if (!res.success) showToast(res.error || "خطا در تغییر نقش کاربر", "error");
   });
 }
 function onWallet(u, e) {
   auth.setWallet(u.id, e.target.value);
 }
-function addWalletPrompt(u) {
-  const add = prompt("مبلغی که می‌خواهید به کیف پول اضافه شود (تومان):");
-  const n = Number(add);
-  if (isNaN(n) || n <= 0) return;
-  auth.setWallet(u.id, (Number(u.wallet) || 0) + n);
-}
 function onFree(u, e) {
   auth.setFreeKroki(u.id, e.target.value);
 }
-function editUser(u) {
-  const name = prompt("نام کاربر:", u.name || "");
-  if (name === null) return;
-  const pass = prompt("رمز عبور جدید (خالی = بدون تغییر):");
-  if (pass === null) return;
-  auth.editUser(u.id, { name, password: pass }).then((res) => {
-    if (!res.success) alert(res.error || "خطا در ویرایش کاربر");
-  });
+
+function showAddWallet(u) {
+  addWalletModal.value = { user: u, amount: "" };
 }
-function removeUser(u) {
-  if (!confirm("کاربر " + u.name + " حذف شود؟")) return;
-  auth.removeUser(u.id).then((res) => {
-    if (!res.success) alert(res.error || "خطا در حذف کاربر");
-  });
+function confirmAddWallet() {
+  const amt = Number(addWalletModal.value.amount);
+  if (!amt || amt <= 0) return;
+  auth.setWallet(addWalletModal.value.user.id, (Number(addWalletModal.value.user.wallet) || 0) + amt);
+  showToast(`مبلغ ${fmtMoney(amt)} تومان به کیف پول اضافه شد.`);
+  addWalletModal.value = null;
+}
+
+function showEditUser(u) {
+  editModal.value = { user: u, name: u.name || "", password: "", error: "", saving: false };
+}
+async function saveEditUser() {
+  const m = editModal.value;
+  m.error = "";
+  m.saving = true;
+  const res = await auth.editUser(m.user.id, { name: m.name, password: m.password });
+  m.saving = false;
+  if (res.success) {
+    showToast("اطلاعات کاربر با موفقیت به‌روزرسانی شد.");
+    editModal.value = null;
+  } else {
+    m.error = res.error || "خطا در ویرایش کاربر";
+  }
+}
+
+function showRemoveUser(u) {
+  removeModal.value = { user: u, saving: false };
+}
+async function confirmRemoveUser() {
+  const m = removeModal.value;
+  m.saving = true;
+  const res = await auth.removeUser(m.user.id);
+  m.saving = false;
+  if (res.success) {
+    showToast("کاربر با موفقیت حذف شد.");
+    removeModal.value = null;
+  } else {
+    showToast(res.error || "خطا در حذف کاربر", "error");
+  }
 }
 
 function logout() {
@@ -358,3 +540,196 @@ onMounted(() => {
   });
 });
 </script>
+
+<style scoped>
+.tabs-container {
+  position: relative;
+}
+
+.tabs-wrapper {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.25s var(--ease-out);
+  position: relative;
+  user-select: none;
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.tab-btn.active {
+  background: var(--accent);
+  color: #241a05;
+  box-shadow: 0 4px 16px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.tab-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.tab-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 12px;
+  transition: all 0.25s var(--ease-out);
+}
+
+.tab-btn.active .tab-icon-wrap {
+  background: rgba(36, 26, 5, 0.15);
+}
+
+.tab-label {
+  line-height: 1;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--danger);
+  color: white;
+}
+
+.tab-btn.active .tab-badge {
+  background: #241a05;
+  color: white;
+}
+
+/* فیلدهای زیبا */
+.field-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: all 0.2s var(--ease-out);
+  min-width: 170px;
+}
+
+.field-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.field-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.wallet-icon {
+  background: linear-gradient(135deg, var(--success-glow), rgba(31, 161, 92, 0.05));
+  color: var(--success);
+}
+
+.freekroki-icon {
+  background: linear-gradient(135deg, var(--accent-glow), rgba(224, 123, 57, 0.05));
+  color: var(--accent);
+}
+
+.field-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  transition: background 0.15s;
+}
+
+.field-input:hover {
+  background: var(--surface2);
+}
+
+.field-input:focus {
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.field-unit {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.field-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  flex-shrink: 0;
+  transition: all 0.2s var(--ease-out);
+}
+
+.wallet-action:hover {
+  background: var(--success-glow);
+  color: var(--success);
+  border-color: var(--success);
+}
+</style>

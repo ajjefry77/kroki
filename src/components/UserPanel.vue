@@ -56,16 +56,21 @@
       </div>
 
       <!-- تب‌ها -->
-      <div class="flex gap-1 p-1 rounded-xl border border-[var(--border)] bg-[var(--surface2)] mb-6 overflow-x-auto">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="py-2.5 px-4 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-          :class="activeTab === tab.id ? 'bg-[var(--accent)] text-[#241a05] shadow' : 'text-[var(--text-muted)] hover:text-[var(--text)]'"
-          @click="activeTab = tab.id"
-        >
-          <i class="fas ml-1" :class="tab.icon"></i>{{ tab.label }}
-        </button>
+      <div class="tabs-container mb-6">
+        <div class="tabs-wrapper">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="tab-btn"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id"
+          >
+            <span class="tab-icon-wrap">
+              <i class="fas" :class="tab.icon"></i>
+            </span>
+            <span class="tab-label">{{ tab.label }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- شارژ / تاریخچه -->
@@ -335,3 +340,74 @@ watch(activeTab, () => {
 
 onMounted(() => loadTx());
 </script>
+
+<style scoped>
+.tabs-container {
+  position: relative;
+}
+
+.tabs-wrapper {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.25s var(--ease-out);
+  user-select: none;
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.tab-btn.active {
+  background: var(--accent);
+  color: #241a05;
+  box-shadow: 0 4px 16px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.tab-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.tab-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 12px;
+  transition: all 0.25s var(--ease-out);
+}
+
+.tab-btn.active .tab-icon-wrap {
+  background: rgba(36, 26, 5, 0.15);
+}
+
+.tab-label {
+  line-height: 1;
+}
+</style>

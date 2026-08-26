@@ -184,7 +184,7 @@ function downloadPdf() {
 .download-card:hover {
   transform: translateY(-4px);
   border-color: rgb(var(--accent-rgb) / 0.5);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 14px 36px rgba(23, 43, 77, 0.12);
 }
 
 .animate-pop {

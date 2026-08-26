@@ -17,19 +17,21 @@
       </div>
 
       <!-- تب‌ها -->
-      <div class="grid grid-cols-2 gap-1 p-1 rounded-xl border border-[var(--border)] bg-[var(--surface2)] mb-6">
+      <div class="auth-tabs mb-6">
         <button
-          class="py-2.5 rounded-lg text-sm font-semibold transition"
-          :class="mode === 'login' ? 'bg-[var(--accent)] text-[#241a05] shadow' : 'text-[var(--text-muted)] hover:text-[var(--text)]'"
+          class="auth-tab"
+          :class="{ active: mode === 'login' }"
           @click="mode = 'login'"
         >
+          <i class="fas fa-right-to-bracket ml-1.5"></i>
           ورود
         </button>
         <button
-          class="py-2.5 rounded-lg text-sm font-semibold transition"
-          :class="mode === 'register' ? 'bg-[var(--accent)] text-[#241a05] shadow' : 'text-[var(--text-muted)] hover:text-[var(--text)]'"
+          class="auth-tab"
+          :class="{ active: mode === 'register' }"
           @click="mode = 'register'"
         >
+          <i class="fas fa-user-plus ml-1.5"></i>
           ثبت‌نام
         </button>
       </div>
@@ -118,4 +120,46 @@ async function submit() {
 .fade-slide-leave-active { animation: fade-out 0.25s ease-in; }
 @keyframes fade-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes fade-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-6px); } }
+
+.auth-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.auth-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.25s var(--ease-out);
+}
+
+.auth-tab:hover:not(.active) {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.auth-tab.active {
+  background: var(--accent);
+  color: #241a05;
+  box-shadow: 0 3px 12px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.auth-tab:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
 </style>

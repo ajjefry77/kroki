@@ -257,7 +257,7 @@ async function loadUsers() {
     state.users = raw
       .map((u) => {
         const uid = u.id;
-        const p = localProfile(uid);
+        const p = ensureProfile(u);
         const roles = rolesOf(u);
         return {
           ...u,
@@ -450,6 +450,19 @@ function rejectRequest(id) {
 function payForKroki() {
   const user = state.user;
   if (!user) return { success: false, error: "ابتدا وارد حساب شوید" };
+
+  // ادمین بدون محدودیت و پرداخت
+  if (rolesOf(user).includes("admin")) {
+    addTx(user.id, {
+      amount: 0,
+      type: "free",
+      typeLabel: "کروکی رایگان (ادمین)",
+      status: "success",
+      remainingFree: user.freeKroki,
+    });
+    return { success: true, mode: "admin", remaining: user.freeKroki };
+  }
+
   if (Number(user.freeKroki) || 0) {
     user.freeKroki = Number(user.freeKroki) - 1;
     const p = localProfile(user.id);

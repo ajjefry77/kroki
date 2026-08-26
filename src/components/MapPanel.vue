@@ -2,6 +2,20 @@
   <div class="relative w-full h-full">
     <div ref="mapContainerRef" class="w-full h-full"></div>
 
+    <!-- هشدار عدم پشتیبانی WebGL -->
+    <div v-if="initError" class="absolute inset-0 z-50 flex items-center justify-center bg-[var(--bg)]">
+      <div class="card !rounded-2xl max-w-sm w-full mx-4 text-center">
+        <div class="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-[var(--danger-glow)]">
+          <i class="fas fa-triangle-exclamation text-2xl text-[var(--danger)]"></i>
+        </div>
+        <h3 class="font-bold text-sm mb-2">خطا در راه‌اندازی نقشه</h3>
+        <p class="text-xs text-[var(--text-muted)] mb-5 leading-6">{{ initError }}</p>
+        <button class="btn btn-primary w-full" @click="$emit('home')">
+          <i class="fas fa-house ml-1"></i> بازگشت به صفحه اصلی
+        </button>
+      </div>
+    </div>
+
     <!-- هشدار حالت ترسیم -->
     <div
       v-if="drawing?.drawMode && drawing.drawMode !== 'measure'"
@@ -134,6 +148,7 @@ const emit = defineEmits(["mapReady", "openKroki", "addPins"]);
 const mapContainerRef = ref(null);
 const kmlInput = ref(null);
 const loading = ref(false);
+const initError = ref(null);
 
 let map = null;
 const mapProxy = ref(null);
@@ -301,39 +316,50 @@ async function onKmlChange(e) {
 function initMap() {
   mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
-  map = new mapboxgl.Map({
-    container: mapContainerRef.value,
-    style: {
-      version: 8,
-      glyphs: "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
-      sources: {
-        satellite: {
-          type: "raster",
-          tiles: ["https://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}"],
-          tileSize: 256,
+  if (!mapboxgl.supported()) {
+    initError.value = "مرورگر شما از WebGL پشتیبانی نمی‌کند. لطفاً از مرورگر دیگری استفاده کنید یا تنظیمات گرافیکی سیستم را بررسی کنید.";
+    return;
+  }
+
+  try {
+    map = new mapboxgl.Map({
+      container: mapContainerRef.value,
+      style: {
+        version: 8,
+        glyphs: "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
+        sources: {
+          satellite: {
+            type: "raster",
+            tiles: ["https://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}"],
+            tileSize: 256,
+          },
         },
+        layers: [
+          {
+            id: "satellite",
+            type: "raster",
+            source: "satellite",
+            minzoom: 0,
+            maxzoom: 22,
+          },
+        ],
       },
-      layers: [
-        {
-          id: "satellite",
-          type: "raster",
-          source: "satellite",
-          minzoom: 0,
-          maxzoom: 22,
-        },
-      ],
-    },
-    center: [51.5, 35.5],
-    zoom: 5,
-    pitch: 0,
-    bearing: 0,
-    maxPitch: 0,
-    dragRotate: false,
-    pitchWithRotate: true,
-    touchPitch: false,
-    attributionControl: false,
-    preserveDrawingBuffer: true,
-  });
+      center: [51.5, 35.5],
+      zoom: 5,
+      pitch: 0,
+      bearing: 0,
+      maxPitch: 0,
+      dragRotate: false,
+      pitchWithRotate: true,
+      touchPitch: false,
+      attributionControl: false,
+      preserveDrawingBuffer: true,
+    });
+  } catch (e) {
+    console.error("خطا در ایجاد نقشه:", e);
+    initError.value = "خطا در راه‌اندازی نقشه: " + (e.message || "اطلاعات بیشتر در کنسول مرورگر");
+    return;
+  }
 
   map.on("load", () => {
     mapProxy.value = map;

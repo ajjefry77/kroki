@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,26 +13,26 @@
 }
 
 :root {
-  --bg: #f3f5fa;
-  --bg-elevated: #eef1f8;
+  --bg: #f4f6fb;
+  --bg-elevated: #edf0f7;
   --surface: #ffffff;
-  --surface2: #f7f9fd;
-  --surface3: #eef1f7;
-  --border: #e2e7f0;
-  --border-strong: #c9d2e3;
+  --surface2: #f8faff;
+  --surface3: #eef1f8;
+  --border: #e1e7f2;
+  --border-strong: #c5cfdf;
 
   --accent: #e07b39;
   --accent-soft: #c8682a;
   --accent-dim: #93471a;
   --accent-glow: rgba(224, 123, 57, 0.1);
-  --accent-glow-strong: rgba(224, 123, 57, 0.18);
+  --accent-glow-strong: rgba(224, 123, 57, 0.2);
 
   --accent-rgb: 224 123 57;
   --accent-soft-rgb: 200 104 42;
   --accent-dim-rgb: 147 71 26;
-  --text: #1b2536;
-  --text-muted: #5c6b84;
-  --text-faint: #93a0b5;
+  --text: #1a2236;
+  --text-muted: #5a6984;
+  --text-faint: #8f9db3;
   --danger: #d64550;
   --danger-glow: rgba(214, 69, 80, 0.1);
   --success: #1fa15c;
@@ -47,16 +47,16 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
 
-  --shadow-sm: 0 1px 2px rgba(23, 43, 77, 0.06);
-  --shadow-md: 0 4px 16px rgba(23, 43, 77, 0.08);
-  --shadow-lg: 0 12px 32px rgba(23, 43, 77, 0.1);
-  --shadow-xl: 0 20px 48px rgba(23, 43, 77, 0.12);
+  --shadow-sm: 0 1px 3px rgba(23, 43, 77, 0.05);
+  --shadow-md: 0 4px 18px rgba(23, 43, 77, 0.07);
+  --shadow-lg: 0 12px 36px rgba(23, 43, 77, 0.09);
+  --shadow-xl: 0 20px 52px rgba(23, 43, 77, 0.11);
 
   --font: 'Vazirmatn', 'Vazir', system-ui, sans-serif;
   --top: 50px;
 
   --card-bg-rgb: 255, 255, 255;
-  --border-rgb: 226, 231, 240;
+  --border-rgb: 225, 231, 242;
 
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -80,9 +80,9 @@ html {
 
 body {
   background:
-    radial-gradient(circle at 12% 0%, rgba(224, 123, 57, 0.08), transparent 42%),
-    radial-gradient(circle at 88% 12%, rgba(29, 58, 110, 0.05), transparent 48%),
-    radial-gradient(circle at 50% 100%, rgba(47, 111, 208, 0.04), transparent 45%),
+    radial-gradient(ellipse at 12% 0%, rgba(224, 123, 57, 0.07), transparent 45%),
+    radial-gradient(ellipse at 88% 10%, rgba(29, 58, 110, 0.04), transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(47, 111, 208, 0.035), transparent 48%),
     var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -111,16 +111,16 @@ button {
 
 /* ============ Scrollbar ============ */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 4px;
-  border: 2px solid var(--bg);
+  border: 2px solid transparent;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-dim);
@@ -140,6 +140,7 @@ button {
 
 @layer components {
 
+/* ============ Buttons ============ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -154,7 +155,7 @@ button {
   border: 1px solid transparent;
   transition:
     transform 0.2s var(--ease-out),
-    box-shadow 0.25s var(--ease-out),
+    box-shadow 0.3s var(--ease-out),
     background-color 0.2s var(--ease-out),
     border-color 0.2s var(--ease-out),
     color 0.2s var(--ease-out),
@@ -173,20 +174,20 @@ button {
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none !important;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #e0702f, #f59a5a);
+  background: linear-gradient(135deg, #e0702f, #f09050);
   color: #241a05;
-  box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 3px 12px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-  box-shadow: 0 6px 22px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  filter: brightness(1.06);
+  box-shadow: 0 6px 24px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);
 }
 
@@ -222,11 +223,12 @@ button {
   border-radius: 6px;
 }
 
+/* ============ Inputs ============ */
 .input {
   width: 100%;
   padding: 10px 14px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
   font-family: var(--font);
@@ -246,7 +248,7 @@ button {
 
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 2px 8px rgba(224, 123, 57, 0.06);
   background: var(--bg-elevated);
 }
 
@@ -258,14 +260,21 @@ input[type="radio"] {
   cursor: pointer;
 }
 
+/* ============ Cards ============ */
 .card {
-  background: linear-gradient(180deg, var(--surface), var(--bg-elevated));
+  background: linear-gradient(175deg, var(--surface), var(--bg-elevated));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.3s var(--ease-out), border-color 0.3s var(--ease-out);
 }
 
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* ============ Tables ============ */
 table {
   border-collapse: collapse;
   width: 100%;
@@ -286,11 +295,15 @@ th {
   white-space: nowrap;
 }
 
+tbody tr {
+  transition: background-color 0.15s var(--ease-out);
+}
+
 tbody tr:hover {
   background: var(--surface2);
 }
 
-/* Modal enter/exit transitions (use <Transition name="modal">) */
+/* ============ Modal Transitions ============ */
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 0.25s var(--ease-out);
@@ -316,7 +329,7 @@ tbody tr:hover {
   transform: translateY(14px) scale(0.96);
 }
 
-/* Step transitions (wizard) */
+/* ============ Step Transitions (wizard) ============ */
 .step-enter-active,
 .step-leave-active {
   transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
@@ -328,6 +341,18 @@ tbody tr:hover {
 .step-leave-to {
   opacity: 0;
   transform: translateY(-12px);
+}
+
+/* ============ Fade ============ */
+.fade-enter-active {
+  transition: opacity 0.3s var(--ease-out);
+}
+.fade-leave-active {
+  transition: opacity 0.2s ease-in;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 } /* end @layer components */
