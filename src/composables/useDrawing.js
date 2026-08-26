@@ -15,12 +15,10 @@ import {
   toUTM,
   toUTMInZone,
   computeCentroid,
-  computeCircleCoords,
 } from "../utils/useDrawingHelpers";
 import { renderPinOnMap } from "../utils/pinRenderer";
 
 export function useDrawing(map, pins) {
-  // Reactive state
   const loading = ref(false);
   const drawMode = ref("");
   const color = ref("#ff0000");
@@ -30,19 +28,18 @@ export function useDrawing(map, pins) {
   const showForm = ref(false);
   const shape = ref(null);
   const activeTab = ref("measurements");
-  const tempCircle = ref(null);
   const measurePoints = reactive([]);
   const coordinateSystem = ref("utm");
   const nameError = ref(false);
 
-  // Non-reactive mutable state
   const hs = {
     mouseMove: null,
     click: null,
     dblClick: null,
     rightClick: null,
     key: null,
-    featureClick: null,
+    mousedown: null,
+    mouseup: null,
     styleLoad: null,
   };
   const ts = {
@@ -52,16 +49,15 @@ export function useDrawing(map, pins) {
     lineLabelSourceId: null,
     extraSourceIds: [],
   };
-  const cs = { radius: 0, center: null };
   const drawDataSourceId = "pins-draw-" + crypto.randomUUID();
 
-  // Computed
+  let draggingIndex = -1;
+  let dragActive = false;
+  let lastClickTs = 0;
+  let rectStart = null;
+
   const livePoints = computed(() => {
     if (shape.value) return getAllPoints();
-    if (drawMode.value === "circle" && tempCircle.value)
-      return [
-        { lat: tempCircle.value.center.lat, lon: tempCircle.value.center.lng },
-      ];
     if (positions.length > 0)
       return positions.map((p) => ({ lat: p.lat, lon: p.lng }));
     return [];
@@ -73,29 +69,13 @@ export function useDrawing(map, pins) {
       const lat = Array.isArray(p) ? p[1] : p.lat;
       if (coordinateSystem.value === "utm") {
         const { x, y, zone } = toUTM(lon, lat);
-        return {
-          lat,
-          lon,
-          displayX: x,
-          displayY: y,
-          zone,
-          system: "utm",
-          index: i,
-        };
+        return { lat, lon, displayX: x, displayY: y, zone, system: "utm", index: i };
       }
-      return {
-        lat,
-        lon,
-        displayX: lon,
-        displayY: lat,
-        system: "latlon",
-        index: i,
-      };
+      return { lat, lon, displayX: lon, displayY: lat, system: "latlon", index: i };
     });
   });
   const livePointCount = computed(() => {
     if (shape.value) return getPointsCount();
-    if (drawMode.value === "circle" && tempCircle.value) return 1;
     if (measureActive.value) return measurePoints.length;
     return positions.length;
   });
@@ -119,7 +99,7 @@ export function useDrawing(map, pins) {
   });
   const liveArea = computed(() => {
     if (shape.value) return calculateArea();
-    if (drawMode.value !== "polygon") return "0 m²";
+    if (drawMode.value !== "polygon" && drawMode.value !== "rectangle") return "0 m²";
     const points = livePoints.value;
     if (points.length < 3) return "0 m²";
     const coords = points.map((p) => {
@@ -134,19 +114,13 @@ export function useDrawing(map, pins) {
     }
     return formatArea(Math.abs(area) / 2);
   });
-  const liveRadius = computed(() => {
-    if (shape.value && shape.value.type === "circle")
-      return formatDistance(shape.value.radius);
-    if (tempCircle.value) return formatDistance(tempCircle.value.radius);
-    return "0 m";
-  });
   const canFinishDrawing = computed(() => {
     if (shape.value) return false;
     const mode = drawMode.value;
     if (mode === "polyline") return positions.length >= 2;
     if (mode === "polygon") return positions.length >= 3;
     if (mode === "multi_point") return positions.length >= 1;
-    if (mode === "circle") return !!(cs.center && cs.radius > 0);
+    if (mode === "rectangle") return !!rectStart;
     return false;
   });
   const isSaveEnabled = computed(() => {
@@ -166,12 +140,9 @@ export function useDrawing(map, pins) {
 
   watch(
     () => formData.value.name,
-    () => {
-      nameError.value = false;
-    },
+    () => { nameError.value = false; },
   );
 
-  // Core utilities
   function clearTempLayers() {
     ts.layerIds.forEach((id) => {
       if (map.getLayer(id)) map.removeLayer(id);
@@ -188,29 +159,21 @@ export function useDrawing(map, pins) {
     ts.polygonLabelSourceId = null;
     ts.lineLabelSourceId = null;
   }
+
   function cleanupHandlers() {
-    if (hs.mouseMove) {
-      map.off("mousemove", hs.mouseMove);
-      hs.mouseMove = null;
-    }
-    if (hs.click) {
-      map.off("click", hs.click);
-      hs.click = null;
-    }
-    if (hs.dblClick) {
-      map.off("dblclick", hs.dblClick);
-      hs.dblClick = null;
-    }
-    if (hs.rightClick) {
-      map.off("contextmenu", hs.rightClick);
-      hs.rightClick = null;
-    }
-    if (hs.key) {
-      window.removeEventListener("keydown", hs.key);
-      hs.key = null;
-    }
+    if (hs.mouseMove) { map.off("mousemove", hs.mouseMove); hs.mouseMove = null; }
+    if (hs.click) { map.off("click", hs.click); hs.click = null; }
+    if (hs.dblClick) { map.off("dblclick", hs.dblClick); hs.dblClick = null; }
+    if (hs.rightClick) { map.off("contextmenu", hs.rightClick); hs.rightClick = null; }
+    if (hs.mousedown) { map.off("mousedown", hs.mousedown); hs.mousedown = null; }
+    if (hs.mouseup) { map.off("mouseup", hs.mouseup); hs.mouseup = null; }
+    if (hs.key) { window.removeEventListener("keydown", hs.key); hs.key = null; }
     map.getCanvas().style.cursor = "default";
+    draggingIndex = -1;
+    dragActive = false;
+    rectStart = null;
   }
+
   function addTempSource() {
     ts.sourceId = "temp-" + crypto.randomUUID();
     map.addSource(ts.sourceId, {
@@ -232,6 +195,7 @@ export function useDrawing(map, pins) {
     ts.extraSourceIds.push(labelId);
     return labelId;
   }
+
   function buildFeatures(pts, closed) {
     const lineCoords = pts.map((p) => [p.lng || p.lon, p.lat]);
     const features = pts.map((p) => ({
@@ -259,10 +223,12 @@ export function useDrawing(map, pins) {
     }
     return { type: "FeatureCollection", features };
   }
+
   function updateTempSource(pts, closed) {
     const src = map.getSource(ts.sourceId);
     if (src) src.setData(buildFeatures(pts, closed));
   }
+
   function midCoord(a, b) {
     const alng = a.lng ?? a.lon;
     const blng = b.lng ?? b.lon;
@@ -280,7 +246,8 @@ export function useDrawing(map, pins) {
     };
   }
   function updatePolygonLabels(pts) {
-    if (drawMode.value !== "polygon" || !ts.polygonLabelSourceId) return;
+    if (drawMode.value !== "polygon" && drawMode.value !== "rectangle") return;
+    if (!ts.polygonLabelSourceId) return;
     const labelSrc = map.getSource(ts.polygonLabelSourceId);
     if (!labelSrc) return;
     const features = [];
@@ -323,11 +290,53 @@ export function useDrawing(map, pins) {
     for (let i = 1; i < pts.length; i++) {
       features.push(edgeFeature(pts[i - 1], pts[i]));
     }
-    // A polyline has no area centroid, so do not place a fake center marker.
     labelSrc.setData({ type: "FeatureCollection", features });
   }
 
-  // Drawing layers setup
+  function updateRectTempSource(start, end) {
+    const src = map.getSource(ts.sourceId);
+    if (!src) return;
+    const s = [start.lng, start.lat];
+    const e = [end.lng, end.lat];
+    const coords = [
+      s,
+      [e[0], s[1]],
+      e,
+      [s[0], e[1]],
+      s,
+    ];
+    const features = [
+      {
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [coords] },
+        properties: {},
+      },
+      ...coords.slice(0, 4).map((c) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: c },
+        properties: {},
+      })),
+    ];
+    src.setData({ type: "FeatureCollection", features });
+  }
+
+  function nearestPointIndex(lngLat, threshold) {
+    const p = map.project(lngLat);
+    let best = -1;
+    let bestDist = threshold;
+    for (let i = 0; i < positions.length; i++) {
+      const cp = map.project({ lng: positions[i].lng, lat: positions[i].lat });
+      const dx = p.x - cp.x;
+      const dy = p.y - cp.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    }
+    return best;
+  }
+
   function addPolygonLayers() {
     addTempLayer(ts.sourceId + "-fill", {
       type: "fill",
@@ -345,10 +354,10 @@ export function useDrawing(map, pins) {
       type: "circle",
       filter: ["==", "$type", "Point"],
       paint: {
-        "circle-radius": 5,
+        "circle-radius": 4,
         "circle-color": "#ffffff",
         "circle-stroke-color": color.value,
-        "circle-stroke-width": 2.5,
+        "circle-stroke-width": 2,
         "circle-opacity": 0.9,
       },
     });
@@ -360,7 +369,7 @@ export function useDrawing(map, pins) {
       filter: ["==", ["get", "kind"], "edge"],
       layout: {
         "text-field": ["get", "label"],
-        "text-size": 11,
+        "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
         "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
@@ -377,7 +386,7 @@ export function useDrawing(map, pins) {
       filter: ["==", ["get", "kind"], "vertex"],
       layout: {
         "text-field": ["get", "label"],
-        "text-size": 10,
+        "text-size": 9,
         "text-offset": [0, -1.2],
         "text-anchor": "bottom",
         "text-allow-overlap": true,
@@ -395,7 +404,7 @@ export function useDrawing(map, pins) {
       source: labelSrcId,
       filter: ["==", ["get", "kind"], "center"],
       paint: {
-        "circle-radius": 5,
+        "circle-radius": 4,
         "circle-color": "#2563eb",
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 2,
@@ -407,7 +416,7 @@ export function useDrawing(map, pins) {
       filter: ["==", ["get", "kind"], "center"],
       layout: {
         "text-field": ["get", "label"],
-        "text-size": 10,
+        "text-size": 9,
         "text-offset": [0, 1.2],
         "text-anchor": "top",
         "text-allow-overlap": true,
@@ -421,12 +430,13 @@ export function useDrawing(map, pins) {
       },
     });
   }
+
   function addPolylineLayers() {
     addTempLayer(ts.sourceId + "-line", {
       type: "line",
       paint: {
         "line-color": color.value,
-        "line-width": 3,
+        "line-width": 2.5,
         "line-opacity": 0.85,
       },
     });
@@ -434,10 +444,10 @@ export function useDrawing(map, pins) {
       type: "circle",
       filter: ["==", "$type", "Point"],
       paint: {
-        "circle-radius": 6,
+        "circle-radius": 4,
         "circle-color": "#ffffff",
         "circle-stroke-color": color.value,
-        "circle-stroke-width": 3,
+        "circle-stroke-width": 2.5,
         "circle-opacity": 0.9,
       },
     });
@@ -449,7 +459,7 @@ export function useDrawing(map, pins) {
       filter: ["==", ["get", "kind"], "edge"],
       layout: {
         "text-field": ["get", "label"],
-        "text-size": 11,
+        "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
         "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
@@ -465,7 +475,7 @@ export function useDrawing(map, pins) {
       source: labelSrcId,
       filter: ["==", ["get", "kind"], "center"],
       paint: {
-        "circle-radius": 5,
+        "circle-radius": 4,
         "circle-color": "#2563eb",
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 2,
@@ -477,7 +487,7 @@ export function useDrawing(map, pins) {
       filter: ["==", ["get", "kind"], "center"],
       layout: {
         "text-field": ["get", "label"],
-        "text-size": 10,
+        "text-size": 9,
         "text-offset": [0, 1.2],
         "text-anchor": "top",
         "text-allow-overlap": true,
@@ -491,11 +501,12 @@ export function useDrawing(map, pins) {
       },
     });
   }
+
   function addMultiPointLayers() {
     addTempLayer(ts.sourceId + "-points", {
       type: "circle",
       paint: {
-        "circle-radius": 7,
+        "circle-radius": 5,
         "circle-color": color.value,
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 2,
@@ -504,10 +515,85 @@ export function useDrawing(map, pins) {
     });
   }
 
-  // Drawing mode setup
+  function addRectangleLayers() {
+    addTempLayer(ts.sourceId + "-fill", {
+      type: "fill",
+      paint: { "fill-color": color.value, "fill-opacity": 0.35 },
+    });
+    addTempLayer(ts.sourceId + "-outline", {
+      type: "line",
+      paint: {
+        "line-color": color.value,
+        "line-width": 2.5,
+        "line-opacity": 0.9,
+      },
+    });
+    addTempLayer(ts.sourceId + "-points", {
+      type: "circle",
+      filter: ["==", "$type", "Point"],
+      paint: {
+        "circle-radius": 4,
+        "circle-color": "#ffffff",
+        "circle-stroke-color": color.value,
+        "circle-stroke-width": 2,
+        "circle-opacity": 0.9,
+      },
+    });
+    const labelSrcId = addLabelSource();
+    ts.polygonLabelSourceId = labelSrcId;
+    addTempLayer(ts.sourceId + "-edge-label", {
+      type: "symbol",
+      source: labelSrcId,
+      filter: ["==", ["get", "kind"], "edge"],
+      layout: {
+        "text-field": ["get", "label"],
+        "text-size": 10,
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+      },
+      paint: {
+        "text-color": "#b45309",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 2,
+      },
+    });
+    addTempLayer(ts.sourceId + "-vertex-label", {
+      type: "symbol",
+      source: labelSrcId,
+      filter: ["==", ["get", "kind"], "vertex"],
+      layout: {
+        "text-field": ["get", "label"],
+        "text-size": 9,
+        "text-offset": [0, -1.2],
+        "text-anchor": "bottom",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+      },
+      paint: {
+        "text-color": "#1e3a8a",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 2,
+      },
+    });
+    addTempLayer(ts.sourceId + "-center-point", {
+      type: "circle",
+      source: labelSrcId,
+      filter: ["==", ["get", "kind"], "center"],
+      paint: {
+        "circle-radius": 4,
+        "circle-color": "#2563eb",
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+    });
+  }
+
   function startDrawing() {
     const m = map;
     m.getCanvas().style.cursor = "crosshair";
+
     if (drawMode.value === "multi_point") {
       addTempSource();
       addMultiPointLayers();
@@ -547,25 +633,50 @@ export function useDrawing(map, pins) {
       window.addEventListener("keydown", hs.key);
       m.on("click", hs.click);
       m.on("contextmenu", hs.rightClick);
+
     } else if (drawMode.value === "polyline") {
       addTempSource();
       addPolylineLayers();
-      let lastClickTs = 0;
-      hs.click = (e) => {
-        const now = Date.now();
-        if (now - lastClickTs < 280) return;
-        lastClickTs = now;
-        positions.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
-        updateTempSource(positions);
-        updateLineLabels(positions);
+      hs.mousedown = (e) => {
+        if (e.originalEvent.button !== 0) return;
+        const idx = nearestPointIndex(e.lngLat, 14);
+        if (idx >= 0 && positions.length >= 2) {
+          dragActive = true;
+          draggingIndex = idx;
+          m.dragPan.disable();
+        }
       };
       hs.mouseMove = (e) => {
+        if (dragActive && draggingIndex >= 0) {
+          positions[draggingIndex] = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+          updateTempSource(positions);
+          updateLineLabels(positions);
+          return;
+        }
         if (positions.length === 0) return;
         updateTempSource([
           ...positions,
           { lng: e.lngLat.lng, lat: e.lngLat.lat },
         ]);
       };
+      hs.mouseup = () => {
+        if (dragActive) {
+          dragActive = false;
+          draggingIndex = -1;
+          m.dragPan.enable();
+        }
+      };
+      hs.click = (e) => {
+        if (dragActive) return;
+        const now = Date.now();
+        if (now - lastClickTs < 280) return;
+        lastClickTs = now;
+        const idx = nearestPointIndex(e.lngLat, 14);
+        if (idx >= 0) return;
+        positions.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+        updateTempSource(positions);
+        updateLineLabels(positions);
+      };
       hs.rightClick = (e) => {
         e.preventDefault();
         if (positions.length > 0) {
@@ -596,25 +707,52 @@ export function useDrawing(map, pins) {
       m.on("mousemove", hs.mouseMove);
       m.on("contextmenu", hs.rightClick);
       m.on("dblclick", hs.dblClick);
+      m.on("mousedown", hs.mousedown);
+      m.on("mouseup", hs.mouseup);
+
     } else if (drawMode.value === "polygon") {
       addTempSource();
       addPolygonLayers();
-      let lastClickTs = 0;
-      hs.click = (e) => {
-        const now = Date.now();
-        if (now - lastClickTs < 280) return;
-        lastClickTs = now;
-        positions.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
-        updateTempSource(positions, true);
-        updatePolygonLabels(positions);
+      hs.mousedown = (e) => {
+        if (e.originalEvent.button !== 0) return;
+        const idx = nearestPointIndex(e.lngLat, 14);
+        if (idx >= 0 && positions.length >= 3) {
+          dragActive = true;
+          draggingIndex = idx;
+          m.dragPan.disable();
+        }
       };
       hs.mouseMove = (e) => {
+        if (dragActive && draggingIndex >= 0) {
+          positions[draggingIndex] = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+          updateTempSource(positions, true);
+          updatePolygonLabels(positions);
+          return;
+        }
         if (positions.length === 0) return;
         updateTempSource(
           [...positions, { lng: e.lngLat.lng, lat: e.lngLat.lat }],
           true,
         );
       };
+      hs.mouseup = () => {
+        if (dragActive) {
+          dragActive = false;
+          draggingIndex = -1;
+          m.dragPan.enable();
+        }
+      };
+      hs.click = (e) => {
+        if (dragActive) return;
+        const now = Date.now();
+        if (now - lastClickTs < 280) return;
+        lastClickTs = now;
+        const idx = nearestPointIndex(e.lngLat, 14);
+        if (idx >= 0) return;
+        positions.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+        updateTempSource(positions, true);
+        updatePolygonLabels(positions);
+      };
       hs.rightClick = (e) => {
         e.preventDefault();
         if (positions.length > 0) {
@@ -645,174 +783,60 @@ export function useDrawing(map, pins) {
       m.on("mousemove", hs.mouseMove);
       m.on("contextmenu", hs.rightClick);
       m.on("dblclick", hs.dblClick);
-    } else if (drawMode.value === "circle") {
-      cs.center = null;
-      tempCircle.value = null;
+      m.on("mousedown", hs.mousedown);
+      m.on("mouseup", hs.mouseup);
+
+    } else if (drawMode.value === "rectangle") {
       addTempSource();
-      addTempLayer(ts.sourceId + "-fill", {
-        type: "fill",
-        paint: { "fill-color": color.value, "fill-opacity": 0.4 },
-      });
-      addTempLayer(ts.sourceId + "-outline", {
-        type: "line",
-        paint: {
-          "line-color": color.value,
-          "line-width": 2,
-          "line-opacity": 0.9,
-        },
-      });
-      addTempLayer(ts.sourceId + "-center", {
-        type: "circle",
-        filter: ["==", "$type", "Point"],
-        paint: {
-          "circle-radius": 8,
-          "circle-color": "#3b82f6",
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 2,
-        },
-      });
-      addTempLayer(ts.sourceId + "-radius", {
-        type: "line",
-        source: ts.sourceId,
-        filter: ["==", "$type", "LineString"],
-        paint: {
-          "line-color": "#3b82f6",
-          "line-width": 2,
-          "line-dasharray": [4, 4],
-          "line-opacity": 0.8,
-        },
-      });
-      const circleLabelSourceId = addLabelSource();
-      addTempLayer(circleLabelSourceId + "-text", {
-        type: "symbol",
-        source: circleLabelSourceId,
-        layout: {
-          "text-field": ["get", "label"],
-          "text-size": 12,
-          "text-allow-overlap": true,
-          "text-ignore-placement": true,
-          "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
-          "text-offset": [0, -1.5],
-          "text-anchor": "bottom",
-        },
-        paint: {
-          "text-color": "#1e40af",
-          "text-halo-color": "#ffffff",
-          "text-halo-width": 2,
-        },
-      });
+      addRectangleLayers();
+      rectStart = null;
       hs.click = (e) => {
-        if (!cs.center) {
-          cs.center = [e.lngLat.lng, e.lngLat.lat];
-          tempCircle.value = {
-            center: { lat: cs.center[1], lng: cs.center[0] },
-            radius: 0,
-          };
-          const src = m.getSource(ts.sourceId);
-          if (src)
-            src.setData({
-              type: "FeatureCollection",
-              features: [
-                {
-                  type: "Feature",
-                  geometry: { type: "Point", coordinates: cs.center },
-                  properties: {},
-                },
-              ],
-            });
+        if (!rectStart) {
+          rectStart = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+          positions.length = 0;
+          positions.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
         } else {
+          const s = rectStart;
+          const f = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+          const pts = [
+            { lng: s.lng, lat: s.lat },
+            { lng: f.lng, lat: s.lat },
+            { lng: f.lng, lat: f.lat },
+            { lng: s.lng, lat: f.lat },
+          ];
+          positions.length = 0;
+          pts.forEach((p) => positions.push(p));
+          updateTempSource([...positions, positions[0]], true);
+          updatePolygonLabels(positions);
           cleanupHandlers();
-          finishDrawing("circle", {
-            center: { lng: cs.center[0], lat: cs.center[1] },
-            radius: cs.radius,
-          });
+          finishDrawing("rectangle", [...positions]);
         }
       };
       hs.mouseMove = (e) => {
-        if (!cs.center) return;
-        const dx =
-          (e.lngLat.lng - cs.center[0]) *
-          111319.9 *
-          Math.cos((cs.center[1] * Math.PI) / 180);
-        const dy = (e.lngLat.lat - cs.center[1]) * 110540;
-        cs.radius = Math.sqrt(dx * dx + dy * dy);
-        tempCircle.value = {
-          center: { lat: cs.center[1], lng: cs.center[0] },
-          radius: cs.radius,
-        };
-        const circleCoords = computeCircleCoords(
-          { lat: cs.center[1], lng: cs.center[0] },
-          cs.radius,
-        );
-        const src = m.getSource(ts.sourceId);
-        if (src) {
-          src.setData({
-            type: "FeatureCollection",
-            features: [
-              {
-                type: "Feature",
-                geometry: { type: "Polygon", coordinates: [circleCoords] },
-                properties: {},
-              },
-              {
-                type: "Feature",
-                geometry: { type: "Point", coordinates: cs.center },
-                properties: {},
-              },
-              {
-                type: "Feature",
-                geometry: {
-                  type: "LineString",
-                  coordinates: [cs.center, [e.lngLat.lng, e.lngLat.lat]],
-                },
-                properties: {},
-              },
-            ],
-          });
-        }
-        const labelSrc = m.getSource(circleLabelSourceId);
-        if (labelSrc) {
-          labelSrc.setData({
-            type: "FeatureCollection",
-            features: [
-              {
-                type: "Feature",
-                geometry: {
-                  type: "Point",
-                  coordinates: [
-                    (cs.center[0] + e.lngLat.lng) / 2,
-                    (cs.center[1] + e.lngLat.lat) / 2,
-                  ],
-                },
-                properties: { label: formatDistance(cs.radius) },
-              },
-            ],
-          });
+        if (!rectStart) return;
+        const s = rectStart;
+        const f = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+        updateRectTempSource(s, f);
+      };
+      hs.key = (event) => {
+        if (event.key === "Escape") {
+          rectStart = null;
+          positions.length = 0;
+          const src = m.getSource(ts.sourceId);
+          if (src) src.setData({ type: "FeatureCollection", features: [] });
         }
       };
+      window.addEventListener("keydown", hs.key);
       m.on("click", hs.click);
       m.on("mousemove", hs.mouseMove);
     }
   }
+
   function finishDrawing(draw, pos) {
     cleanupHandlers();
     map.getCanvas().style.cursor = "default";
     const defaultOpacity = 0.7;
-    if (draw === "circle") {
-      shape.value = {
-        type: "circle",
-        center: pos.center,
-        radius: pos.radius ?? cs.radius,
-        color: color.value,
-        opacity: defaultOpacity,
-        width: 3,
-        backgroundImage: null,
-        show: true,
-      };
-      tempCircle.value = null;
-      cs.center = null;
-      cs.radius = 0;
-    } else if (draw === "multi_point") {
+    if (draw === "multi_point") {
       shape.value = {
         type: "multi_point",
         positions: pos.map((p) => ({
@@ -835,7 +859,7 @@ export function useDrawing(map, pins) {
         width: 3,
         show: true,
       };
-    } else if (draw === "polygon") {
+    } else if (draw === "polygon" || draw === "rectangle") {
       const coords = pos.map((p) => ({ lon: p.lng, lat: p.lat, height: 0 }));
       shape.value = {
         type: "polygon",
@@ -850,7 +874,6 @@ export function useDrawing(map, pins) {
     positions.length = 0;
   }
 
-  /** اتمام ترسیم از پنل یا Enter — در صورت داشتن نام، ذخیره هم می‌شود */
   function finishCurrentDrawing() {
     if (shape.value) {
       if (formData.value?.name?.trim()) {
@@ -874,12 +897,9 @@ export function useDrawing(map, pins) {
       cleanupHandlers();
       finishDrawing("multi_point", [...positions]);
       finished = true;
-    } else if (mode === "circle" && cs.center && cs.radius > 0) {
+    } else if (mode === "rectangle" && positions.length >= 4) {
       cleanupHandlers();
-      finishDrawing("circle", {
-        center: { lng: cs.center[0], lat: cs.center[1] },
-        radius: cs.radius,
-      });
+      finishDrawing("rectangle", [...positions]);
       finished = true;
     }
     if (finished) {
@@ -892,6 +912,7 @@ export function useDrawing(map, pins) {
       });
     }
   }
+
   function setDrawMode(mode) {
     if (drawMode.value === mode && showForm.value) return;
     measureActive.value = false;
@@ -901,16 +922,12 @@ export function useDrawing(map, pins) {
     activeTab.value = "measurements";
     positions.length = 0;
     shape.value = null;
-    tempCircle.value = null;
-    cs.center = null;
-    cs.radius = 0;
     showForm.value = true;
     setTimeout(() => {
       startDrawing();
     }, 100);
   }
 
-  // Measure mode
   function toggleMeasure() {
     measureActive.value = !measureActive.value;
     if (measureActive.value) {
@@ -921,6 +938,7 @@ export function useDrawing(map, pins) {
       stopMeasure();
     }
   }
+
   function startMeasure() {
     const m = map;
     measurePoints.length = 0;
@@ -935,7 +953,7 @@ export function useDrawing(map, pins) {
       source: tempId,
       paint: {
         "line-color": "#f97316",
-        "line-width": 4,
+        "line-width": 3,
         "line-dasharray": [8, 6],
         "line-opacity": 0.85,
       },
@@ -946,10 +964,10 @@ export function useDrawing(map, pins) {
       source: tempId,
       filter: ["==", "$type", "Point"],
       paint: {
-        "circle-radius": 8,
+        "circle-radius": 5,
         "circle-color": "#f97316",
         "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": 3,
+        "circle-stroke-width": 2,
         "circle-opacity": 0.9,
       },
     });
@@ -960,7 +978,7 @@ export function useDrawing(map, pins) {
       filter: ["has", "distance"],
       layout: {
         "text-field": ["get", "distance"],
-        "text-size": 14,
+        "text-size": 12,
         "text-offset": [0, -1.5],
         "text-anchor": "top",
         "text-allow-overlap": true,
@@ -1022,6 +1040,7 @@ export function useDrawing(map, pins) {
     m.on("mousemove", hs.mouseMove);
     m.on("contextmenu", hs.rightClick);
   }
+
   function stopMeasure() {
     cleanupHandlers();
     measurePoints.length = 0;
@@ -1029,7 +1048,6 @@ export function useDrawing(map, pins) {
     clearTempLayers();
   }
 
-  // Cancel form / drawing
   const cancelForm = () => {
     shape.value = null;
     clearTempLayers();
@@ -1037,16 +1055,13 @@ export function useDrawing(map, pins) {
     showForm.value = false;
     drawMode.value = "";
     formData.value = { name: "", description: "" };
-    tempCircle.value = null;
-    cs.center = null;
-    cs.radius = 0;
     positions.length = 0;
     measurePoints.length = 0;
     measureActive.value = false;
+    rectStart = null;
     map.getCanvas().style.cursor = "default";
   };
 
-  // Save pin
   const handleSave = () => {
     if (!shape.value && canFinishDrawing.value) {
       const mode = drawMode.value;
@@ -1058,18 +1073,14 @@ export function useDrawing(map, pins) {
         finishDrawing("polygon", [...positions]);
       } else if (mode === "multi_point" && positions.length >= 1) {
         finishDrawing("multi_point", [...positions]);
-      } else if (mode === "circle" && cs.center && cs.radius > 0) {
+      } else if (mode === "rectangle" && positions.length >= 4) {
         cleanupHandlers();
-        finishDrawing("circle", {
-          center: { lng: cs.center[0], lat: cs.center[1] },
-          radius: cs.radius,
-        });
+        finishDrawing("rectangle", [...positions]);
       }
     }
     savePin();
   };
 
-  // رندر یک ترسیم تازه ذخیره شده روی نقشه
   function renderNewPin(pin) {
     renderPinOnMap(map, pin);
   }
@@ -1097,17 +1108,14 @@ export function useDrawing(map, pins) {
     drawMode.value = "";
     showForm.value = false;
     formData.value = { name: "", description: "" };
-    tempCircle.value = null;
-    cs.center = null;
-    cs.radius = 0;
+    rectStart = null;
     clearTempLayers();
     renderNewPin(pin);
   };
 
-  // Shape helpers
   function getPointsCount() {
     if (!shape.value) return 0;
-    if (shape.value.type === "circle" || shape.value.type === "point") return 1;
+    if (shape.value.type === "point") return 1;
     if (shape.value.type === "multi_point")
       return shape.value.positions?.length || 0;
     const pos = shape.value.positions || [];
@@ -1115,8 +1123,6 @@ export function useDrawing(map, pins) {
   }
   function getAllPoints() {
     if (!shape.value) return [];
-    if (shape.value.type === "circle")
-      return [{ lat: shape.value.center.lat, lon: shape.value.center.lng }];
     if (shape.value.type === "point")
       return [{ lat: shape.value.lat, lon: shape.value.lon }];
     const pos = shape.value.positions || [];
@@ -1164,9 +1170,7 @@ export function useDrawing(map, pins) {
     measureActive.value = false;
     measurePoints.length = 0;
     positions.length = 0;
-    tempCircle.value = null;
-    cs.center = null;
-    cs.radius = 0;
+    rectStart = null;
     if (map.getSource(drawDataSourceId)) {
       map
         .getSource(drawDataSourceId)
@@ -1185,7 +1189,6 @@ export function useDrawing(map, pins) {
     showForm,
     shape,
     activeTab,
-    tempCircle,
     coordinateSystem,
     nameError,
     livePoints,
@@ -1193,7 +1196,6 @@ export function useDrawing(map, pins) {
     livePointCount,
     liveTotalLength,
     liveArea,
-    liveRadius,
     canFinishDrawing,
     isSaveEnabled,
     toggleMeasure,

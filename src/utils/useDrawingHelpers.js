@@ -104,19 +104,19 @@ export function computeCentroid(positions) {
 export function getDrawTypeName(type, isEditing) {
   if (isEditing) {
     const names = {
-      circle: "ویرایش دایره",
       polygon: "ویرایش پلیگن",
       polyline: "ویرایش خط",
       multi_point: "ویرایش چند نقطه",
       point: "ویرایش نقطه",
+      rectangle: "ویرایش مستطیل",
     };
     return names[type] || "ویرایش ترسیم";
   }
   const names = {
-    circle: "ترسیم دایره جدید",
     polygon: "ترسیم پلیگن جدید",
     polyline: "ترسیم خط جدید",
     multi_point: "ترسیم چند نقطه جدید",
+    rectangle: "ترسیم مستطیل جدید",
   };
   return names[type] || "ترسیم جدید";
 }

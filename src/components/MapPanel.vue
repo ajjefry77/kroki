@@ -322,7 +322,7 @@ function initMap() {
   }
 
   try {
-    map = new mapboxgl.Map({
+      map = new mapboxgl.Map({
       container: mapContainerRef.value,
       style: {
         version: 8,
@@ -346,14 +346,17 @@ function initMap() {
       },
       center: [51.5, 35.5],
       zoom: 5,
+      minZoom: 3,
+      maxZoom: 20,
       pitch: 0,
       bearing: 0,
       maxPitch: 0,
       dragRotate: false,
-      pitchWithRotate: true,
+      pitchWithRotate: false,
       touchPitch: false,
       attributionControl: false,
       preserveDrawingBuffer: true,
+      maxBounds: [[-180, -85], [180, 85]],
     });
   } catch (e) {
     console.error("خطا در ایجاد نقشه:", e);

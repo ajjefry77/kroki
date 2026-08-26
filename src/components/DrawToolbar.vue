@@ -4,7 +4,6 @@
       @click.stop
       class="flex flex-col rounded-md shadow-lg p-2 gap-1.5 bg-white/10 backdrop-blur-md border border-white/20"
     >
-
       
       <!-- اندازه‌گیری -->
       <button
@@ -52,18 +51,18 @@
         <i class="fas fa-draw-polygon"></i>
       </button>
 
-      <!-- دایره -->
+      <!-- مستطیل -->
       <button
-        @click="$emit('setDrawMode', 'circle')"
+        @click="$emit('setDrawMode', 'rectangle')"
         :class="[
           'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
-          drawMode === 'circle'
+          drawMode === 'rectangle'
             ? 'text-white bg-accent'
             : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)]',
         ]"
-        title="دایره"
+        title="مستطیل"
       >
-        <i class="fa fa-circle"></i>
+        <i class="far fa-square"></i>
       </button>
 
       <div class="w-full border-t border-[var(--border)] my-1"></div>
