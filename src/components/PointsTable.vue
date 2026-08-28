@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full min-h-0">
+  <div class="flex flex-col">
     <div class="px-4 py-3 border-b border-[var(--border)]">
       <h2 class="text-sm font-semibold flex items-center gap-2">
         <i class="fas fa-table-cells text-[var(--accent)]"></i>
@@ -10,7 +10,7 @@
       </p>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
+    <div class="p-3 space-y-4">
       <!-- ترسیم در حال انجام -->
       <div v-if="draftRows.length" class="card !rounded-xl !p-3 ring-1 ring-[var(--accent)]/50">
         <div class="flex items-center justify-between mb-2">
@@ -27,11 +27,9 @@
             <thead>
               <tr class="text-[var(--text-muted)]">
                 <th class="text-center w-6">#</th>
-                <th class="text-center">X (UTM)</th>
-                <th class="text-center">Y (UTM)</th>
-                <th class="text-center">Zone</th>
-                <th class="text-center">عرض (Lat)</th>
-                <th class="text-center">طول (Lon)</th>
+                <th class="text-center min-w-[80px]">X (UTM)</th>
+                <th class="text-center min-w-[80px]">Y (UTM)</th>
+                <th class="text-center min-w-[56px]">Zone</th>
                 <th class="w-6"></th>
               </tr>
             </thead>
@@ -42,7 +40,7 @@
                   <input
                     type="number"
                     step="any"
-                    class="input !py-1 !text-[11px] text-center"
+                    class="input w-full !py-1.5 !px-1.5 !text-[13px] text-center"
                     dir="ltr"
                     :value="pt.x"
                     @change="updateDraftPoint(i, 'utmX', $event.target.value)"
@@ -52,7 +50,7 @@
                   <input
                     type="number"
                     step="any"
-                    class="input !py-1 !text-[11px] text-center"
+                    class="input w-full !py-1.5 !px-1.5 !text-[13px] text-center"
                     dir="ltr"
                     :value="pt.y"
                     @change="updateDraftPoint(i, 'utmY', $event.target.value)"
@@ -61,30 +59,10 @@
                 <td>
                   <input
                     type="number"
-                    class="input !py-1 !text-[11px] text-center"
+                    class="input w-full !py-1.5 !px-1.5 !text-[13px] text-center"
                     dir="ltr"
                     :value="pt.zone"
                     @change="updateDraftPoint(i, 'utmZone', $event.target.value)"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="any"
-                    class="input !py-1 !text-[11px] text-center"
-                    dir="ltr"
-                    :value="pt.lat"
-                    @change="updateDraftPoint(i, 'lat', $event.target.value)"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="any"
-                    class="input !py-1 !text-[11px] text-center"
-                    dir="ltr"
-                    :value="pt.lon"
-                    @change="updateDraftPoint(i, 'lon', $event.target.value)"
                   />
                 </td>
                 <td class="text-center">
@@ -126,11 +104,9 @@
             <thead>
               <tr class="text-[var(--text-muted)]">
                 <th class="text-center w-6">#</th>
-                <th class="text-center">X (UTM)</th>
-                <th class="text-center">Y (UTM)</th>
-                <th class="text-center">Zone</th>
-                <th class="text-center">عرض (Lat)</th>
-                <th class="text-center">طول (Lon)</th>
+                <th class="text-center min-w-[80px]">X (UTM)</th>
+                <th class="text-center min-w-[80px]">Y (UTM)</th>
+                <th class="text-center min-w-[56px]">Zone</th>
                 <th class="w-6"></th>
               </tr>
             </thead>
@@ -141,7 +117,7 @@
                   <input
                     type="number"
                     step="any"
-                    class="input !py-1 !text-[11px] text-center"
+                    class="input w-full !py-1.5 !px-1.5 !text-[13px] text-center"
                     dir="ltr"
                     :value="pt.x"
                     @change="updatePoint(i, 'utmX', $event.target.value)"
@@ -151,7 +127,7 @@
                   <input
                     type="number"
                     step="any"
-                    class="input !py-1 !text-[11px] text-center"
+                    class="input w-full !py-1.5 !px-1.5 !text-[13px] text-center"
                     dir="ltr"
                     :value="pt.y"
                     @change="updatePoint(i, 'utmY', $event.target.value)"
@@ -160,30 +136,10 @@
                 <td>
                   <input
                     type="number"
-                    class="input !py-1 !text-[11px] text-center"
+                    class="input w-full !py-1.5 !px-1.5 !text-[13px] text-center"
                     dir="ltr"
                     :value="pt.zone"
                     @change="updatePoint(i, 'utmZone', $event.target.value)"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="any"
-                    class="input !py-1 !text-[11px] text-center"
-                    dir="ltr"
-                    :value="pt.lat"
-                    @change="updatePoint(i, 'lat', $event.target.value)"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="any"
-                    class="input !py-1 !text-[11px] text-center"
-                    dir="ltr"
-                    :value="pt.lon"
-                    @change="updatePoint(i, 'lon', $event.target.value)"
                   />
                 </td>
                 <td class="text-center">
@@ -209,11 +165,6 @@
 
       <div v-else-if="activePin" class="card !rounded-xl !p-3 text-[11px] text-[var(--text-muted)]">
         این ترسیم نقطه قابل ویرایش ندارد.
-      </div>
-
-      <div v-else class="card !rounded-xl !p-3 text-[11px] text-[var(--text-muted)] leading-6">
-        <i class="fas fa-hand-pointer ml-1 text-[var(--accent)]"></i>
-        روی یکی از ترسیم‌ها (در نقشه یا فهرست سمت راست) کلیک کنید تا نقاط آن برای ویرایش نمایش داده شود.
       </div>
 
       <!-- ساخت ترسیم جدید با نقاط دستی / CSV -->
@@ -245,32 +196,24 @@
             <table class="w-full text-[11px]">
               <thead>
                 <tr class="text-[var(--text-muted)]">
-                  <th class="text-center w-6">#</th>
-                  <th class="text-center">X (UTM)</th>
-                  <th class="text-center">Y (UTM)</th>
-                  <th class="text-center">Zone</th>
-                  <th class="text-center">عرض (Lat)</th>
-                  <th class="text-center">طول (Lon)</th>
-                  <th class="w-6"></th>
+                <th class="text-center w-6">#</th>
+                <th class="text-center min-w-[80px]">X (UTM)</th>
+                <th class="text-center min-w-[80px]">Y (UTM)</th>
+                <th class="text-center min-w-[56px]">Zone</th>
+                <th class="w-6"></th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(pt, i) in builderPoints" :key="i">
                   <td class="text-center text-[var(--text-faint)]">{{ i + 1 }}</td>
                   <td>
-                    <input v-model="pt.utmX" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="569000" @input="syncBuilderUtm(i)" />
+                    <input v-model="pt.utmX" type="number" step="any" dir="ltr" class="input w-full !py-1.5 !text-[13px] text-center" placeholder="569000" @input="syncBuilderUtm(i)" />
                   </td>
                   <td>
-                    <input v-model="pt.utmY" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="3958000" @input="syncBuilderUtm(i)" />
+                    <input v-model="pt.utmY" type="number" step="any" dir="ltr" class="input w-full !py-1.5 !text-[13px] text-center" placeholder="3958000" @input="syncBuilderUtm(i)" />
                   </td>
                   <td>
-                    <input v-model="pt.utmZone" type="number" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="39" @input="syncBuilderUtm(i)" />
-                  </td>
-                  <td>
-                    <input v-model="pt.lat" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="35.7" @input="syncBuilderLatLon(i)" />
-                  </td>
-                  <td>
-                    <input v-model="pt.lon" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="51.4" @input="syncBuilderLatLon(i)" />
+                    <input v-model="pt.utmZone" type="number" dir="ltr" class="input w-full !py-1.5 !text-[13px] text-center" placeholder="39" @input="syncBuilderUtm(i)" />
                   </td>
                   <td class="text-center">
                     <button class="text-gray-500 hover:text-[var(--danger)] px-1" @click="builderPoints.splice(i, 1)">
@@ -430,18 +373,6 @@ const canCreate = computed(() => {
   const minPts = builderType.value === "polygon" ? 3 : 2;
   return valid.length >= minPts;
 });
-
-function syncBuilderLatLon(i) {
-  const pt = builderPoints.value[i];
-  if (!pt) return;
-  const lat = parseFloat(pt.lat);
-  const lon = parseFloat(pt.lon);
-  if (isNaN(lat) || isNaN(lon)) return;
-  const { x, y, zone } = toUTM(lon, lat);
-  pt.utmX = x.toFixed(2);
-  pt.utmY = y.toFixed(2);
-  pt.utmZone = String(zone);
-}
 
 function syncBuilderUtm(i) {
   const pt = builderPoints.value[i];

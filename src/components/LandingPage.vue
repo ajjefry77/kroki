@@ -2,7 +2,7 @@
   <div class="landing min-h-screen flex flex-col overflow-x-hidden">
     <!-- نوار بالا -->
     <header class="sticky top-0 z-50 backdrop-blur-md bg-[var(--bg)]/85 border-b border-[var(--border)]">
-      <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+      <div class="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow-strong)]">
             <i class="fas fa-drafting-compass text-[#241a05] text-lg"></i>
@@ -105,7 +105,7 @@
     <!-- هیرو -->
     <section class="relative flex-1 flex items-center justify-center py-16 md:py-24">
       <div class="hero-bg absolute inset-0 pointer-events-none"></div>
-      <div class="relative max-w-5xl mx-auto px-5 text-center">
+      <div class="relative max-w-7xl mx-auto px-5 text-center">
         <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--accent)]/40 bg-[var(--accent-glow)] text-[var(--accent-soft)] text-xs font-medium mb-6 reveal">
           <i class="fas fa-certificate"></i>
           رسمی، سازمانی و با استانداردهای فنی
@@ -209,7 +209,7 @@
 
     <!-- امکانات -->
     <section id="features" class="py-16 md:py-20 border-t border-[var(--border)] bg-[var(--bg-elevated)]/50">
-      <div class="max-w-6xl mx-auto px-5">
+      <div class="max-w-7xl mx-auto px-5">
         <div class="text-center mb-12 reveal">
           <div class="text-xs text-[var(--accent-soft)] font-semibold mb-2">امکانات سامانه</div>
           <h2 class="text-2xl md:text-4xl font-extrabold">همه‌چیز برای یک کروکی دقیق</h2>
@@ -229,7 +229,7 @@
 
     <!-- قالب‌ها -->
     <section id="templates" class="py-16 md:py-20 border-t border-[var(--border)]">
-      <div class="max-w-6xl mx-auto px-5">
+      <div class="max-w-7xl mx-auto px-5">
         <div class="text-center mb-12 reveal">
           <div class="text-xs text-[var(--accent-soft)] font-semibold mb-2">قالب‌های آماده</div>
           <h2 class="text-2xl md:text-4xl font-extrabold">قالب استاندارد کروکی را انتخاب کنید</h2>
@@ -265,7 +265,7 @@
 
     <!-- مراحل -->
     <section id="how" class="py-16 md:py-20 border-t border-[var(--border)] bg-[var(--bg-elevated)]/50">
-      <div class="max-w-5xl mx-auto px-5">
+      <div class="max-w-7xl mx-auto px-5">
         <div class="text-center mb-12 reveal">
           <div class="text-xs text-[var(--accent-soft)] font-semibold mb-2">مراحل کار</div>
           <h2 class="text-2xl md:text-4xl font-extrabold">در ۵ گام ساده</h2>
@@ -288,7 +288,7 @@
     <!-- CTA پایانی -->
     <section class="py-16 md:py-24 border-t border-[var(--border)] relative overflow-hidden">
       <div class="absolute inset-0 hero-bg pointer-events-none"></div>
-      <div class="relative max-w-3xl mx-auto px-5 text-center reveal">
+      <div class="relative max-w-7xl mx-auto px-5 text-center reveal">
         <h2 class="text-2xl md:text-4xl font-extrabold mb-4">آماده ساخت کروکی هستید؟</h2>
         <p class="text-[var(--text-muted)] mb-8">همین حالا شروع کنید و در چند دقیقه کروکی استاندارد خود را دریافت کنید.</p>
         <button class="btn btn-primary !px-10 !py-3.5 !text-lg !rounded-xl" @click="$emit('start')">
@@ -299,7 +299,7 @@
     </section>
 
     <footer class="border-t border-[var(--border)] py-6 bg-[var(--bg-elevated)]/70">
-      <div class="max-w-6xl mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
+      <div class="max-w-7xl mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
         <div class="flex items-center gap-2">
           <i class="fas fa-drafting-compass text-[var(--accent)]"></i>
           <span>سامانه تولید کروکی نقشه — نسخه آزمایشی</span>
