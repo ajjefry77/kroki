@@ -21,7 +21,7 @@
           </div>
           <div>
             <h2 class="font-bold text-sm">اطلاعات کروکی</h2>
-            <p class="text-[11px] text-[var(--text-muted)]">مشخصات ملک و کارفرما را وارد کنید</p>
+            <p class="text-[11px] text-[var(--text-muted)]">مشخصات ملک و متقاضی را وارد کنید</p>
           </div>
         </div>
 
@@ -42,8 +42,8 @@
             />
           </div>
           <div>
-            <label class="block mb-1.5 font-medium text-xs">کارفرما / درخواست‌کننده *</label>
-            <input v-model="form.client" type="text" class="input" placeholder="نام کارفرما" />
+            <label class="block mb-1.5 font-medium text-xs">متقاضی *</label>
+            <input v-model="form.client" type="text" class="input" placeholder="نام متقاضی" />
           </div>
           <div>
             <label class="block mb-1.5 font-medium text-xs">کارشناس / نقشه‌بردار</label>

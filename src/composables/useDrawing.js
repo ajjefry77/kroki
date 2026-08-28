@@ -1118,16 +1118,25 @@ export function useDrawing(map, pins) {
     if (shape.value.type === "point") return 1;
     if (shape.value.type === "multi_point")
       return shape.value.positions?.length || 0;
-    const pos = shape.value.positions || [];
-    return pos.length > 0 ? pos.length - 1 : 0;
+    return getAllPoints().length;
   }
   function getAllPoints() {
     if (!shape.value) return [];
     if (shape.value.type === "point")
       return [{ lat: shape.value.lat, lon: shape.value.lon }];
     const pos = shape.value.positions || [];
-    if (shape.value.type === "polygon" && pos.length > 1)
-      return pos.slice(0, -1);
+    if (pos.length > 1) {
+      const first = pos[0];
+      const last = pos[pos.length - 1];
+      // نقطه پایانی اگر دقیقاً همان نقطه آغازین باشد (بسته‌سازی تکراری) حذف می‌شود
+      if (
+        shape.value.type === "polygon" &&
+        last.lon === first.lon &&
+        last.lat === first.lat
+      ) {
+        return pos.slice(0, -1);
+      }
+    }
     return pos;
   }
   function calculateTotalLength() {
@@ -1179,6 +1188,106 @@ export function useDrawing(map, pins) {
     map.getCanvas().style.cursor = "default";
   }
 
+  /* -------- ویرایش نقاط ترسیم در حال انجام از جدول ✏️ -------- */
+
+  function renderDraftLayers() {
+    if (!map) return;
+    if (shape.value) {
+      const s = shape.value;
+      clearTempLayers();
+      positions.length = 0;
+      (s.positions || []).forEach((p) =>
+        positions.push({ lng: p.lon ?? p.lng, lat: p.lat }),
+      );
+      drawMode.value = s.type;
+      if (!positions.length) return;
+      addTempSource();
+      if (s.type === "polygon") {
+        if (positions.length >= 3) {
+          addPolygonLayers();
+          updateTempSource(positions, true);
+          updatePolygonLabels(positions);
+        }
+      } else if (s.type === "multi_point") {
+        addMultiPointLayers();
+        updateTempSource(positions, false);
+      } else {
+        addPolylineLayers();
+        updateTempSource(positions);
+        updateLineLabels(positions);
+      }
+      return;
+    }
+    if (!positions.length) return;
+    if (drawMode.value === "polygon") {
+      updateTempSource(positions, true);
+      updatePolygonLabels(positions);
+    } else if (drawMode.value === "polyline") {
+      updateTempSource(positions);
+      updateLineLabels(positions);
+    } else {
+      const src = map.getSource(ts.sourceId);
+      if (src) src.setData(buildFeatures(positions, false));
+    }
+  }
+
+  function updateDraftPoint(index, key, value) {
+    const num = parseFloat(value);
+    if (isNaN(num)) return;
+    if (shape.value) {
+      const s = shape.value;
+      if (s.type === "point") {
+        s[key] = num;
+      } else if (Array.isArray(s.positions) && s.positions[index]) {
+        s.positions[index][key === "lon" ? "lon" : "lat"] = num;
+      }
+    } else if (Array.isArray(positions) && positions[index]) {
+      if (key === "lon") positions[index].lng = num;
+      else positions[index].lat = num;
+    }
+    renderDraftLayers();
+    logger.info("draw", "ویرایش دستی نقطه در حال ترسیم", { index, key, value: num });
+  }
+
+  function removeDraftPoint(index) {
+    if (shape.value) {
+      const s = shape.value;
+      if (!Array.isArray(s.positions)) return;
+      const min = s.type === "polygon" ? 3 : 2;
+      if (s.positions.length <= min) return;
+      s.positions.splice(index, 1);
+    } else if (Array.isArray(positions) && positions[index]) {
+      positions.splice(index, 1);
+    }
+    renderDraftLayers();
+  }
+
+  function addDraftPoint() {
+    const push = (arr) => {
+      const last = arr[arr.length - 1];
+      const prev = arr.length > 1 ? arr[arr.length - 2] : last;
+      const dLat = last.lat - prev.lat || 0.0002;
+      const dLon =
+        (last.lon ?? last.lng) - (prev.lon ?? prev.lng) || 0.0002;
+      arr.push({
+        lat: last.lat + dLat,
+        lon: (last.lon ?? last.lng) + dLon,
+        height: 0,
+      });
+    };
+    if (shape.value && Array.isArray(shape.value.positions)) {
+      push(shape.value.positions);
+    } else if (positions.length) {
+      const arr = positions;
+      const last = arr[arr.length - 1];
+      const prev = arr.length > 1 ? arr[arr.length - 2] : last;
+      const dLat = last.lat - prev.lat || 0.0002;
+      const dLng = (last.lng ?? last.lon) - (prev.lng ?? prev.lon) || 0.0002;
+      arr.push({ lng: last.lng + dLng, lat: last.lat + dLat });
+    }
+    renderDraftLayers();
+  }
+
   return {
     loading,
     drawMode,
@@ -1206,5 +1315,8 @@ export function useDrawing(map, pins) {
     getDrawTypeName: () =>
       getDrawTypeName(shape.value?.type || drawMode.value, false),
     inactiveDrawing,
+    updateDraftPoint,
+    removeDraftPoint,
+    addDraftPoint,
   };
 }

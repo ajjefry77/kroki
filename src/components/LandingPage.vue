@@ -194,7 +194,7 @@
                 <text x="140" y="352" fill="#333" font-size="12" font-family="Tahoma" text-anchor="middle">50 m</text>
                 <rect x="70" y="410" width="760" height="78" fill="none" stroke="#1d3a6e" stroke-width="1.5" />
                 <rect x="70" y="410" width="760" height="22" fill="#1d3a6e" />
-                <text x="820" y="425" fill="#fff" font-size="11" font-family="Vazirmatn, Tahoma" text-anchor="start">کارفرما: مثال</text>
+                <text x="820" y="425" fill="#fff" font-size="11" font-family="Vazirmatn, Tahoma" text-anchor="start">متقاضی: مثال</text>
                 <text x="450" y="425" fill="#fff" font-size="11" font-family="Vazirmatn, Tahoma" text-anchor="middle">مقیاس: ۱:۵۰۰</text>
                 <text x="80" y="425" fill="#fff" font-size="11" font-family="Vazirmatn, Tahoma" text-anchor="end">تاریخ: ۱۴۰۳</text>
                 <text x="820" y="450" fill="#333" font-size="10" font-family="Vazirmatn, Tahoma" text-anchor="start">سیستم مختصات: WGS84 / UTM</text>
@@ -339,7 +339,7 @@ const features = [
 
 const steps = [
   { title: "ترسیم نقشه", desc: "مرز ملک را روی نقشه هوایی رسم کنید یا فایل KML بارگذاری کنید." },
-  { title: "ثبت اطلاعات", desc: "مشخصات ملک، کارفرما و قالب کروکی را وارد کنید." },
+  { title: "ثبت اطلاعات", desc: "مشخصات ملک، متقاضی و قالب کروکی را وارد کنید." },
   { title: "پیش‌نمایش", desc: "خروجی نهایی را بررسی و ویرایش متن ضلع‌ها را انجام دهید." },
   { title: "پرداخت", desc: "به‌صورت امن و آنی هزینه سرویس را پرداخت کنید." },
   { title: "دانلود", desc: "فایل کروکی را در قالب PNG یا PDF دانلود کنید." },

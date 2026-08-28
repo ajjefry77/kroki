@@ -2,12 +2,24 @@
   <div class="flex-1 min-h-0 flex flex-col bg-[var(--bg)]">
     <main class="flex-1 min-h-0 flex flex-col lg:flex-row">
       <!-- نقشه -->
-      <section class="relative flex-1 min-h-[340px] lg:min-h-0 border-b lg:border-b-0 lg:border-l border-[var(--border)]">
-        <MapPanel :pins="pins" @mapReady="$emit('mapReady', $event)" @openKroki="$emit('openKroki')" />
+      <section class="relative flex-1 min-h-[340px] lg:min-h-0 border-b lg:border-b-0 border-[var(--border)]">
+        <MapPanel :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" />
       </section>
 
+      <!-- جدول نقاط (سمت چپ نقشه، بلافاصله کنار آن) -->
+      <aside class="lg:w-[300px] xl:w-[340px] flex-shrink-0 flex flex-col border-t lg:border-t-0 lg:border-r border-[var(--border)] bg-[var(--surface)]">
+        <PointsTable
+          :pins="pins"
+          :active-pin-id="activePinId"
+          :drawing="drawingRef"
+          :map="mapRef"
+          @select="activePinId = $event"
+          @created="onShapeCreated"
+        />
+      </aside>
+
       <!-- لیست ترسیم‌ها -->
-      <aside class="lg:w-[360px] xl:w-[400px] flex-shrink-0 flex flex-col border-t lg:border-t-0 border-[var(--border)] bg-[var(--surface)]">
+      <aside class="lg:w-[260px] xl:w-[300px] flex-shrink-0 flex flex-col border-t lg:border-t-0 lg:border-r border-[var(--border)] bg-[var(--surface)]">
         <div class="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
           <h2 class="text-sm font-semibold flex items-center gap-2">
             <i class="fas fa-list-check text-[var(--accent)]"></i>
@@ -24,7 +36,7 @@
             <p>
               هنوز ترسیمی روی نقشه وجود ندارد.<br />
               از ابزارهای سمت چپ نقشه استفاده کنید<br />
-              یا فایل KML آپلود کنید.
+              یا فایل KML آپلود کنید یا از جدول نقاط استفاده کنید.
             </p>
             <button class="btn btn-ghost btn-xs" @click="showKmlHint = !showKmlHint">
               <i class="fas fa-question-circle ml-1"></i>
@@ -36,8 +48,12 @@
             <div
               v-for="p in flatPins"
               :key="p.id"
-              class="flex items-center gap-2 rounded-lg px-2.5 py-2 bg-[var(--surface2)] border transition"
-              :class="isKrokiEligible(p) ? 'border-[var(--border)]' : 'border-[var(--border)]/50 opacity-70'"
+              class="flex items-center gap-2 rounded-lg px-2.5 py-2 bg-[var(--surface2)] border transition cursor-pointer"
+              :class="[
+                isKrokiEligible(p) ? 'border-[var(--border)]' : 'border-[var(--border)]/50 opacity-70',
+                activePinId === p.id ? 'ring-2 ring-[var(--accent)]' : '',
+              ]"
+              @click="activePinId = p.id"
             >
               <input
                 v-if="isKrokiEligible(p)"
@@ -45,6 +61,7 @@
                 type="checkbox"
                 class="accent-[var(--accent)]"
                 :title="p.selected === false ? 'شامل ساختن در کروکی' : 'حذف از کروکی'"
+                @click.stop
               />
               <i class="w-4 text-center text-xs" :class="shapeIcon(p)"></i>
               <div class="flex-1 min-w-0">
@@ -59,7 +76,7 @@
               <button
                 class="text-gray-500 hover:text-[var(--danger)] text-sm px-1 leading-none transition"
                 title="حذف ترسیم"
-                @click="$emit('removePin', p)"
+                @click.stop="onRemove(p)"
               >
                 <i class="fas fa-trash-alt"></i>
               </button>
@@ -76,6 +93,8 @@
               <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> از تولبار سمت چپ نقشه، ابزار ترسیم را انتخاب کنید.</li>
               <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی نقشه نقاط را اضافه کنید و با Enter پایان دهید.</li>
               <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> برای آپلود فایل KML/KMZ از دکمه بالای نقشه استفاده کنید.</li>
+              <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> از جدول نقاط سمت چپ نیز می‌توانید با Import CSV یا وارد کردن دستی مختصات، ترسیم بسازید.</li>
+              <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی هر ترسیم (اینجا یا در جدول نقاط)، نقاط آن برای ویرایش نمایش داده می‌شود — نقاط KML نیز قابل ویرایش‌اند.</li>
               <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> تیک ترسیم‌هایی که می‌خواهید در کروکی بیاید فعال باشد.</li>
             </ul>
           </div>
@@ -118,6 +137,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import MapPanel from "../MapPanel.vue";
+import PointsTable from "../PointsTable.vue";
 import { eligiblePinsOf, isKrokiEligible } from "../../composables/useKrokiGenerator";
 
 const props = defineProps({
@@ -127,6 +147,24 @@ const props = defineProps({
 const emit = defineEmits(["mapReady", "openKroki", "removePin", "submit", "back"]);
 
 const showKmlHint = ref(false);
+const activePinId = ref(null);
+const mapRef = ref(null);
+const drawingRef = ref(null);
+
+function onMapReady(payload) {
+  mapRef.value = payload?.map || null;
+  drawingRef.value = payload?.drawing || null;
+  emit("mapReady", payload);
+}
+
+function onShapeCreated(pin) {
+  activePinId.value = pin.id;
+}
+
+function onRemove(p) {
+  if (activePinId.value === p.id) activePinId.value = null;
+  emit("removePin", p);
+}
 
 function flatten(list) {
   const out = [];

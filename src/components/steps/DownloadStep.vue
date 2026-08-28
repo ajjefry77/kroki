@@ -32,7 +32,7 @@
             <span class="font-medium">{{ form.title }}</span>
           </div>
           <div class="flex items-center justify-between bg-[var(--surface2)] rounded-lg px-3 py-2.5">
-            <span class="text-[var(--text-muted)]">کارفرما</span>
+            <span class="text-[var(--text-muted)]">متقاضی</span>
             <span class="font-medium">{{ form.client }}</span>
           </div>
           <div class="flex items-center justify-between bg-[var(--surface2)] rounded-lg px-3 py-2.5">

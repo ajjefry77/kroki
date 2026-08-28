@@ -1,6 +1,54 @@
 import { getDashArray, ensurePointSymbolImages, pointIcon } from "./drawStyle";
 import { registerDrawLayer, bringDrawingsToFront } from "./layerOrder";
 
+// بازسازی داده‌های هندسی یک ترسیم روی نقشه پس از ویرایش نقاط آن (دستی، CSV یا KML)
+export function updatePinGeometry(map, pin) {
+  if (!map || !pin || !pin.shape) return;
+  const s = pin.shape;
+  const sourceId = s._sourceIds?.[0] || "draw-pin-" + pin.id;
+  const source = map.getSource(sourceId);
+  if (!source) return;
+
+  if (s.type === "polygon" || s.type === "polyline") {
+    const coords = (s.positions || []).map((p) => [Number(p.lon), Number(p.lat)]);
+    if (s.type === "polygon" && coords.length) coords.push(coords[0]);
+    source.setData({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry:
+            s.type === "polygon"
+              ? { type: "Polygon", coordinates: [coords] }
+              : { type: "LineString", coordinates: coords },
+          properties: { name: pin.name },
+        },
+      ],
+    });
+  } else if (s.type === "point") {
+    source.setData({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [Number(s.lon), Number(s.lat)] },
+          properties: {},
+        },
+      ],
+    });
+  } else if (s.type === "multi_point") {
+    const features = (s.positions || []).map((p) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [Number(p.lon), Number(p.lat)] },
+      properties: {
+        color: p.color || s.color || "#00ff00",
+        icon: pointIcon(s.symbol || p.symbol),
+      },
+    }));
+    source.setData({ type: "FeatureCollection", features });
+  }
+}
+
 export function renderPinOnMap(map, pin) {
   if (!map || !pin || !pin.shape || !pin.shape.type) return;
   const s = pin.shape;
