@@ -15,10 +15,6 @@
             <i class="fas fa-layers text-[var(--accent)]"></i>
             {{ currentTemplate?.name }} — {{ currentTemplate?.subtitle }}
           </span>
-          <button class="btn btn-ghost btn-sm" :disabled="!gen.state.ready" @click="print">
-            <i class="fas fa-print ml-1"></i>
-            چاپ / PDF
-          </button>
         </div>
       </div>
 
@@ -49,7 +45,7 @@
           </div>
         </div>
         <p class="text-[10px] text-[var(--text-faint)] mt-2 leading-5">
-          در حالت عمودی، کروکی در یک سطر کامل و تصویر نقشه به‌صورت بندانگشتی گوشه آن قرار می‌گیرد.
+          در حالت عمودی، کروکی در یک سطر کامل قرار می‌گیرد و تصویر نقشه در یک قاب جداگانه زیر آن چاپ می‌شود.
           در حالت افقی، کروکی بزرگ در وسط صفحه و سایر اطلاعات در دو طرف آن چیده می‌شوند.
         </p>
       </div>
@@ -67,35 +63,6 @@
           placeholder="نشانی کامل ملک را وارد یا ویرایش کنید"
           @input="rerender"
         />
-      </div>
-
-      <!-- آدرس‌یابی مراکز ترسیم‌ها -->
-      <div v-if="gen.state.ready && gen.state.shapeCentroids?.length" class="card !rounded-2xl !py-3">
-        <label class="text-xs font-semibold flex items-center gap-2 mb-1">
-          <i class="fas fa-map-location-dot text-[var(--accent)]"></i>
-          آدرس‌یابی مراکز ترسیم‌ها (قابل ویرایش)
-        </label>
-        <p class="text-[10px] text-[var(--text-faint)] mb-3 leading-5">
-          این نشانی‌ها به‌صورت خودکار از موقعیت مرکز هر ترسیم شناسایی شده‌اند؛ می‌توانید آن‌ها را ویرایش کنید تا در خروجی چاپی اعمال شوند.
-        </p>
-        <div v-for="(c, i) in gen.state.shapeCentroids" :key="i" class="mb-3 last:mb-0 flex items-start gap-2">
-          <div class="shrink-0 mt-1 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-[#fff]" :style="{ background: 'var(--accent)' }">
-            {{ i + 1 }}
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] text-[var(--text-muted)] mb-1" dir="ltr">
-              مرکز: X {{ c.utm?.x?.toFixed(2) }} / Y {{ c.utm?.y?.toFixed(2) }}
-            </div>
-            <input
-              v-model="c.address"
-              type="text"
-              class="input !text-xs"
-              dir="rtl"
-              placeholder="نشانی مرکز این ترسیم…"
-              @input="rerender"
-            />
-          </div>
-        </div>
       </div>
 
       <!-- حالت تولید -->
@@ -397,9 +364,5 @@ function downloadMap() {
 
 function downloadSketch() {
   props.gen.downloadCanvasImage(sketchCanvasRef.value, "kroki-sketch.png");
-}
-
-function print() {
-  props.gen.openPrint(sketchCanvasRef.value);
 }
 </script>

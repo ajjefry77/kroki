@@ -27,6 +27,9 @@
             <thead>
               <tr class="text-[var(--text-muted)]">
                 <th class="text-center w-6">#</th>
+                <th class="text-center">X (UTM)</th>
+                <th class="text-center">Y (UTM)</th>
+                <th class="text-center">Zone</th>
                 <th class="text-center">عرض (Lat)</th>
                 <th class="text-center">طول (Lon)</th>
                 <th class="w-6"></th>
@@ -35,6 +38,35 @@
             <tbody>
               <tr v-for="(pt, i) in draftRows" :key="i">
                 <td class="text-center text-[var(--text-faint)]">{{ i + 1 }}</td>
+                <td>
+                  <input
+                    type="number"
+                    step="any"
+                    class="input !py-1 !text-[11px] text-center"
+                    dir="ltr"
+                    :value="pt.x"
+                    @change="updateDraftPoint(i, 'utmX', $event.target.value)"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    step="any"
+                    class="input !py-1 !text-[11px] text-center"
+                    dir="ltr"
+                    :value="pt.y"
+                    @change="updateDraftPoint(i, 'utmY', $event.target.value)"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    class="input !py-1 !text-[11px] text-center"
+                    dir="ltr"
+                    :value="pt.zone"
+                    @change="updateDraftPoint(i, 'utmZone', $event.target.value)"
+                  />
+                </td>
                 <td>
                   <input
                     type="number"
@@ -94,6 +126,9 @@
             <thead>
               <tr class="text-[var(--text-muted)]">
                 <th class="text-center w-6">#</th>
+                <th class="text-center">X (UTM)</th>
+                <th class="text-center">Y (UTM)</th>
+                <th class="text-center">Zone</th>
                 <th class="text-center">عرض (Lat)</th>
                 <th class="text-center">طول (Lon)</th>
                 <th class="w-6"></th>
@@ -102,6 +137,35 @@
             <tbody>
               <tr v-for="(pt, i) in pointRows" :key="i">
                 <td class="text-center text-[var(--text-faint)]">{{ i + 1 }}</td>
+                <td>
+                  <input
+                    type="number"
+                    step="any"
+                    class="input !py-1 !text-[11px] text-center"
+                    dir="ltr"
+                    :value="pt.x"
+                    @change="updatePoint(i, 'utmX', $event.target.value)"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    step="any"
+                    class="input !py-1 !text-[11px] text-center"
+                    dir="ltr"
+                    :value="pt.y"
+                    @change="updatePoint(i, 'utmY', $event.target.value)"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    class="input !py-1 !text-[11px] text-center"
+                    dir="ltr"
+                    :value="pt.zone"
+                    @change="updatePoint(i, 'utmZone', $event.target.value)"
+                  />
+                </td>
                 <td>
                   <input
                     type="number"
@@ -182,6 +246,9 @@
               <thead>
                 <tr class="text-[var(--text-muted)]">
                   <th class="text-center w-6">#</th>
+                  <th class="text-center">X (UTM)</th>
+                  <th class="text-center">Y (UTM)</th>
+                  <th class="text-center">Zone</th>
                   <th class="text-center">عرض (Lat)</th>
                   <th class="text-center">طول (Lon)</th>
                   <th class="w-6"></th>
@@ -191,10 +258,19 @@
                 <tr v-for="(pt, i) in builderPoints" :key="i">
                   <td class="text-center text-[var(--text-faint)]">{{ i + 1 }}</td>
                   <td>
-                    <input v-model="pt.lat" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="35.7" />
+                    <input v-model="pt.utmX" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="569000" @input="syncBuilderUtm(i)" />
                   </td>
                   <td>
-                    <input v-model="pt.lon" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="51.4" />
+                    <input v-model="pt.utmY" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="3958000" @input="syncBuilderUtm(i)" />
+                  </td>
+                  <td>
+                    <input v-model="pt.utmZone" type="number" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="39" @input="syncBuilderUtm(i)" />
+                  </td>
+                  <td>
+                    <input v-model="pt.lat" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="35.7" @input="syncBuilderLatLon(i)" />
+                  </td>
+                  <td>
+                    <input v-model="pt.lon" type="number" step="any" dir="ltr" class="input !py-1 !text-[11px] text-center" placeholder="51.4" @input="syncBuilderLatLon(i)" />
                   </td>
                   <td class="text-center">
                     <button class="text-gray-500 hover:text-[var(--danger)] px-1" @click="builderPoints.splice(i, 1)">
@@ -207,7 +283,7 @@
           </div>
 
           <div class="flex gap-2">
-            <button class="btn btn-ghost btn-xs flex-1" @click="builderPoints.push({ lat: '', lon: '' })">
+            <button class="btn btn-ghost btn-xs flex-1" @click="builderPoints.push({ lat: '', lon: '', utmX: '', utmY: '', utmZone: '' })">
               <i class="fas fa-plus ml-1"></i> افزودن ردیف
             </button>
             <button class="btn btn-ghost btn-xs flex-1" @click="csvInput?.click()">
@@ -216,7 +292,7 @@
             <input ref="csvInput" type="file" accept=".csv,text/csv" class="hidden" @change="onCsvChange" />
           </div>
           <p class="text-[9px] text-[var(--text-faint)] leading-4">
-            فرمت CSV: ستون‌های <code dir="ltr">lat,lon</code> یا <code dir="ltr">name,lat,lon</code> (سطر اول = عنوان ستون‌ها).
+            فرمت CSV: ستون‌های <code dir="ltr">lat,lon</code> یا <code dir="ltr">name,lat,lon</code>؛ برای UTM: <code dir="ltr">x,y,zone</code> که خودکار به Lat/Lon تبدیل می‌شود (سطر اول = عنوان ستون‌ها).
           </p>
 
           <button class="btn btn-primary btn-xs w-full" :disabled="!canCreate" @click="createShape">
@@ -232,6 +308,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
+import { toUTM, fromUTM } from "../utils/useDrawingHelpers";
 import { logger } from "../utils/logger";
 
 const props = defineProps({
@@ -252,19 +329,53 @@ function flatten(list) {
   return out;
 }
 
+function utmFieldsOf(p) {
+  const lat = parseFloat(p?.lat);
+  const lon = parseFloat(p?.lon ?? p?.lng);
+  if (isNaN(lat) || isNaN(lon)) return { x: "", y: "", zone: "" };
+  const { x, y, zone } = toUTM(lon, lat);
+  return { x: x.toFixed(2), y: y.toFixed(2), zone };
+}
+
+function applyUtmEdit(row, key, value) {
+  if (!row || isNaN(parseFloat(value))) return null;
+  const x = parseFloat(key === "utmX" ? value : row.x);
+  const y = parseFloat(key === "utmY" ? value : row.y);
+  const zone = parseInt(key === "utmZone" ? value : row.zone, 10);
+  if (isNaN(x) || isNaN(y) || isNaN(zone) || zone < 1 || zone > 60) return null;
+  const { lng, lat } = fromUTM(x, y, zone, true);
+  return { lat, lon: lng };
+}
+
 const activePin = computed(() => flatten(props.pins).find((p) => p.id === props.activePinId) || null);
 
 const pointRows = computed(() => {
   const s = activePin.value?.shape;
   if (!s) return [];
-  if (s.type === "point") return [{ lat: s.lat, lon: s.lon }];
-  if (Array.isArray(s.positions)) return s.positions;
+  if (s.type === "point") return [{ lat: s.lat, lon: s.lon, ...utmFieldsOf(s) }];
+  if (Array.isArray(s.positions)) return s.positions.map((p) => ({ lat: p.lat, lon: p.lon, ...utmFieldsOf(p) }));
   return [];
 });
 
 function updatePoint(i, key, value) {
   const s = activePin.value?.shape;
   if (!s) return;
+  const row = pointRows.value[i];
+  if (!row) return;
+  if (key === "utmX" || key === "utmY" || key === "utmZone") {
+    const ll = applyUtmEdit(row, key, value);
+    if (!ll) return;
+    if (s.type === "point") {
+      s.lat = ll.lat;
+      s.lon = ll.lon;
+    } else if (Array.isArray(s.positions) && s.positions[i]) {
+      s.positions[i].lat = ll.lat;
+      s.positions[i].lon = ll.lon;
+    }
+    updatePinGeometry(props.map, activePin.value);
+    logger.info("draw", "ویرایش دستی مختصات UTM", { pin: activePin.value.name, index: i, key, value });
+    return;
+  }
   const num = parseFloat(value);
   if (isNaN(num)) return;
   if (s.type === "point") {
@@ -300,14 +411,49 @@ function addPointToActive() {
 const builderOpen = ref(false);
 const builderName = ref("");
 const builderType = ref("polygon");
-const builderPoints = ref([{ lat: "", lon: "" }, { lat: "", lon: "" }, { lat: "", lon: "" }]);
+const builderPoints = ref([
+  { lat: "", lon: "", utmX: "", utmY: "", utmZone: "" },
+  { lat: "", lon: "", utmX: "", utmY: "", utmZone: "" },
+  { lat: "", lon: "", utmX: "", utmY: "", utmZone: "" },
+]);
 const csvInput = ref(null);
 
 const canCreate = computed(() => {
-  const valid = builderPoints.value.filter((p) => p.lat !== "" && p.lon !== "" && !isNaN(parseFloat(p.lat)) && !isNaN(parseFloat(p.lon)));
+  const valid = builderPoints.value.filter((p) => {
+    const lat = parseFloat(p.lat);
+    const lon = parseFloat(p.lon);
+    const x = parseFloat(p.utmX);
+    const y = parseFloat(p.utmY);
+    const z = parseInt(p.utmZone, 10);
+    return (!isNaN(lat) && !isNaN(lon)) || (!isNaN(x) && !isNaN(y) && !isNaN(z));
+  });
   const minPts = builderType.value === "polygon" ? 3 : 2;
   return valid.length >= minPts;
 });
+
+function syncBuilderLatLon(i) {
+  const pt = builderPoints.value[i];
+  if (!pt) return;
+  const lat = parseFloat(pt.lat);
+  const lon = parseFloat(pt.lon);
+  if (isNaN(lat) || isNaN(lon)) return;
+  const { x, y, zone } = toUTM(lon, lat);
+  pt.utmX = x.toFixed(2);
+  pt.utmY = y.toFixed(2);
+  pt.utmZone = String(zone);
+}
+
+function syncBuilderUtm(i) {
+  const pt = builderPoints.value[i];
+  if (!pt) return;
+  const x = parseFloat(pt.utmX);
+  const y = parseFloat(pt.utmY);
+  const z = parseInt(pt.utmZone, 10);
+  if (isNaN(x) || isNaN(y) || isNaN(z)) return;
+  const { lng, lat } = fromUTM(x, y, z, true);
+  pt.lat = lat.toFixed(6);
+  pt.lon = lng.toFixed(6);
+}
 
 function parseCsv(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -317,17 +463,31 @@ function parseCsv(text) {
   const idxLat = header.findIndex((h) => ["lat", "latitude", "عرض", "y"].includes(h));
   const idxLon = header.findIndex((h) => ["lon", "lng", "longitude", "طول", "x"].includes(h));
   const idxName = header.findIndex((h) => ["name", "نام"].includes(h));
-  const hasHeader = idxLat !== -1 && idxLon !== -1;
+  const idxZone = header.findIndex((h) => ["zone", "zon", "z", "منطقه"].includes(h));
+  const idxX = header.findIndex((h) => ["x", "easting", "شرقی"].includes(h));
+  const idxY = header.findIndex((h) => ["y", "northing", "شمالی"].includes(h));
+  const isUtm = idxZone !== -1 && idxX !== -1 && idxY !== -1;
+  const hasHeader = (idxLat !== -1 && idxLon !== -1) || isUtm;
   const dataLines = hasHeader ? lines.slice(1) : lines;
   const li = hasHeader ? idxLat : 1;
   const lo = hasHeader ? idxLon : 0;
   const out = [];
   for (const line of dataLines) {
     const cols = line.split(delim).map((c) => c.trim());
+    const name = hasHeader && idxName !== -1 ? cols[idxName] : "";
+    if (isUtm) {
+      const easting = parseFloat(cols[idxX]);
+      const northing = parseFloat(cols[idxY]);
+      const zone = parseInt(cols[idxZone], 10);
+      if (isNaN(easting) || isNaN(northing) || isNaN(zone) || zone < 1 || zone > 60) continue;
+      const { lng, lat } = fromUTM(easting, northing, zone, true);
+      out.push({ lat, lon: lng, name });
+      continue;
+    }
     const lat = parseFloat(cols[li]);
     const lon = parseFloat(cols[lo]);
     if (isNaN(lat) || isNaN(lon)) continue;
-    out.push({ lat, lon, name: hasHeader && idxName !== -1 ? cols[idxName] : "" });
+    out.push({ lat, lon, name });
   }
   return out;
 }
@@ -344,7 +504,11 @@ function onCsvChange(e) {
         alert("نقطه معتبری در فایل CSV پیدا نشد. ستون‌های lat و lon را بررسی کنید.");
         return;
       }
-      builderPoints.value = rows.map((r) => ({ lat: r.lat, lon: r.lon }));
+      builderPoints.value = rows.map((r) => ({
+        lat: r.lat,
+        lon: r.lon,
+        ...utmFieldsOf(r),
+      }));
       if (!builderName.value && rows[0]?.name) builderName.value = rows[0].name;
       logger.info("draw", "بارگذاری نقاط از CSV", { count: rows.length });
     } catch (err) {
@@ -358,7 +522,11 @@ function onCsvChange(e) {
 const draftRows = computed(() => {
   const d = props.drawing;
   if (!d) return [];
-  return (d.livePoints || []).map((p) => ({ lat: Number(p.lat), lon: Number(p.lon) }));
+  return (d.livePoints || []).map((p) => ({
+    lat: Number(p.lat),
+    lon: Number(p.lon),
+    ...utmFieldsOf(p),
+  }));
 });
 
 const draftMinPoints = computed(() => {
@@ -392,6 +560,16 @@ const draftTitle = computed(() => {
 });
 
 function updateDraftPoint(i, key, value) {
+  if (key === "utmX" || key === "utmY" || key === "utmZone") {
+    const row = draftRows.value[i];
+    if (!row) return;
+    const ll = applyUtmEdit(row, key, value);
+    if (!ll) return;
+    props.drawing?.updateDraftPoint?.(i, "lat", String(ll.lat));
+    props.drawing?.updateDraftPoint?.(i, "lon", String(ll.lon));
+    logger.info("draw", "ویرایش مختصات UTM نقطه در حال ترسیم از جدول", { index: i, key, value });
+    return;
+  }
   props.drawing?.updateDraftPoint?.(i, key, value);
   logger.info("draw", "ویرایش نقطه در حال ترسیم از جدول", { index: i, key, value });
 }
@@ -408,8 +586,21 @@ function addDraftPoint() {
 function createShape() {
   if (!canCreate.value) return;
   const positions = builderPoints.value
-    .filter((p) => p.lat !== "" && p.lon !== "")
-    .map((p) => ({ lat: parseFloat(p.lat), lon: parseFloat(p.lon), height: 0 }));
+    .map((p) => {
+      const lat = parseFloat(p.lat);
+      const lon = parseFloat(p.lon);
+      if (!isNaN(lat) && !isNaN(lon)) return { lat, lon };
+      const x = parseFloat(p.utmX);
+      const y = parseFloat(p.utmY);
+      const z = parseInt(p.utmZone, 10);
+      if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+        const { lng, lat: la } = fromUTM(x, y, z, true);
+        return { lat: la, lon: lng };
+      }
+      return null;
+    })
+    .filter(Boolean)
+    .map((p) => ({ lat: p.lat, lon: p.lon, height: 0 }));
 
   const pin = {
     id: crypto.randomUUID(),
@@ -433,7 +624,11 @@ function createShape() {
   if (props.map) renderPinOnMap(props.map, pin);
 
   builderName.value = "";
-  builderPoints.value = [{ lat: "", lon: "" }, { lat: "", lon: "" }, { lat: "", lon: "" }];
+  builderPoints.value = [
+    { lat: "", lon: "", utmX: "", utmY: "", utmZone: "" },
+    { lat: "", lon: "", utmX: "", utmY: "", utmZone: "" },
+    { lat: "", lon: "", utmX: "", utmY: "", utmZone: "" },
+  ];
   builderOpen.value = false;
   emit("created", pin);
   logger.info("draw", "ایجاد ترسیم با نقاط دستی/CSV", { name: pin.name, points: positions.length });

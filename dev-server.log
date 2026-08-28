@@ -1,0 +1,63 @@
+
+> kroki-app@0.0.1 dev
+> vite
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m367[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5174[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.184.1:[1m5174[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.180.1:[1m5174[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://169.254.255.178:[1m5174[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.130.1:[1m5174[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.74.1:[1m5174[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.254.5:[1m5174[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m1:03:45 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:03:45 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:04:50 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:04:57 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:05:20 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:08:52 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:08:57 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:09:13 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:12:55 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:18:27 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:18:47 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:18:57 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:19:05 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:23:23 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:23:25 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:23:28 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:23:30 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:23:34 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:23:39 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:23:42 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/composables/useKrokiGenerator.js[22m
+[2m1:26:50 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:28:50 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.html[22m
+[2m1:28:50 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mscratch.js[22m
+[2m1:38:45 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:38:53 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:15 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:19 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:30 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:35 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:49 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:39:57 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:40:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:40:14 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:40:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:40:51 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:41:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/steps/PreviewStep.vue, /src/style.css[22m
+[2m1:41:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.vue, /src/style.css, /src/components/steps/DrawStep.vue, /src/components/steps/PaymentStep.vue, /src/components/steps/InfoStep.vue[22m
+[2m1:41:14 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.vue, /src/style.css, /src/components/steps/DrawStep.vue, /src/components/steps/PaymentStep.vue, /src/components/steps/InfoStep.vue[22m
+[2m1:42:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PointsTable.vue, /src/style.css[22m
+[2m1:54:45 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/steps/DrawStep.vue, /src/style.css[22m
+[2m1:54:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/steps/DrawStep.vue, /src/style.css[22m
+[2m1:54:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/steps/DrawStep.vue, /src/style.css[22m
+[2m1:59:10 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.vue, /src/style.css[22m
+[2m2:06:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/steps/DrawStep.vue, /src/style.css[22m
+[2m2:06:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.vue, /src/style.css[22m

@@ -113,11 +113,13 @@ function toUTM(positions) {
   const lonAvg =
     positions.reduce((s, p) => s + (p.lon ?? p.lng), 0) / positions.length;
   const zone = Math.floor((lonAvg + 180) / 6) + 1;
-  const projStr = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
+  const meanLat = positions.reduce((s, p) => s + Number(p.lat), 0) / positions.length;
+  const projStr = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs${meanLat < 0 ? " +south" : ""}`;
   return positions.map((p) => {
     const lon = p.lon ?? p.lng;
-    const [x, y] = proj4("EPSG:4326", projStr, [lon, p.lat]);
-    return { x, y, zone };
+    const lat = Number(p.lat);
+    const [x, y] = proj4("EPSG:4326", projStr, [lon, lat]);
+    return { x, y, zone, lat, lon };
   });
 }
 
@@ -505,7 +507,10 @@ export function useKrokiGenerator() {
         centerX = (minX + maxX) / 2;
         centerY = (minY + maxY) / 2;
       }
-      state.centerUtm = { x: centerX, y: centerY, zone: state.utmZone };
+      const meanLat0 = allPositions.reduce((s, p) => s + Number(p.lat), 0) / allPositions.length;
+      const centerProj = `+proj=utm +zone=${state.utmZone} +datum=WGS84 +units=m +no_defs${meanLat0 < 0 ? " +south" : ""}`;
+      const [cLon, cLat] = proj4(centerProj, "EPSG:4326", [centerX, centerY]);
+      state.centerUtm = { x: centerX, y: centerY, lat: cLat, lon: cLon, zone: state.utmZone };
 
       // آدرس‌یابی معکوس
       const zone = state.utmZone;
@@ -652,13 +657,13 @@ export function useKrokiGenerator() {
       ctx.strokeRect(bx, by, bw, bh);
       ctx.fillStyle = "#444";
       ctx.font = "600 12px Vazirmatn, Tahoma, sans-serif";
-      ctx.textAlign = "right";
       ctx.textBaseline = "middle";
-      ctx.fillText(truncateText(ctx, "متقاضی: " + (form.client || "—"), bw * 0.4), bx + 8, by + 15);
+      ctx.textAlign = "right";
+      ctx.fillText(truncateText(ctx, "متقاضی: " + (form.client || "—"), bw * 0.4), bx + bw - 8, by + 15);
       ctx.textAlign = "center";
       ctx.fillText("مقیاس: " + extra.scaleText, bx + bw / 2, by + 15);
       ctx.textAlign = "left";
-      ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), bw * 0.3), bx + bw - 8, by + 15);
+      ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), bw * 0.34), bx + 8, by + 15);
       return;
     }
     if (t.titleBlock === "hand") {
@@ -666,14 +671,17 @@ export function useKrokiGenerator() {
       ctx.font = "12px Vazirmatn, Tahoma, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("کروکی توصیفی دستی — " + (form.title || ""), W / 2, H - 28);
+      ctx.fillText(truncateText(ctx, "کروکی توصیفی دستی — " + (form.title || ""), W - 28), W / 2, H - 28);
       return;
     }
     if (t.titleBlock !== "official") return;
+
     const bh = 96;
     const bx = 24,
       by = H - bh - 22,
       bw = W - 48;
+    const half = bw / 2;
+    const mid = bx + half;
     ctx.strokeStyle = t.headerColor;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(bx, by, bw, bh);
@@ -683,52 +691,53 @@ export function useKrokiGenerator() {
     ctx.font = "600 12px Vazirmatn, Tahoma, sans-serif";
     ctx.textBaseline = "middle";
     ctx.textAlign = "right";
-    ctx.fillText(truncateText(ctx, "متقاضی: " + (form.client || "—"), bw * 0.38), bx + 10, by + 12);
+    ctx.fillText(truncateText(ctx, "متقاضی: " + (form.client || "—"), half - 20), mid - 6, by + 12);
     ctx.textAlign = "center";
-    ctx.fillText("مقیاس: " + extra.scaleText, bx + bw / 2, by + 12);
+    ctx.fillText("مقیاس: " + extra.scaleText, mid, by + 12);
     ctx.textAlign = "left";
-    ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), bw * 0.28), bx + bw - 10, by + 12);
+    ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), half - 20), mid + 6, by + 12);
 
     const rowH = (bh - 24) / 3;
     ctx.fillStyle = "#333";
     ctx.font = "600 11px Vazirmatn, Tahoma, sans-serif";
+    // ردیف دوم: سیستم مختصات (راست) / مساحت (چپ)
     ctx.textAlign = "right";
     ctx.fillText(
-      truncateText(ctx, "سیستم مختصات: WGS84 / UTM — Zone " + (extra.zone || "—"), bw * 0.46),
-      bx + 10,
+      truncateText(ctx, "سیستم مختصات: WGS84 / UTM — Zone " + (extra.zone || "—"), half - 16),
+      mid - 6,
       by + 24 + rowH * 0.5,
     );
     ctx.textAlign = "left";
     ctx.fillText(
-      truncateText(ctx, "مساحت: " + extra.area, bw * 0.46),
-      bx + bw - 10,
+      truncateText(ctx, "مساحت: " + extra.area, half - 16),
+      mid + 6,
       by + 24 + rowH * 0.5,
     );
-
+    // ردیف سوم: کارشناس (راست) / پلاک ثبتی (چپ)
     ctx.textAlign = "right";
     ctx.fillText(
-      truncateText(ctx, "کارشناس: " + (form.surveyor || "———"), bw * 0.46),
-      bx + 10,
+      truncateText(ctx, "کارشناس: " + (form.surveyor || "———"), half - 16),
+      mid - 6,
       by + 24 + rowH * 1.5,
     );
     ctx.textAlign = "left";
     ctx.fillText(
-      truncateText(ctx, "پلاک ثبتی: " + (form.plaque || "—"), bw * 0.46),
-      bx + bw - 10,
+      truncateText(ctx, "پلاک ثبتی: " + (form.plaque || "—"), half - 16),
+      mid + 6,
       by + 24 + rowH * 1.5,
     );
-
+    // ردیف چهارم: نشانی (راست، پرعرض) / عرض معبر (چپ)
     ctx.fillStyle = "#555";
     ctx.textAlign = "right";
     ctx.fillText(
-      truncateText(ctx, "نشانی: " + (form.address || "—"), bw * 0.52),
-      bx + 10,
+      truncateText(ctx, "نشانی: " + (form.address || "—"), bw * 0.7 - 20),
+      bx + bw - 10,
       by + 24 + rowH * 2.5,
     );
     ctx.textAlign = "left";
     ctx.fillText(
-      truncateText(ctx, "عرض معبر: " + (form.streetWidth || "—"), bw * 0.36),
-      bx + bw - 10,
+      truncateText(ctx, "عرض معبر: " + (form.streetWidth || "—"), bw * 0.26 - 12),
+      bx + 10,
       by + 24 + rowH * 2.5,
     );
   }
@@ -1122,18 +1131,6 @@ export function useKrokiGenerator() {
       </table>`
       : "";
 
-    const centroidsTable = state.shapeCentroids.length
-      ? `<div class="block-title">نشانی مراکز ترسیم‌ها</div>
-        <table class="utm-table">
-          <thead><tr><th>ترسیم</th><th>نشانی مرکز</th></tr></thead>
-          <tbody>
-            ${state.shapeCentroids
-              .map((c, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(c.address) || "—"}</td></tr>`)
-              .join("")}
-          </tbody>
-        </table>`
-      : "";
-
     // متن ضلع‌ها (اطلاعات مجاورت) فقط برای قالب ثبتی نمایش داده می‌شود
     const edgeTable =
       isSabt && state.edgeTexts.some((arr) => arr.some((x) => x))
@@ -1168,7 +1165,14 @@ export function useKrokiGenerator() {
         <div class="sign-box"><div class="sign-label">امضای متقاضی / مالک</div></div>
       </div>`;
 
-    const sideExtras = `${utmTable}${centroidsTable}${edgeTable}`;
+    const sideExtras = `${utmTable}${edgeTable}`;
+
+    const mapFig = state.mapImage
+      ? `<figure class="map-fig">
+          <img src="${state.mapImage}" />
+          <figcaption>تصویر نقشه</figcaption>
+        </figure>`
+      : "";
 
     let html;
     if (landscape) {
@@ -1185,10 +1189,7 @@ export function useKrokiGenerator() {
           ${infoTable}
         </div>
         <div class="col">
-          <figure class="map-fig">
-            <img src="${state.mapImage}" />
-            <figcaption>تصویر نقشه</figcaption>
-          </figure>
+          ${mapFig}
         </div>
       </div>
       <div class="extras-grid">
@@ -1198,18 +1199,16 @@ export function useKrokiGenerator() {
       ${signRow}
     </div>`;
     } else {
-      // چیدمان عمودی: کروکی در یک سطر کامل، عکس نقشه به‌صورت بندانگشتی گوشه آن
+      // چیدمان عمودی: کروکی در یک سطر کامل، عکس نقشه در یک قاب جداگانه زیر آن
       html = `
     <div class="sheet portrait">
       ${headBlock}
       ${infoTable}
       <figure class="sketch-fig sketch-fig-full">
         <img src="__SKETCH__" />
-        <div class="map-thumb">
-          <img src="${state.mapImage}" />
-        </div>
         <figcaption>${escapeHtml(t.subtitle)}</figcaption>
       </figure>
+      ${mapFig}
       <div class="tables-row">
         ${sideExtras}
       </div>
@@ -1274,11 +1273,9 @@ export function useKrokiGenerator() {
           const pageH = (printableH * 96) / 25.4;
           const sheetW = sheet.scrollWidth;
           const sheetH = sheet.scrollHeight;
-          // در حالت افقی کروکی باید تمام‌عرض صفحه باشد؛ سایر محتوا در صورت
-          // نیاز به صفحات بعدی می‌روند. در حالت عمودی همچنان تک‌صفحه نگه داشته می‌شود.
-          const scale = landscape
-            ? Math.min(pageW / sheetW, 1)
-            : Math.min(pageW / sheetW, pageH / sheetH, 1);
+          // در هر دو جهت خروجی، کل برگه به‌گونه‌ای مقیاس می‌شود که در همان صفحه
+          // اول قرار بگیرد (بدون ایجاد صفحات اضافی).
+          const scale = Math.min(pageW / sheetW, pageH / sheetH, 1);
           if (scale < 1) {
             sheet.style.transformOrigin = "top left";
             sheet.style.transform = `scale(${scale})`;
@@ -1323,11 +1320,10 @@ figcaption { font-size: 10px; color: #444; margin-top: 4px; font-weight: 600; }
 .sign-box { flex: 1; border: 1px solid #bbb; min-height: 52px; border-radius: 6px; padding: 6px 8px; }
 .sign-label { font-size: 10px; color: #555; font-weight: 600; }
 
-/* ---- چیدمان عمودی: کروکی در یک سطر کامل، نقشه به‌صورت بندانگشتی گوشه آن ---- */
-.sheet.portrait .sketch-fig-full { position: relative; margin-bottom: 8px; }
+/* ---- چیدمان عمودی: کروکی در یک سطر کامل، نقشه به‌صورت یک قاب جداگانه زیر آن ---- */
+.sheet.portrait .sketch-fig-full { margin-bottom: 8px; }
 .sheet.portrait .sketch-fig-full img { width: 100%; }
-.sheet.portrait .map-thumb { position: absolute; top: 8px; left: 8px; width: 26%; max-width: 150px; border: 2px solid #fff; box-shadow: 0 0 0 1px #999, 0 2px 6px rgba(0,0,0,.35); background: #fff; }
-.sheet.portrait .map-thumb img { width: 100%; display: block; }
+.sheet.portrait .map-fig { max-width: 55%; margin: 0 auto 8px; }
 .sheet.portrait .tables-row { display: flex; gap: 10px; align-items: flex-start; }
 .sheet.portrait .tables-row > * { flex: 1; min-width: 0; }
 .sheet.portrait .tables-row table { margin-bottom: 6px; }
