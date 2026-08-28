@@ -1266,21 +1266,14 @@ export function useKrokiGenerator() {
         ),
       ).then(() => {
         try {
-          // عرض/ارتفاع قابل چاپ A4 با حاشیه 6mm (در 96dpi)، بسته به جهت خروجی
-          const printableW = landscape ? 297 - 12 : 210 - 12;
-          const printableH = landscape ? 210 - 12 : 297 - 12;
-          const pageW = (printableW * 96) / 25.4;
-          const pageH = (printableH * 96) / 25.4;
-          const sheetW = sheet.scrollWidth;
-          const sheetH = sheet.scrollHeight;
-          // در هر دو جهت خروجی، کل برگه به‌گونه‌ای مقیاس می‌شود که در همان صفحه
-          // اول قرار بگیرد (بدون ایجاد صفحات اضافی).
-          const scale = Math.min(pageW / sheetW, pageH / sheetH, 1);
-          if (scale < 1) {
-            sheet.style.transformOrigin = "top left";
-            sheet.style.transform = `scale(${scale})`;
-            sheet.style.width = `${sheetW * scale}px`;
-          }
+          // برگه دقیقاً هم‌عرض ناحیه قابل چاپ A4 تنظیم می‌شود (در 96dpi) تا هیچ
+          // مقیاس‌گرفتی و ریزدن کلی انجام نشود و محتوا با اندازه واقعی/خوانا و
+          // صفحه‌بندی طبیعی چاپ شود (بدون ایجاد صفحه‌ی خالی اضافه).
+          const printableWmm = landscape ? 297 - 12 : 210 - 12;
+          const pageW = (printableWmm * 96) / 25.4;
+          sheet.style.width = pageW + "px";
+          sheet.style.height = "auto";
+          sheet.style.margin = "0";
           iw.focus();
           iw.print();
         } catch (e) {
@@ -1299,42 +1292,44 @@ export function useKrokiGenerator() {
     return `
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { font-family: Tahoma, 'Vazirmatn', sans-serif; color: #222; }
-.sheet { width: ${landscape ? "285mm" : "198mm"}; margin: 0 auto; padding: 8px; }
-.head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 8px; }
+body { font-family: Tahoma, 'Vazirmatn', sans-serif; color: #222; background: #fff; }
+.sheet { margin: 0 auto; padding: 8px; }
+.head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 10px; page-break-inside: avoid; }
 .head-logo-title { display: flex; align-items: center; gap: 8px; }
 .head-logo { width: 34px; height: 34px; object-fit: contain; }
-.head-title { font-size: 16px; font-weight: 700; }
-.head-sub { font-size: 10px; color: #555; }
-.block-title { font-weight: 700; font-size: 11px; margin: 8px 0 4px; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 10.5px; }
-table.info-table td { border: 1px solid #bbb; padding: 3px 6px; line-height: 1.35; }
+.head-title { font-size: 18px; font-weight: 700; }
+.head-sub { font-size: 11px; color: #555; }
+.block-title { font-weight: 700; font-size: 11.5px; margin: 8px 0 4px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px; }
+table.info-table td { border: 1px solid #bbb; padding: 4px 7px; line-height: 1.4; }
 table.info-table td:nth-child(1), table.info-table td:nth-child(3) { background: #f3f3f3; font-weight: 600; width: 15%; white-space: nowrap; }
-table.utm-table th, table.utm-table td { border: 1px solid #bbb; padding: 3px 5px; text-align: center; }
+table.utm-table th, table.utm-table td { border: 1px solid #bbb; padding: 3px 6px; text-align: center; }
 table.utm-table thead th { background: #f3f3f3; }
 figure { margin: 0; border: 1px solid #bbb; padding: 4px; text-align: center; }
 figure img { width: 100%; height: auto; display: block; }
-figcaption { font-size: 10px; color: #444; margin-top: 4px; font-weight: 600; }
-.disclaimer { font-size: 9.5px; color: #666; border-top: 1px solid #ccc; padding-top: 5px; margin-top: 5px; }
+figcaption { font-size: 11px; color: #444; margin-top: 4px; font-weight: 600; }
+.disclaimer { font-size: 9.5px; color: #666; border-top: 1px solid #ccc; padding-top: 5px; margin-top: 5px; page-break-inside: avoid; }
 .sign-row { display: flex; gap: 8px; margin-top: 12px; page-break-inside: avoid; }
 .sign-box { flex: 1; border: 1px solid #bbb; min-height: 52px; border-radius: 6px; padding: 6px 8px; }
 .sign-label { font-size: 10px; color: #555; font-weight: 600; }
 
-/* ---- چیدمان عمودی: کروکی در یک سطر کامل، نقشه به‌صورت یک قاب جداگانه زیر آن ---- */
-.sheet.portrait .sketch-fig-full { margin-bottom: 8px; }
+/* ---- چیدمان عمودی (portrait): کروکی تمام‌عرض در یک سطر، سپس اطلاعات طبقه‌ای ---- */
+.sheet.portrait .sketch-fig-full { margin-bottom: 10px; }
 .sheet.portrait .sketch-fig-full img { width: 100%; }
-.sheet.portrait .map-fig { max-width: 55%; margin: 0 auto 8px; }
-.sheet.portrait .tables-row { display: flex; gap: 10px; align-items: flex-start; }
-.sheet.portrait .tables-row > * { flex: 1; min-width: 0; }
+.sheet.portrait .map-fig { max-width: 60%; margin: 0 auto 10px; }
+.sheet.portrait .tables-row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.sheet.portrait .tables-row > * { flex: 1 1 46%; min-width: 280px; }
 .sheet.portrait .tables-row table { margin-bottom: 6px; }
 
-/* ---- چیدمان افقی: کروکی تمام‌عرض صفحه ---- */
+/* ---- چیدمان افقی (landscape): کروکی بزرگ تمام‌عرض صفحه و اطلاعات در نوارهای زیر آن ---- */
+.sheet.landscape .sketch-full { margin-bottom: 10px; }
 .sheet.landscape .sketch-full img { width: 100%; height: auto; display: block; }
 .sheet.landscape .sketch-full figcaption { font-size: 12px; }
-.sheet.landscape .lay-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; margin-top: 8px; align-items: start; }
+.sheet.landscape .lay-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; margin-top: 10px; align-items: start; }
+.sheet.landscape .lay-grid > * { page-break-inside: avoid; }
 .sheet.landscape .map-fig { margin: 0; }
-.sheet.landscape .extras-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-.sheet.landscape .extras-grid > * { flex: 1; min-width: 42%; }
+.sheet.landscape .extras-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.sheet.landscape .extras-grid > * { flex: 1 1 46%; min-width: 280px; page-break-inside: avoid; }
 .sheet.landscape .col-side table { font-size: 9.5px; }
 
 @page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 6mm; }
