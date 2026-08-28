@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>نمونه</name>
+    <Placemark>
+      <name>قطعه نمونه</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>51.3890,35.6892,0 51.3920,35.6895,0 51.3922,35.6915,0 51.3894,35.6912,0 51.3890,35.6892,0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>
