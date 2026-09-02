@@ -1227,25 +1227,27 @@ export function useKrokiGenerator() {
       <div class="head-sub">قالب: ${escapeHtml(t.name)} — تاریخ برداشت: ${escapeHtml(last.form.date)}</div>
     </div>`;
 
-    const infoTable = `
-    <table class="info-table">
-      <tr>
-        <td>متقاضی</td><td>${escapeHtml(last.form.client)}</td>
-        <td>نشانی ملک</td><td>${escapeHtml(last.form.address)}</td>
-      </tr>
-      <tr>
-        <td>سیستم مختصات</td><td>WGS84 / UTM — Zone: ${state.utmZone ?? "—"}</td>
-        <td>مساحت کل</td><td>${state.areaM2.toFixed(2)} متر مربع</td>
-      </tr>
-      <tr>
-        <td>سازمان / مرجع</td><td>${escapeHtml(t.org)}</td>
-        <td>کارشناس</td><td>${escapeHtml(last.form.surveyor)}</td>
-      </tr>
-      <tr>
-        <td>عرض معبر</td><td>${escapeHtml(last.form.streetWidth) || "—"} متر</td>
-        <td>شماره پلاک ثبتی</td><td>${escapeHtml(last.form.plaque) || "—"}</td>
-      </tr>
-    </table>`;
+    const infoRows = [
+      ["متقاضی", escapeHtml(last.form.client)],
+      ["نشانی ملک", escapeHtml(last.form.address)],
+      ["سیستم مختصات", `WGS84 / UTM — Zone: ${state.utmZone ?? "—"}`],
+      ["مساحت کل", `${state.areaM2.toFixed(2)} متر مربع`],
+      ["سازمان / مرجع", escapeHtml(t.org)],
+      ["کارشناس", escapeHtml(last.form.surveyor)],
+      ["عرض معبر", `${escapeHtml(last.form.streetWidth) || "—"} متر`],
+      ["شماره پلاک ثبتی", escapeHtml(last.form.plaque) || "—"],
+    ];
+    const infoTable2col = `<table class="info-table"><tbody>${Array.from(
+      { length: 4 },
+      (_, r) =>
+        `<tr>${infoRows
+          .slice(r * 2, r * 2 + 2)
+          .map(([l, v]) => `<td>${l}</td><td>${v}</td>`)
+          .join("")}</tr>`,
+    ).join("")}</tbody></table>`;
+    const infoTableStacked = `<table class="info-table info-stacked"><tbody>${infoRows
+      .map(([l, v]) => `<tr><td class="cell-lb">${l}</td><td>${v}</td></tr>`)
+      .join("")}</tbody></table>`;
 
     const utmTable = hasUtm
       ? `<table class="utm-table">
@@ -1299,22 +1301,26 @@ export function useKrokiGenerator() {
 
     let html;
     if (landscape) {
-      // چیدمان افقی: کروکی کل صفحه، جداول و عکس نقشه در حاشیه‌ها
+      // چیدمان افقی: کروکی در سمت چپ، جدول مشخصات و سایر جداول در ستون سمت راست
       html = `
   <div class="sheet landscape">
     ${headBlock}
     <div class="map-area">
-      <figure class="sketch-fig">
-        <img src="__SKETCH__" />
-        <figcaption>${escapeHtml(t.subtitle)}</figcaption>
-      </figure>
-      <div class="mg mg-tl">${infoTable}</div>
-      <div class="mg mg-bl">
-        ${utmTable}
-        ${edgeTable}
+      <div class="side-panel">
+        <div class="mg mg-info">${infoTableStacked}</div>
+        <div class="mg mg-utm">
+          ${utmTable}
+          ${edgeTable}
+        </div>
+        <div class="mg mg-map">${mapFig}</div>
+        <div class="mg mg-note">${disclaimer}</div>
       </div>
-      <div class="mg mg-br">${mapFig}</div>
-      <div class="mg mg-note">${disclaimer}</div>
+      <div class="sketch-side">
+        <figure class="sketch-fig">
+          <img src="__SKETCH__" />
+          <figcaption>${escapeHtml(t.subtitle)}</figcaption>
+        </figure>
+      </div>
     </div>
     ${signRow}
   </div>`;
@@ -1323,7 +1329,7 @@ export function useKrokiGenerator() {
       html = `
   <div class="sheet portrait">
     ${headBlock}
-    ${infoTable}
+    ${infoTable2col}
     <figure class="sketch-fig sketch-fig-full">
       <img src="__SKETCH__" />
       <figcaption>${escapeHtml(t.subtitle)}</figcaption>
@@ -1386,9 +1392,10 @@ export function useKrokiGenerator() {
         ),
       ).then(() => {
         try {
-          // ابعاد قابل چاپ A4 (با حاشیه 6mm از هر طرف)
-          const printWmm = landscape ? 297 - 12 : 210 - 12;
-          const printHmm = landscape ? 210 - 12 : 297 - 12;
+          // ابعاد کامل A4 (بدون حاشیه چاپی مرورگر تا URL صفحه چاپ نشود؛
+          // فاصله داخل برگه با padding خود برگه تأمین می‌شود)
+          const printWmm = landscape ? 297 : 210;
+          const printHmm = landscape ? 210 : 297;
           const pageW = (printWmm * 96) / 25.4;
           const pageH = (printHmm * 96) / 25.4;
 
@@ -1422,6 +1429,7 @@ body { font-family: Tahoma, 'Vazirmatn', sans-serif; color: #222; background: #f
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 6mm;
 }
 .sheet > * { flex-shrink: 0; }
 
@@ -1449,22 +1457,46 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
 .sign-label { font-size: 9px; color: #555; font-weight: 600; }
 
 /* ═══════════════════════════════════════════════════════════════
-   چیدمان افقی (landscape): کروکی تمام‌صفحه + جداول در حاشیه‌ها
+   چیدمان افقی (landscape): کروکی در سمت چپ + ستون اطلاعات در سمت راست
    ═══════════════════════════════════════════════════════════════ */
 .sheet.landscape { position: relative; }
 .sheet.landscape .head { position: relative; z-index: 10; flex-shrink: 0; }
 
-/* ناحیه کروکی: تمام فضای باقی‌مانده */
+/* ناحیه اصلی: فِلکس — کروکی چپ، ستون اطلاعات راست */
 .sheet.landscape .map-area {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   border: 1px solid #999;
   margin: 6px 0;
+  padding: 4px;
+  display: flex;
+  gap: 6px;
   overflow: hidden;
 }
 
-/* کروکی: تمام فضای map-area را می‌گیرد */
+/* ستون سمت راست (در چیدمان راست‌به‌چپ = ابتدای فِلکس) */
+.sheet.landscape .side-panel {
+  order: 1;
+  flex: 0 0 34%;
+  max-width: 34%;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+.sheet.landscape .side-panel .mg { width: 100%; }
+
+/* کروکی: سمت چپ و تمام فضای باقی‌مانده */
+.sheet.landscape .sketch-side {
+  order: 2;
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  border: 1px solid #bbb;
+}
 .sheet.landscape .sketch-fig {
   position: absolute;
   inset: 0;
@@ -1494,27 +1526,33 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
   border-radius: 3px;
 }
 
-/* جداول حاشیه‌ای */
+/* جعبه‌های اطلاعات */
 .sheet.landscape .mg {
-  position: absolute;
   background: rgba(255,255,255,0.94);
   border: 1px solid #bbb;
   padding: 4px 6px;
   font-size: 8px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-  z-index: 5;
 }
 .sheet.landscape .mg table { font-size: 8px; margin-bottom: 0; }
 .sheet.landscape .mg table.info-table td { padding: 2px 4px; }
 .sheet.landscape .mg table.utm-table th, 
 .sheet.landscape .mg table.utm-table td { padding: 1px 3px; font-size: 7.5px; }
 
-/* موقعیت جداول */
-.sheet.landscape .mg-tl { top: 3px; left: 3px; max-width: 36%; }
-.sheet.landscape .mg-bl { bottom: 3px; left: 3px; max-width: 40%; max-height: 62%; overflow: hidden; }
-.sheet.landscape .mg-br { bottom: 3px; right: 3px; max-width: 28%; }
-.sheet.landscape .mg-br img { max-height: 90px; width: auto; max-width: 100%; margin: 0 auto; }
-.sheet.landscape .mg-note { top: 3px; right: 3px; max-width: 26%; font-size: 7.5px; border: 0; box-shadow: none; background: rgba(255,255,255,0.85); }
+/* ترتیب داخل ستون راست */
+.sheet.landscape .mg-info { flex: 0 0 auto; }
+.sheet.landscape .mg-utm { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.sheet.landscape .mg-map { flex: 0 0 auto; }
+.sheet.landscape .mg-map img { max-height: 90px; width: auto; max-width: 100%; margin: 0 auto; }
+.sheet.landscape .mg-note { flex: 0 0 auto; font-size: 7.5px; border: 0; box-shadow: none; background: rgba(255,255,255,0.85); }
+
+/* جدول مشخصاتِ عمودی: هر فیلد در یک ردیف */
+.sheet.landscape .mg .info-stacked td.cell-lb {
+  width: 34%;
+  background: #f3f3f3;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    چیدمان عمودی (portrait): کروکی بالا، عکس نقشه و جداول کنار هم
@@ -1553,9 +1591,8 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
 }
 .sheet.portrait .bottom-left table { margin-bottom: 6px; }
 
-@page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 6mm; }
+@page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 0; }
 @media print {
-  .sheet { padding: 0; }
   figure, table, .sign-row { page-break-inside: avoid; }
 }
 `;
