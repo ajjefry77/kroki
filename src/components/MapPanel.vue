@@ -59,7 +59,7 @@
     />
 
     <!-- جستجوی آدرس / مختصات -->
-    <MapSearchBox :map="mapProxy" v-model:open="searchOpen" />
+    <MapSearchBox :map="mapProxy" :drawing="drawing" v-model:open="searchOpen" />
 
     <!-- فرم ذخیره ترسیم (پس از پایان ترسیم با Enter نمایش داده می‌شود) -->
     <Transition name="modal">

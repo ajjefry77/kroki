@@ -281,6 +281,7 @@ import proj4 from "proj4";
 
 const props = defineProps({
   map: { type: Object, default: null },
+  drawing: { type: Object, default: null },
   open: { type: Boolean, default: false },
 });
 
@@ -306,6 +307,18 @@ const results = ref([]);
 const error = ref(null);
 const searched = ref(false);
 let searchMarker = null;
+
+// نشانگر آدرس هنگام ترسیم روی نقشه باقی می‌ماند و فقط پس از پایان ترسیم
+// (ظاهر شدن فرم ذخیره) از روی نقشه حذف می‌شود.
+watch(
+  () => props.drawing?.showForm,
+  (v) => {
+    if (v) {
+      clearSearchMarker();
+      clearCoordMarker();
+    }
+  },
+);
 
 const activeTab = ref("address");
 const coordSystem = ref("latlon");
@@ -403,20 +416,35 @@ function clearCoordMarker() {
   }
 }
 
+// با کلیک راست روی نشانگر، آن را حذف می‌کند (فقط حذف روی نقشه، بدون تأثیر روی جستجو)
+function attachMarkerContextDelete(marker) {
+  if (!marker?.getElement) return;
+  marker.getElement().addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation?.();
+    try {
+      marker.remove();
+    } catch (err) {}
+    if (searchMarker === marker) searchMarker = null;
+    if (coordMarker === marker) coordMarker = null;
+  });
+}
+
 function flyToLocation(item) {
   if (!props.map || !item.geom) return;
   const [lng, lat] = item.geom.coordinates;
   props.map.flyTo({ center: [lng, lat], zoom: 16, essential: true });
-  clearSearchMarker();
+  clearCoordMarker();
   searchMarker = new mapboxgl.Marker({ color: "#e07b39" })
     .setLngLat([lng, lat])
     .setPopup(new mapboxgl.Popup().setText(item.title || "مکان انتخاب شده"))
     .addTo(props.map);
+  attachMarkerContextDelete(searchMarker);
 };
 
 const closePanel = () => {
-  clearSearchMarker();
-  clearCoordMarker();
+  // نشانگر جستجو بسته شدن پنل پاک نمی‌شود؛ تا جستجوی جدید، کلیک راست روی نشانگر
+  // یا پایان ترسیم روی نقشه باقی می‌ماند.
   emit("update:open", false);
 };
 const clearSearch = () => {
@@ -433,10 +461,11 @@ const clearResults = () => {
 
 function placeCoordMarker(lon, lat) {
   if (!props.map) return;
-  clearCoordMarker();
+  clearSearchMarker();
   coordMarker = new mapboxgl.Marker({ color: "#ea580c" })
     .setLngLat([lon, lat])
     .addTo(props.map);
+  attachMarkerContextDelete(coordMarker);
   props.map.flyTo({ center: [lon, lat], zoom: Math.max(props.map.getZoom(), 15), essential: true });
 }
 
