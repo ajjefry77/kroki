@@ -23,20 +23,24 @@ function toJalali(gy, gm, gd) {
     jy += Math.floor((days - 1) / 365);
     days = (days - 1) % 365;
   }
-  const jm = days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+  const jm =
+    days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
   const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30);
   return { jy, jm, jd };
 }
 
 export function getTodayJalali() {
   const d = new Date();
-  const { jy, jm, jd } = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  const { jy, jm, jd } = toJalali(
+    d.getFullYear(),
+    d.getMonth() + 1,
+    d.getDate(),
+  );
   const pad = (n) => String(n).padStart(2, "0");
   return `${jy}/${pad(jm)}/${pad(jd)}`;
 }
 
 const MAP_IR_KEY = import.meta.env.VITE_MAP_IR_KEY || "";
-
 async function reverseLookup(lat, lon) {
   const url = `https://map.ir/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
   const res = await fetch(url, {
@@ -51,10 +55,12 @@ async function reverseLookup(lat, lon) {
       data.address ||
       data.postal_address ||
       data.last ||
-      [a.province, a.city, a.neighbourhood, a.primary].filter(Boolean).join("، ") ||
+      [a.province, a.city, a.neighbourhood, a.primary]
+        .filter(Boolean)
+        .join("، ") ||
       data.display_name ||
-      "",
-    road: a.primary || a.road || data.primary || data.road || a.last || "",
+      " ",
+    road: a.primary || a.road || data.primary || data.road || a.last || " ",
   };
 }
 
@@ -71,7 +77,6 @@ function flattenPins(list) {
 }
 
 let logoImageCache = { src: "", img: null };
-
 function loadLogoImage(src) {
   return new Promise((resolve) => {
     if (!src) {
@@ -113,7 +118,8 @@ function toUTM(positions) {
   const lonAvg =
     positions.reduce((s, p) => s + (p.lon ?? p.lng), 0) / positions.length;
   const zone = Math.floor((lonAvg + 180) / 6) + 1;
-  const meanLat = positions.reduce((s, p) => s + Number(p.lat), 0) / positions.length;
+  const meanLat =
+    positions.reduce((s, p) => s + Number(p.lat), 0) / positions.length;
   const projStr = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs${meanLat < 0 ? " +south" : ""}`;
   return positions.map((p) => {
     const lon = p.lon ?? p.lng;
@@ -143,13 +149,11 @@ function computeShapeCentroid(pos, zone) {
     const [x, y] = proj4("EPSG:4326", projStr, [lon, Number(p.lat)]);
     return { x, y };
   });
-
   const origin = projected[0];
   const pts = projected.map((p) => ({ x: p.x - origin.x, y: p.y - origin.y }));
-
-  let twiceArea = 0;
-  let cx = 0;
-  let cy = 0;
+  let twiceArea = 0,
+    cx = 0,
+    cy = 0;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     const q = pts[(i + 1) % pts.length];
@@ -158,7 +162,6 @@ function computeShapeCentroid(pos, zone) {
     cx += (p.x + q.x) * cross;
     cy += (p.y + q.y) * cross;
   }
-
   if (Math.abs(twiceArea) < 1e-9) return null;
   const x = origin.x + cx / (3 * twiceArea);
   const y = origin.y + cy / (3 * twiceArea);
@@ -217,15 +220,17 @@ function wrapCanvasText(ctx, text, maxWidth) {
   return lines;
 }
 
-function escapeHtml(s = "") {
-  return String(s).replace(/[&<>"']/g, (c) =>
-    ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[c]),
+function escapeHtml(s = " ") {
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c],
   );
 }
 
@@ -242,9 +247,9 @@ function truncateText(ctx, text, maxWidth) {
 
 function canvasPolygonCentroid(points) {
   if (!points || points.length < 3) return null;
-  let twiceArea = 0;
-  let cx = 0;
-  let cy = 0;
+  let twiceArea = 0,
+    cx = 0,
+    cy = 0;
   for (let i = 0; i < points.length; i++) {
     const a = points[i];
     const b = points[(i + 1) % points.length];
@@ -285,40 +290,34 @@ export function useKrokiGenerator() {
     edgeTexts: [],
     selectedShapesMeta: [],
     templateId: "technical",
-    orientation: "portrait", // portrait (عمودی) | landscape (افقی)
+    orientation: "portrait",
     styleOverrides: {},
   });
-
-  const last = reactive({
-    form: {},
-    pins: [],
+  const last = reactive({ form: {}, pins: [] });
+  const template = () => ({
+    ...getTemplate(state.templateId),
+    ...state.styleOverrides,
   });
-
-  const template = () => ({ ...getTemplate(state.templateId), ...state.styleOverrides });
 
   function setOrientation(o) {
     state.orientation = o === "landscape" ? "landscape" : "portrait";
-    logger.info("template", "تغییر جهت خروجی", { orientation: state.orientation });
   }
-
   function setStyleOverride(key, value) {
     state.styleOverrides[key] = value;
   }
-
   function resetStyleOverrides() {
-    Object.keys(state.styleOverrides).forEach((k) => delete state.styleOverrides[k]);
+    Object.keys(state.styleOverrides).forEach(
+      (k) => delete state.styleOverrides[k],
+    );
   }
-
   function setTemplate(id) {
     if (!id) return;
     state.templateId = id;
-    logger.info("template", "انتخاب قالب کروکی", { id });
   }
 
   function buildGeometry(pins) {
     const selected = eligiblePinsOf(pins);
     if (!selected.length) return null;
-
     const allPositions = [];
     const metas = [];
     for (const pin of selected) {
@@ -351,18 +350,18 @@ export function useKrokiGenerator() {
     try {
       const bounds = new mapboxgl.LngLatBounds();
       allPositions.forEach((p) => bounds.extend([p.lon, p.lat]));
-
       const allLayers = map.getStyle().layers || [];
       const layerStates = new Map();
       for (const layer of allLayers) {
         try {
-          const visibility = map.getLayoutProperty(layer.id, "visibility");
-          layerStates.set(layer.id, visibility);
+          layerStates.set(
+            layer.id,
+            map.getLayoutProperty(layer.id, "visibility"),
+          );
         } catch (e) {
           layerStates.set(layer.id, "visible");
         }
       }
-
       const baseLayerIds = new Set();
       for (const layer of allLayers) {
         if (
@@ -370,16 +369,13 @@ export function useKrokiGenerator() {
           layer.id === "satellite" ||
           layer.id === "local-tile-layer" ||
           layer.id === "local-tile"
-        ) {
+        )
           baseLayerIds.add(layer.id);
-        }
       }
-
       const activePinIds = new Set();
       for (const pin of flattenPins(pins)) {
         if (pin.shape && pin.shape.show !== false) activePinIds.add(pin.id);
       }
-
       for (const layer of allLayers) {
         if (!baseLayerIds.has(layer.id)) {
           try {
@@ -399,61 +395,60 @@ export function useKrokiGenerator() {
           }
         }
       }
-
       const container = map.getContainer();
       const origWidth = container.style.width;
       const origHeight = container.style.height;
       const aspectUtm = toUTM(allPositions);
-      const aspectXs = aspectUtm.map((p) => p.x);
-      const aspectYs = aspectUtm.map((p) => p.y);
-      const aspectSpanX = Math.max(Math.max(...aspectXs) - Math.min(...aspectXs), 1);
-      const aspectSpanY = Math.max(Math.max(...aspectYs) - Math.min(...aspectYs), 1);
+      const aspectSpanX = Math.max(
+        Math.max(...aspectUtm.map((p) => p.x)) -
+          Math.min(...aspectUtm.map((p) => p.x)),
+        1,
+      );
+      const aspectSpanY = Math.max(
+        Math.max(...aspectUtm.map((p) => p.y)) -
+          Math.min(...aspectUtm.map((p) => p.y)),
+        1,
+      );
       const { w: cw, h: ch } = computeCanvasSize(aspectSpanX, aspectSpanY);
       container.style.width = cw + "px";
       container.style.height = ch + "px";
       map.resize();
-
       await new Promise((resolve) => {
         map.fitBounds(bounds, { padding: 120, maxZoom: 20, duration: 0 });
         map.once("idle", resolve);
         setTimeout(resolve, 1500);
       });
-
       map.triggerRepaint();
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      );
       await new Promise((r) => setTimeout(r, 200));
-
       const dataUrl = map.getCanvas().toDataURL("image/png");
-
       container.style.width = origWidth;
       container.style.height = origHeight;
       map.resize();
-
       for (const [layerId, visibility] of layerStates) {
         try {
           map.setLayoutProperty(layerId, "visibility", visibility);
         } catch (e) {}
       }
-
       return dataUrl;
     } catch (e) {
-      logger.warn("capture", "خطا در ثبت تصویر نقشه", e.message);
       return "";
     }
   }
 
   async function computeGeometry(pins, form) {
-    errorReset();
+    state.errorMsg = "";
+    state.ready = false;
     const geom = buildGeometry(pins);
     if (!geom) {
-      state.errorMsg = "حداقل یک ترسیم (پلی‌گان یا خط) را انتخاب کنید.";
-      logger.warn("generate", "تولید بدون ترسیم معتبر رد شد");
+      state.errorMsg = "حداقل یک ترسیم معتبر انتخاب کنید.";
       return false;
     }
     last.form = { ...form };
     last.pins = pins;
     loadLogoImage(last.form.logo);
-
     state.generating = true;
     try {
       const { allPositions, metas } = geom;
@@ -461,19 +456,18 @@ export function useKrokiGenerator() {
       state.utmPoints = utm;
       state.utmZone = utm[0]?.zone ?? null;
       state.selectedShapesMeta = metas;
-
       let totalArea = 0;
       for (const meta of metas) {
-        if (!meta.isClosed) continue;
-        totalArea += computeArea(utm.slice(meta.startIdx, meta.startIdx + meta.count));
+        if (meta.isClosed)
+          totalArea += computeArea(
+            utm.slice(meta.startIdx, meta.startIdx + meta.count),
+          );
       }
       state.areaM2 = totalArea;
-
-      const minX = Math.min(...utm.map((p) => p.x));
-      const maxX = Math.max(...utm.map((p) => p.x));
-      const minY = Math.min(...utm.map((p) => p.y));
-      const maxY = Math.max(...utm.map((p) => p.y));
-
+      const minX = Math.min(...utm.map((p) => p.x)),
+        maxX = Math.max(...utm.map((p) => p.x));
+      const minY = Math.min(...utm.map((p) => p.y)),
+        maxY = Math.max(...utm.map((p) => p.y));
       let areaSum = 0,
         cxSum = 0,
         cySum = 0;
@@ -485,8 +479,8 @@ export function useKrokiGenerator() {
           cx = 0,
           cy = 0;
         for (let i = 0; i < slice.length; i++) {
-          const p = slice[i];
-          const q = slice[(i + 1) % slice.length];
+          const p = slice[i],
+            q = slice[(i + 1) % slice.length];
           const cross = p.x * q.y - q.x * p.y;
           a += cross;
           cx += (p.x + q.x) * cross;
@@ -499,33 +493,44 @@ export function useKrokiGenerator() {
         cxSum += (cx / (6 * a)) * absA;
         cySum += (cy / (6 * a)) * absA;
       }
-      let centerX, centerY;
-      if (areaSum > 1e-6) {
-        centerX = cxSum / areaSum;
-        centerY = cySum / areaSum;
-      } else {
-        centerX = (minX + maxX) / 2;
-        centerY = (minY + maxY) / 2;
-      }
-      const meanLat0 = allPositions.reduce((s, p) => s + Number(p.lat), 0) / allPositions.length;
+      let centerX = areaSum > 1e-6 ? cxSum / areaSum : (minX + maxX) / 2;
+      let centerY = areaSum > 1e-6 ? cySum / areaSum : (minY + maxY) / 2;
+      const meanLat0 =
+        allPositions.reduce((s, p) => s + Number(p.lat), 0) /
+        allPositions.length;
       const centerProj = `+proj=utm +zone=${state.utmZone} +datum=WGS84 +units=m +no_defs${meanLat0 < 0 ? " +south" : ""}`;
       const [cLon, cLat] = proj4(centerProj, "EPSG:4326", [centerX, centerY]);
-      state.centerUtm = { x: centerX, y: centerY, lat: cLat, lon: cLon, zone: state.utmZone };
+      state.centerUtm = {
+        x: centerX,
+        y: centerY,
+        lat: cLat,
+        lon: cLon,
+        zone: state.utmZone,
+      };
 
-      // آدرس‌یابی معکوس
-      const zone = state.utmZone;
       const centroidResults = [];
       const centroidTasks = [];
       for (const meta of metas) {
-        const slice = allPositions.slice(meta.startIdx, meta.startIdx + meta.count);
-        const c = computeShapeCentroid(slice, zone);
+        const slice = allPositions.slice(
+          meta.startIdx,
+          meta.startIdx + meta.count,
+        );
+        const c = computeShapeCentroid(slice, state.utmZone);
         if (!c) continue;
-        const rec = { lat: c.lat, lon: c.lon, utm: { x: c.x, y: c.y, zone } };
+        const rec = {
+          lat: c.lat,
+          lon: c.lon,
+          utm: { x: c.x, y: c.y, zone: state.utmZone },
+        };
         const idx = centroidResults.length;
         centroidResults.push(rec);
         centroidTasks.push(
           reverseLookup(c.lat, c.lon)
-            .then((r) => ({ idx, display: r.display || "", road: r.road || "" }))
+            .then((r) => ({
+              idx,
+              display: r.display || "",
+              road: r.road || "",
+            }))
             .catch(() => ({ idx, display: "", road: "" })),
         );
       }
@@ -537,40 +542,110 @@ export function useKrokiGenerator() {
         }
       }
       state.shapeCentroids = centroidResults;
-
-      // اگر نشانی ملک خالی بود، از نخستین نشانی استخراج‌شده پر شود
       const firstAddress = centroidResults.find((c) => c.address)?.address;
-      if (firstAddress && !last.form.address) {
-        last.form.address = firstAddress;
-      }
-
-      state.edgeTexts = metas.map((meta) => {
-        const count = meta.isClosed ? meta.count : Math.max(meta.count - 1, 0);
-        return Array(count).fill("");
-      });
-
+      if (firstAddress && !last.form.address) last.form.address = firstAddress;
+      state.edgeTexts = metas.map((meta) =>
+        Array(meta.isClosed ? meta.count : Math.max(meta.count - 1, 0)).fill(
+          "",
+        ),
+      );
       state.ready = true;
-      logger.info("generate", "محاسبات هندسی کروکی انجام شد", {
-        points: allPositions.length,
-        shapes: metas.length,
-        area: totalArea.toFixed(2),
-        zone: state.utmZone,
-      });
       return true;
     } catch (err) {
-      console.error("خطا در تولید کروکی:", err);
-      state.errorMsg = "خطا در تولید کروکی. کنسول را برای جزئیات بررسی کنید.";
-      logger.error("generate", "خطا در تولید کروکی", err.message);
+      state.errorMsg = "خطا در تولید کروکی.";
       return false;
     } finally {
       state.generating = false;
     }
   }
 
-  function errorReset() {
-    state.errorMsg = "";
-    state.ready = false;
+  // ─────────────── KML Export ───────────────
+  function exportKml() {
+    const metas = state.selectedShapesMeta;
+    const pts = state.utmPoints;
+    if (!pts.length || !metas.length) return;
+
+    let placemarks = "";
+    for (let m = 0; m < metas.length; m++) {
+      const meta = metas[m];
+      const slice = pts.slice(meta.startIdx, meta.startIdx + meta.count);
+      const coords = slice
+        .map((p) => `${p.lon.toFixed(8)},${p.lat.toFixed(8)},0`)
+        .join(" ");
+
+      if (meta.isClosed) {
+        const first = slice[0];
+        const closedCoords =
+          coords + ` ${first.lon.toFixed(8)},${first.lat.toFixed(8)},0`;
+        placemarks += `<Placemark><name>ترسیم ${m + 1} (پلی‌گان)</name><Style><LineStyle><color>ff0000ff</color><width>2</width></LineStyle><PolyStyle><color>330000ff</color></PolyStyle></Style><Polygon><outerBoundaryIs><LinearRing><coordinates>${closedCoords}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;
+      } else {
+        placemarks += `<Placemark><name>ترسیم ${m + 1} (خط)</name><Style><LineStyle><color>ff0000ff</color><width>3</width></LineStyle></Style><LineString><coordinates>${coords}</coordinates></LineString></Placemark>`;
+      }
+    }
+
+    const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>کروکی - ${last.form?.title || "بدون عنوان"}</name><Folder><name>ترسیمات</name>${placemarks}</Folder></Document></kml>`;
+    const blob = new Blob([kml], {
+      type: "application/vnd.google-earth.kml+xml;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kroki-${Date.now()}.kml`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
+
+  // ─────────────── DXF Export ───────────────
+  function exportDxf() {
+    const metas = state.selectedShapesMeta;
+    const pts = state.utmPoints;
+    if (!pts.length || !metas.length) return;
+
+    let entities = "";
+    for (let m = 0; m < metas.length; m++) {
+      const meta = metas[m];
+      const slice = pts.slice(meta.startIdx, meta.startIdx + meta.count);
+      if (slice.length < 2) continue;
+
+      if (meta.isClosed && slice.length >= 3) {
+        entities += `  0\nLWPOLYLINE\n  8\n0\n 90\n${slice.length}\n 70\n1\n`;
+        for (const p of slice)
+          entities += ` 10\n${p.x.toFixed(4)}\n 20\n${p.y.toFixed(4)}\n`;
+      } else {
+        for (let i = 0; i < slice.length - 1; i++) {
+          const a = slice[i],
+            b = slice[i + 1];
+          entities += `  0\nLINE\n  8\n0\n 10\n${a.x.toFixed(4)}\n 20\n${a.y.toFixed(4)}\n 30\n0.0\n 11\n${b.x.toFixed(4)}\n 21\n${b.y.toFixed(4)}\n 31\n0.0\n`;
+        }
+      }
+
+      for (let i = 0; i < slice.length; i++) {
+        const next = (i + 1) % slice.length;
+        if (!meta.isClosed && next === 0 && i === slice.length - 1) break;
+        const a = slice[i],
+          b = slice[next];
+        const dx = b.x - a.x,
+          dy = b.y - a.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const mx = (a.x + b.x) / 2,
+          my = (a.y + b.y) / 2;
+        const nlen = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / nlen,
+          ny = dx / nlen;
+        entities += `  0\nTEXT\n  8\n0\n 10\n${(mx + nx * 2).toFixed(4)}\n 20\n${(my + ny * 2).toFixed(4)}\n 30\n0.0\n 40\n2.5\n 1\n${len.toFixed(2)}\n`;
+      }
+    }
+
+    const dxf = `  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1027\n  9\n$INSUNITS\n 70\n6\n  0\nENDSEC\n  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n1\n  0\nLAYER\n  2\n0\n 70\n0\n 62\n7\n  6\nCONTINUOUS\n  0\nENDTAB\n  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n${entities}  0\nENDSEC\n  0\nEOF\n`;
+    const blob = new Blob([dxf], { type: "application/dxf;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kroki-${Date.now()}.dxf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  // ------------------------------------
 
   function drawFrame(ctx, W, H, t) {
     ctx.save();
@@ -632,7 +707,11 @@ export function useKrokiGenerator() {
     ctx.font = "500 11px Vazirmatn, Tahoma, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.fillText(
-      truncateText(ctx, (form.title || "کروکی") + " — تاریخ برداشت: " + (form.date || "—"), textW),
+      truncateText(
+        ctx,
+        (form.title || "کروکی") + " — تاریخ برداشت: " + (form.date || "—"),
+        textW,
+      ),
       W / 2,
       34,
     );
@@ -659,11 +738,19 @@ export function useKrokiGenerator() {
       ctx.font = "600 12px Vazirmatn, Tahoma, sans-serif";
       ctx.textBaseline = "middle";
       ctx.textAlign = "right";
-      ctx.fillText(truncateText(ctx, "متقاضی: " + (form.client || "—"), bw * 0.4), bx + bw - 8, by + 15);
+      ctx.fillText(
+        truncateText(ctx, "متقاضی: " + (form.client || "—"), bw * 0.4),
+        bx + bw - 8,
+        by + 15,
+      );
       ctx.textAlign = "center";
       ctx.fillText("مقیاس: " + extra.scaleText, bx + bw / 2, by + 15);
       ctx.textAlign = "left";
-      ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), bw * 0.34), bx + 8, by + 15);
+      ctx.fillText(
+        truncateText(ctx, "تاریخ: " + (form.date || "—"), bw * 0.34),
+        bx + 8,
+        by + 15,
+      );
       return;
     }
     if (t.titleBlock === "hand") {
@@ -671,7 +758,11 @@ export function useKrokiGenerator() {
       ctx.font = "12px Vazirmatn, Tahoma, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(truncateText(ctx, "کروکی توصیفی دستی — " + (form.title || ""), W - 28), W / 2, H - 28);
+      ctx.fillText(
+        truncateText(ctx, "کروکی توصیفی دستی — " + (form.title || ""), W - 28),
+        W / 2,
+        H - 28,
+      );
       return;
     }
     if (t.titleBlock !== "official") return;
@@ -691,11 +782,19 @@ export function useKrokiGenerator() {
     ctx.font = "600 12px Vazirmatn, Tahoma, sans-serif";
     ctx.textBaseline = "middle";
     ctx.textAlign = "right";
-    ctx.fillText(truncateText(ctx, "متقاضی: " + (form.client || "—"), half - 20), mid - 6, by + 12);
+    ctx.fillText(
+      truncateText(ctx, "متقاضی: " + (form.client || "—"), half - 20),
+      mid - 6,
+      by + 12,
+    );
     ctx.textAlign = "center";
     ctx.fillText("مقیاس: " + extra.scaleText, mid, by + 12);
     ctx.textAlign = "left";
-    ctx.fillText(truncateText(ctx, "تاریخ: " + (form.date || "—"), half - 20), mid + 6, by + 12);
+    ctx.fillText(
+      truncateText(ctx, "تاریخ: " + (form.date || "—"), half - 20),
+      mid + 6,
+      by + 12,
+    );
 
     const rowH = (bh - 24) / 3;
     ctx.fillStyle = "#333";
@@ -703,7 +802,11 @@ export function useKrokiGenerator() {
     // ردیف دوم: سیستم مختصات (راست) / مساحت (چپ)
     ctx.textAlign = "right";
     ctx.fillText(
-      truncateText(ctx, "سیستم مختصات: WGS84 / UTM — Zone " + (extra.zone || "—"), half - 16),
+      truncateText(
+        ctx,
+        "سیستم مختصات: WGS84 / UTM — Zone " + (extra.zone || "—"),
+        half - 16,
+      ),
       mid - 6,
       by + 24 + rowH * 0.5,
     );
@@ -736,13 +839,28 @@ export function useKrokiGenerator() {
     );
     ctx.textAlign = "left";
     ctx.fillText(
-      truncateText(ctx, "عرض معبر: " + (form.streetWidth || "—"), bw * 0.26 - 12),
+      truncateText(
+        ctx,
+        "عرض معبر: " + (form.streetWidth || "—"),
+        bw * 0.26 - 12,
+      ),
       bx + 10,
       by + 24 + rowH * 2.5,
     );
   }
 
-  function drawGrid(ctx, minX, minY, maxX, maxY, effScale, pad, drawTop, drawBottom, W) {
+  function drawGrid(
+    ctx,
+    minX,
+    minY,
+    maxX,
+    maxY,
+    effScale,
+    pad,
+    drawTop,
+    drawBottom,
+    W,
+  ) {
     const spanX = Math.max(maxX - minX, 0.001);
     const gx = niceScaleLength(spanX) / 4;
     ctx.save();
@@ -791,10 +909,17 @@ export function useKrokiGenerator() {
     const spanY = Math.max(maxY - minY, 0.001);
 
     const titleBlockH =
-      t.titleBlock === "official" ? 118 : t.titleBlock === "technical" ? 54 : 30;
+      t.titleBlock === "official"
+        ? 118
+        : t.titleBlock === "technical"
+          ? 54
+          : 30;
     const drawTop = headerH + pad + 30;
     const drawBottom = H - pad - titleBlockH - 14;
-    const effScale = Math.min((W - 2 * pad) / spanX, (drawBottom - drawTop) / spanY);
+    const effScale = Math.min(
+      (W - 2 * pad) / spanX,
+      (drawBottom - drawTop) / spanY,
+    );
 
     const toCanvas = (p) => ({
       x: pad + (p.x - minX) * effScale,
@@ -811,9 +936,8 @@ export function useKrokiGenerator() {
 
     const form = last.form || {};
 
-    const metersPerCm =
-      spanX / ((W - 2 * pad) / 96 * 2.54);
-    const den = niceScaleDen(Math.round((metersPerCm) * 100) / 1);
+    const metersPerCm = spanX / (((W - 2 * pad) / 96) * 2.54);
+    const den = niceScaleDen(Math.round(metersPerCm * 100) / 1);
     const scaleText = den ? "1:" + den.toLocaleString("fa-IR") : "—";
 
     // کادر
@@ -821,7 +945,19 @@ export function useKrokiGenerator() {
     // هدر
     drawHeaderBand(ctx, W, t, form);
     // شبکه
-    if (t.grid) drawGrid(ctx, minX, minY, maxX, maxY, effScale, pad, drawTop, drawBottom, W);
+    if (t.grid)
+      drawGrid(
+        ctx,
+        minX,
+        minY,
+        maxX,
+        maxY,
+        effScale,
+        pad,
+        drawTop,
+        drawBottom,
+        W,
+      );
 
     let globalIdx = 0;
     const nwIndex = computeNWIndex(cpts);
@@ -834,7 +970,9 @@ export function useKrokiGenerator() {
       const isClosed = meta.isClosed;
 
       ctx.beginPath();
-      slice.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      slice.forEach((p, i) =>
+        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
+      );
       if (isClosed) ctx.closePath();
       if (isClosed) {
         ctx.fillStyle = t.colorful
@@ -966,15 +1104,13 @@ export function useKrokiGenerator() {
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         const maxW = 260;
-        const lines = [
-          "X: " + cent.x.toFixed(2),
-          "Y: " + cent.y.toFixed(2),
-        ];
+        const lines = ["X: " + cent.x.toFixed(2), "Y: " + cent.y.toFixed(2)];
         const lineH = 21;
         const padV = 4;
         const padH = 10;
         let boxW = 0;
-        for (const line of lines) boxW = Math.max(boxW, ctx.measureText(line).width);
+        for (const line of lines)
+          boxW = Math.max(boxW, ctx.measureText(line).width);
         boxW = Math.min(boxW + padH * 2, W - 12);
         const boxH = lines.length * lineH + padV * 2;
         const halfW = Math.min(boxW / 2, W / 2 - 6);
@@ -1070,18 +1206,12 @@ export function useKrokiGenerator() {
     const rows = state.utmPoints
       .map(
         (p, i) =>
-          `<tr><td>${i + 1}</td><td>${p.x.toFixed(2)}</td><td>${p.y.toFixed(2)}</td><td>${
-            p.zone ?? state.utmZone ?? ""
-          }</td></tr>`,
+          `<tr><td>${i + 1}</td><td>${p.x.toFixed(2)}</td><td>${p.y.toFixed(2)}</td><td>${p.zone ?? state.utmZone ?? ""}</td></tr>`,
       )
       .join("");
 
     const centerRow = state.centerUtm
-      ? `<tr style="background:#eff6ff;font-weight:600"><td>مرکز</td><td>${state.centerUtm.x.toFixed(
-          2,
-        )}</td><td>${state.centerUtm.y.toFixed(2)}</td><td>${
-          state.centerUtm.zone ?? state.utmZone ?? ""
-        }</td></tr>`
+      ? `<tr style="background:#eff6ff;font-weight:600"><td>مرکز</td><td>${state.centerUtm.x.toFixed(2)}</td><td>${state.centerUtm.y.toFixed(2)}</td><td>${state.centerUtm.zone ?? state.utmZone ?? ""}</td></tr>`
       : "";
 
     const hasUtm = t.coordinateTable !== "none";
@@ -1089,37 +1219,33 @@ export function useKrokiGenerator() {
     const landscape = state.orientation === "landscape";
 
     const headBlock = `
-      <div class="head" style="border-bottom-color:${t.headerColor}">
-        <div class="head-logo-title">
-          ${
-            last.form.logo
-              ? `<img class="head-logo" src="${last.form.logo}" alt="" />`
-              : ""
-          }
-          <div class="head-title">${escapeHtml(last.form.title) || "کروکی وضعیت موجود"}</div>
-        </div>
-        <div class="head-sub">قالب: ${escapeHtml(t.name)} — تاریخ برداشت: ${escapeHtml(last.form.date)}</div>
-      </div>`;
+    <div class="head" style="border-bottom-color:${t.headerColor}">
+      <div class="head-logo-title">
+        ${last.form.logo ? `<img class="head-logo" src="${last.form.logo}" alt="" />` : ""}
+        <div class="head-title">${escapeHtml(last.form.title) || "کروکی وضعیت موجود"}</div>
+      </div>
+      <div class="head-sub">قالب: ${escapeHtml(t.name)} — تاریخ برداشت: ${escapeHtml(last.form.date)}</div>
+    </div>`;
 
     const infoTable = `
-      <table class="info-table">
-        <tr>
-          <td>متقاضی</td><td>${escapeHtml(last.form.client)}</td>
-          <td>نشانی ملک</td><td>${escapeHtml(last.form.address)}</td>
-        </tr>
-        <tr>
-          <td>سیستم مختصات</td><td>WGS84 / UTM — Zone: ${state.utmZone ?? "—"}</td>
-          <td>مساحت کل</td><td>${state.areaM2.toFixed(2)} متر مربع</td>
-        </tr>
-        <tr>
-          <td>سازمان / مرجع</td><td>${escapeHtml(t.org)}</td>
-          <td>کارشناس</td><td>${escapeHtml(last.form.surveyor)}</td>
-        </tr>
-        <tr>
-          <td>عرض معبر</td><td>${escapeHtml(last.form.streetWidth) || "—"} متر</td>
-          <td>شماره پلاک ثبتی</td><td>${escapeHtml(last.form.plaque) || "—"}</td>
-        </tr>
-      </table>`;
+    <table class="info-table">
+      <tr>
+        <td>متقاضی</td><td>${escapeHtml(last.form.client)}</td>
+        <td>نشانی ملک</td><td>${escapeHtml(last.form.address)}</td>
+      </tr>
+      <tr>
+        <td>سیستم مختصات</td><td>WGS84 / UTM — Zone: ${state.utmZone ?? "—"}</td>
+        <td>مساحت کل</td><td>${state.areaM2.toFixed(2)} متر مربع</td>
+      </tr>
+      <tr>
+        <td>سازمان / مرجع</td><td>${escapeHtml(t.org)}</td>
+        <td>کارشناس</td><td>${escapeHtml(last.form.surveyor)}</td>
+      </tr>
+      <tr>
+        <td>عرض معبر</td><td>${escapeHtml(last.form.streetWidth) || "—"} متر</td>
+        <td>شماره پلاک ثبتی</td><td>${escapeHtml(last.form.plaque) || "—"}</td>
+      </tr>
+    </table>`;
 
     const utmTable = hasUtm
       ? `<table class="utm-table">
@@ -1131,90 +1257,89 @@ export function useKrokiGenerator() {
       </table>`
       : "";
 
-    // متن ضلع‌ها (اطلاعات مجاورت) فقط برای قالب ثبتی نمایش داده می‌شود
     const edgeTable =
       isSabt && state.edgeTexts.some((arr) => arr.some((x) => x))
-        ? `<div class="block-title">متن ضلع‌ها / مجاورت (نام کوچه، معبر، ملک مجاور)</div>
-        <table class="utm-table">
-          <thead><tr><th>ترسیم</th><th>ضلع</th><th>متن</th></tr></thead>
-          <tbody>
-            ${state.edgeTexts
-              .map((texts, s) =>
-                texts
-                  .map((txt, e) =>
-                    txt
-                      ? `<tr><td>${s + 1}</td><td>${e + 1}</td><td>${escapeHtml(txt)}</td></tr>`
-                      : "",
-                  )
-                  .join(""),
-              )
-              .join("")}
-          </tbody>
-        </table>`
+        ? `<div class="block-title">متن ضلع‌ها / مجاورت</div>
+      <table class="utm-table">
+        <thead><tr><th>ترسیم</th><th>ضلع</th><th>متن</th></tr></thead>
+        <tbody>
+          ${state.edgeTexts
+            .map((texts, s) =>
+              texts
+                .map((txt, e) =>
+                  txt
+                    ? `<tr><td>${s + 1}</td><td>${e + 1}</td><td>${escapeHtml(txt)}</td></tr>`
+                    : "",
+                )
+                .join(""),
+            )
+            .join("")}
+        </tbody>
+      </table>`
         : "";
 
     const disclaimer = `
-      <div class="disclaimer">
-        کلیه حدود بر اساس اظهارات و ارائه مالک برداشت شده است و نقشه‌بردار هیچ مسئولیتی در قبال تعدی به املاک مجاور و حریم‌های موجود ندارد.
-      </div>`;
+    <div class="disclaimer">
+      کلیه حدود بر اساس اظهارات و ارائه مالک برداشت شده است و نقشه‌بردار هیچ مسئولیتی در قبال تعدی به املاک مجاور و حریم‌های موجود ندارد.
+    </div>`;
 
     const signRow = `
-      <div class="sign-row">
-        <div class="sign-box"><div class="sign-label">تاریخ: ${getTodayJalali()}</div></div>
-        <div class="sign-box"><div class="sign-label">مهر و امضای کارشناس / نقشه‌بردار</div></div>
-        <div class="sign-box"><div class="sign-label">امضای متقاضی / مالک</div></div>
-      </div>`;
-
-    const sideExtras = `${utmTable}${edgeTable}`;
+    <div class="sign-row">
+      <div class="sign-box"><div class="sign-label">تاریخ: ${getTodayJalali()}</div></div>
+      <div class="sign-box"><div class="sign-label">مهر و امضای کارشناس / نقشه‌بردار</div></div>
+      <div class="sign-box"><div class="sign-label">امضای متقاضی / مالک</div></div>
+    </div>`;
 
     const mapFig = state.mapImage
       ? `<figure class="map-fig">
-          <img src="${state.mapImage}" />
-          <figcaption>تصویر نقشه</figcaption>
-        </figure>`
+        <img src="${state.mapImage}" />
+        <figcaption>تصویر نقشه</figcaption>
+      </figure>`
       : "";
 
     let html;
     if (landscape) {
-      // چیدمان افقی: کروکی تمام‌عرض صفحه، سایر اطلاعات زیر آن در دو ستون
+      // چیدمان افقی: کروکی کل صفحه، جداول و عکس نقشه در حاشیه‌ها
       html = `
-    <div class="sheet landscape">
-      ${headBlock}
-      <figure class="sketch-fig sketch-full">
+  <div class="sheet landscape">
+    ${headBlock}
+    <div class="map-area">
+      <figure class="sketch-fig">
         <img src="__SKETCH__" />
         <figcaption>${escapeHtml(t.subtitle)}</figcaption>
       </figure>
-      <div class="lay-grid">
-        <div class="col">
-          ${infoTable}
-        </div>
-        <div class="col">
-          ${mapFig}
-        </div>
+      <div class="mg mg-tl">${infoTable}</div>
+      <div class="mg mg-bl">
+        ${utmTable}
+        ${edgeTable}
       </div>
-      <div class="extras-grid">
-        ${sideExtras}
-      </div>
-      ${disclaimer}
-      ${signRow}
-    </div>`;
+      <div class="mg mg-br">${mapFig}</div>
+      <div class="mg mg-note">${disclaimer}</div>
+    </div>
+    ${signRow}
+  </div>`;
     } else {
-      // چیدمان عمودی: کروکی در یک سطر کامل، عکس نقشه در یک قاب جداگانه زیر آن
+      // چیدمان عمودی: کروکی بالا، عکس نقشه کوچک در کنار جداول
       html = `
-    <div class="sheet portrait">
-      ${headBlock}
-      ${infoTable}
-      <figure class="sketch-fig sketch-fig-full">
-        <img src="__SKETCH__" />
-        <figcaption>${escapeHtml(t.subtitle)}</figcaption>
-      </figure>
-      ${mapFig}
-      <div class="tables-row">
-        ${sideExtras}
+  <div class="sheet portrait">
+    ${headBlock}
+    ${infoTable}
+    <figure class="sketch-fig sketch-fig-full">
+      <img src="__SKETCH__" />
+      <figcaption>${escapeHtml(t.subtitle)}</figcaption>
+    </figure>
+    <div class="bottom-section">
+      <div class="bottom-right">
+        ${mapFig}
       </div>
-      ${disclaimer}
-      ${signRow}
-    </div>`;
+      <div class="bottom-left">
+        ${utmTable}
+        ${edgeTable}
+      </div>
+    </div>
+    ${disclaimer}
+    ${signRow}
+  </div>`;
     }
 
     return { html, style: `headerColor:${t.headerColor}` };
@@ -1227,13 +1352,8 @@ export function useKrokiGenerator() {
     const landscape = state.orientation === "landscape";
 
     const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.style.visibility = "hidden";
+    iframe.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
     document.body.appendChild(iframe);
 
     const doc = iframe.contentWindow.document;
@@ -1241,9 +1361,9 @@ export function useKrokiGenerator() {
     doc.write(`<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
-  <meta charset="utf-8"/>
-  <title>&nbsp;</title>
-  <style>${printCss(landscape)}</style>
+<meta charset="utf-8">
+<title>&nbsp;</title>
+<style>${printCss(landscape)}</style>
 </head>
 <body>${finalHtml}</body>
 </html>`);
@@ -1255,25 +1375,28 @@ export function useKrokiGenerator() {
       if (!iw || !idoc) return;
       const sheet = idoc.querySelector(".sheet");
       const images = Array.from(idoc.images);
+
       Promise.all(
-        images.map(
-          (img) =>
-            img.complete
-              ? Promise.resolve()
-              : new Promise((res) => {
-                  img.onload = img.onerror = res;
-                }),
+        images.map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((res) => {
+                img.onload = img.onerror = res;
+              }),
         ),
       ).then(() => {
         try {
-          // برگه دقیقاً هم‌عرض ناحیه قابل چاپ A4 تنظیم می‌شود (در 96dpi) تا هیچ
-          // مقیاس‌گرفتی و ریزدن کلی انجام نشود و محتوا با اندازه واقعی/خوانا و
-          // صفحه‌بندی طبیعی چاپ شود (بدون ایجاد صفحه‌ی خالی اضافه).
-          const printableWmm = landscape ? 297 - 12 : 210 - 12;
-          const pageW = (printableWmm * 96) / 25.4;
+          // ابعاد قابل چاپ A4 (با حاشیه 6mm از هر طرف)
+          const printWmm = landscape ? 297 - 12 : 210 - 12;
+          const printHmm = landscape ? 210 - 12 : 297 - 12;
+          const pageW = (printWmm * 96) / 25.4;
+          const pageH = (printHmm * 96) / 25.4;
+
           sheet.style.width = pageW + "px";
-          sheet.style.height = "auto";
+          sheet.style.height = pageH + "px";
           sheet.style.margin = "0";
+          sheet.style.overflow = "hidden";
+
           iw.focus();
           iw.print();
         } catch (e) {
@@ -1290,47 +1413,145 @@ export function useKrokiGenerator() {
 
   function printCss(landscape) {
     return `
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { font-family: Tahoma, 'Vazirmatn', sans-serif; color: #222; background: #fff; }
-.sheet { margin: 0 auto; padding: 8px; }
-.head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 10px; page-break-inside: avoid; }
+body { font-family: Tahoma, 'Vazirmatn', sans-serif; color: #222; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* برگه دقیقاً یک صفحه */
+.sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sheet > * { flex-shrink: 0; }
+
+.head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 7px; }
 .head-logo-title { display: flex; align-items: center; gap: 8px; }
-.head-logo { width: 34px; height: 34px; object-fit: contain; }
-.head-title { font-size: 18px; font-weight: 700; }
-.head-sub { font-size: 11px; color: #555; }
-.block-title { font-weight: 700; font-size: 11.5px; margin: 8px 0 4px; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px; }
-table.info-table td { border: 1px solid #bbb; padding: 4px 7px; line-height: 1.4; }
-table.info-table td:nth-child(1), table.info-table td:nth-child(3) { background: #f3f3f3; font-weight: 600; width: 15%; white-space: nowrap; }
-table.utm-table th, table.utm-table td { border: 1px solid #bbb; padding: 3px 6px; text-align: center; }
+.head-logo { width: 32px; height: 32px; object-fit: contain; }
+.head-title { font-size: 16px; font-weight: 700; }
+.head-sub { font-size: 10px; color: #555; }
+
+.block-title { font-weight: 700; font-size: 11px; margin: 5px 0 3px; }
+
+table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 10px; }
+table.info-table td { border: 1px solid #bbb; padding: 3px 6px; line-height: 1.35; }
+table.info-table td:nth-child(1), table.info-table td:nth-child(3) { background: #f3f3f3; font-weight: 600; width: 14%; white-space: nowrap; }
+table.utm-table th, table.utm-table td { border: 1px solid #bbb; padding: 2px 5px; text-align: center; }
 table.utm-table thead th { background: #f3f3f3; }
-figure { margin: 0; border: 1px solid #bbb; padding: 4px; text-align: center; }
-figure img { width: 100%; height: auto; display: block; }
-figcaption { font-size: 11px; color: #444; margin-top: 4px; font-weight: 600; }
-.disclaimer { font-size: 9.5px; color: #666; border-top: 1px solid #ccc; padding-top: 5px; margin-top: 5px; page-break-inside: avoid; }
-.sign-row { display: flex; gap: 8px; margin-top: 12px; page-break-inside: avoid; }
-.sign-box { flex: 1; border: 1px solid #bbb; min-height: 52px; border-radius: 6px; padding: 6px 8px; }
-.sign-label { font-size: 10px; color: #555; font-weight: 600; }
 
-/* ---- چیدمان عمودی (portrait): کروکی تمام‌عرض در یک سطر، سپس اطلاعات طبقه‌ای ---- */
+figure { margin: 0; border: 1px solid #bbb; padding: 3px; text-align: center; }
+figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
+
+.disclaimer { font-size: 8.5px; color: #666; border-top: 1px solid #ccc; padding-top: 3px; margin-top: 4px; }
+
+.sign-row { display: flex; gap: 8px; margin-top: 8px; }
+.sign-box { flex: 1; border: 1px solid #bbb; min-height: 44px; border-radius: 6px; padding: 5px 8px; }
+.sign-label { font-size: 9px; color: #555; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════
+   چیدمان افقی (landscape): کروکی تمام‌صفحه + جداول در حاشیه‌ها
+   ═══════════════════════════════════════════════════════════════ */
+.sheet.landscape { position: relative; }
+.sheet.landscape .head { position: relative; z-index: 10; flex-shrink: 0; }
+
+/* ناحیه کروکی: تمام فضای باقی‌مانده */
+.sheet.landscape .map-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid #999;
+  margin: 6px 0;
+  overflow: hidden;
+}
+
+/* کروکی: تمام فضای map-area را می‌گیرد */
+.sheet.landscape .sketch-fig {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+.sheet.landscape .sketch-fig img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+.sheet.landscape .sketch-fig figcaption {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.85);
+  padding: 1px 8px;
+  border-radius: 3px;
+}
+
+/* جداول حاشیه‌ای */
+.sheet.landscape .mg {
+  position: absolute;
+  background: rgba(255,255,255,0.94);
+  border: 1px solid #bbb;
+  padding: 4px 6px;
+  font-size: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  z-index: 5;
+}
+.sheet.landscape .mg table { font-size: 8px; margin-bottom: 0; }
+.sheet.landscape .mg table.info-table td { padding: 2px 4px; }
+.sheet.landscape .mg table.utm-table th, 
+.sheet.landscape .mg table.utm-table td { padding: 1px 3px; font-size: 7.5px; }
+
+/* موقعیت جداول */
+.sheet.landscape .mg-tl { top: 3px; left: 3px; max-width: 36%; }
+.sheet.landscape .mg-bl { bottom: 3px; left: 3px; max-width: 40%; max-height: 62%; overflow: hidden; }
+.sheet.landscape .mg-br { bottom: 3px; right: 3px; max-width: 28%; }
+.sheet.landscape .mg-br img { max-height: 90px; width: auto; max-width: 100%; margin: 0 auto; }
+.sheet.landscape .mg-note { top: 3px; right: 3px; max-width: 26%; font-size: 7.5px; border: 0; box-shadow: none; background: rgba(255,255,255,0.85); }
+
+/* ═══════════════════════════════════════════════════════════════
+   چیدمان عمودی (portrait): کروکی بالا، عکس نقشه و جداول کنار هم
+   ═══════════════════════════════════════════════════════════════ */
 .sheet.portrait .sketch-fig-full { margin-bottom: 10px; }
-.sheet.portrait .sketch-fig-full img { width: 100%; }
-.sheet.portrait .map-fig { max-width: 60%; margin: 0 auto 10px; }
-.sheet.portrait .tables-row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
-.sheet.portrait .tables-row > * { flex: 1 1 46%; min-width: 280px; }
-.sheet.portrait .tables-row table { margin-bottom: 6px; }
+.sheet.portrait .sketch-fig-full img { width: 100%; height: auto; display: block; }
 
-/* ---- چیدمان افقی (landscape): کروکی بزرگ تمام‌عرض صفحه و اطلاعات در نوارهای زیر آن ---- */
-.sheet.landscape .sketch-full { margin-bottom: 10px; }
-.sheet.landscape .sketch-full img { width: 100%; height: auto; display: block; }
-.sheet.landscape .sketch-full figcaption { font-size: 12px; }
-.sheet.landscape .lay-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; margin-top: 10px; align-items: start; }
-.sheet.landscape .lay-grid > * { page-break-inside: avoid; }
-.sheet.landscape .map-fig { margin: 0; }
-.sheet.landscape .extras-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
-.sheet.landscape .extras-grid > * { flex: 1 1 46%; min-width: 280px; page-break-inside: avoid; }
-.sheet.landscape .col-side table { font-size: 9.5px; }
+/* بخش پایینی: عکس نقشه و جداول کنار هم */
+.sheet.portrait .bottom-section {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+/* سمت راست: عکس نقشه */
+.sheet.portrait .bottom-right {
+  flex: 0 0 35%;
+  min-width: 180px;
+}
+.sheet.portrait .bottom-right .map-fig {
+  margin: 0;
+}
+.sheet.portrait .bottom-right .map-fig img {
+  width: 100%;
+  max-height: 140px;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+/* سمت چپ: جداول */
+.sheet.portrait .bottom-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sheet.portrait .bottom-left table { margin-bottom: 6px; }
 
 @page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 6mm; }
 @media print {
@@ -1359,6 +1580,8 @@ figcaption { font-size: 11px; color: #444; margin-top: 4px; font-weight: 600; }
     buildGeometry,
     eligiblePinsOf,
     isKrokiEligible,
+    exportKml,
+    exportDxf, // توابع جدید اضافه شدند
   };
 }
 

@@ -21,7 +21,7 @@ export function updatePinGeometry(map, pin) {
             s.type === "polygon"
               ? { type: "Polygon", coordinates: [coords] }
               : { type: "LineString", coordinates: coords },
-          properties: { name: pin.name },
+          properties: { name: pin.name, id: pin.id },
         },
       ],
     });
@@ -71,7 +71,7 @@ export function renderPinOnMap(map, pin) {
               s.type === "polygon"
                 ? { type: "Polygon", coordinates: [coords] }
                 : { type: "LineString", coordinates: coords },
-            properties: { name: pin.name },
+            properties: { name: pin.name, id: pin.id },
           },
         ],
       },

@@ -1,56 +1,114 @@
 export function kmlToGeoJSON(doc) {
   const features = [];
+  const placemarks = doc.getElementsByTagName("Placemark");
 
-  const processPlacemark = (pm) => {
-    const nameEl = pm.querySelector("name");
-    const descEl = pm.querySelector("description");
+  const processGeometry = (geomEl, name, description, out) => {
+    const tag = geomEl.tagName;
+
+    if (tag === "Point") {
+      const coordsEl = geomEl.getElementsByTagName("coordinates")[0];
+      const coords = parseKMLCoordsText(coordsEl ? coordsEl.textContent : "");
+      if (coords.length) {
+        out.push({
+          type: "Feature",
+          properties: { name, description },
+          geometry: { type: "Point", coordinates: coords[0] },
+        });
+      }
+    } else if (tag === "LineString") {
+      const coordsEl = geomEl.getElementsByTagName("coordinates")[0];
+      const coords = parseKMLCoordsText(coordsEl ? coordsEl.textContent : "");
+      if (coords.length) {
+        out.push({
+          type: "Feature",
+          properties: { name, description },
+          geometry: { type: "LineString", coordinates: coords },
+        });
+      }
+    } else if (tag === "Polygon") {
+      const outer = geomEl.getElementsByTagName("outerBoundaryIs")[0];
+      const outerText = outer
+        ? outer.getElementsByTagName("coordinates")[0]?.textContent
+        : "";
+      const ring = outerText ? parseKMLCoordsText(outerText) : [];
+      if (ring.length >= 3) {
+        ring.push(ring[0]);
+        out.push({
+          type: "Feature",
+          properties: { name, description },
+          geometry: { type: "Polygon", coordinates: [ring] },
+        });
+      }
+    } else if (tag === "MultiGeometry") {
+      for (const child of geomEl.children) {
+        if (child.tagName && child.getElementsByTagName) {
+          processGeometry(child, name, description, out);
+        }
+      }
+    }
+  };
+
+  for (let i = 0; i < placemarks.length; i++) {
+    const pm = placemarks[i];
+    const nameEl = pm.getElementsByTagName("name")[0];
+    const descEl = pm.getElementsByTagName("description")[0];
     const name = nameEl ? nameEl.textContent : "";
     const description = descEl ? descEl.textContent : "";
 
-    const point = pm.querySelector("Point");
-    const lineString = pm.querySelector("LineString");
-    const polygon = pm.querySelector("Polygon");
-
-    let geometry = null;
-
-    if (point) {
-      const coords = parseKMLCoords(point.querySelector("coordinates"));
-      if (coords.length) geometry = { type: "Point", coordinates: coords[0] };
-    } else if (lineString) {
-      const coords = parseKMLCoords(lineString.querySelector("coordinates"));
-      if (coords.length)
-        geometry = { type: "LineString", coordinates: coords };
-    } else if (polygon) {
-      const outer = polygon.querySelector("outerBoundaryIs coordinates");
-      const coords = parseKMLCoords(outer);
-      if (coords.length) {
-        coords.push(coords[0]);
-        geometry = { type: "Polygon", coordinates: [coords] };
+    const geometryNodes = pm.children;
+    for (let j = 0; j < geometryNodes.length; j++) {
+      const el = geometryNodes[j];
+      const tag = el.tagName;
+      if (tag === "Point" || tag === "LineString" || tag === "Polygon" || tag === "MultiGeometry") {
+        processGeometry(el, name, description, features);
       }
     }
+  }
 
-    if (geometry)
-      features.push({
-        type: "Feature",
-        properties: { name, description },
-        geometry,
-      });
-  };
-
-  doc.querySelectorAll("Placemark").forEach(processPlacemark);
   return { type: "FeatureCollection", features };
+}
+
+// استخراج مختصات: هر توکن جدا شده با فاصله شامل "lon,lat[,height]" است
+export function parseKMLCoordsText(text) {
+  if (!text) return [];
+  const out = [];
+  let start = -1;
+  const n = text.length;
+
+  for (let i = 0; i <= n; i++) {
+    const c = i < n ? text.charCodeAt(i) : 32;
+    const isSep = c === 32 || c === 9 || c === 10 || c === 13;
+    if (!isSep && start < 0) {
+      start = i;
+    } else if (isSep && start >= 0) {
+      let tok = text.slice(start, i);
+      start = -1;
+      // جدا کردن با کاما
+      let comma = -1;
+      for (let j = 0; j < tok.length; j++) {
+        if (tok.charCodeAt(j) === 44) {
+          comma = j;
+          break;
+        }
+      }
+      if (comma > 0) {
+        const lon = parseFloat(tok.slice(0, comma));
+        let k = comma + 1;
+        while (k < tok.length && tok.charCodeAt(k) === 44) k++;
+        const lat = parseFloat(tok.slice(k, tok.length));
+        if (!isNaN(lon) && !isNaN(lat)) out.push([lon, lat]);
+      } else {
+        tok = null;
+      }
+    }
+  }
+
+  return out;
 }
 
 export function parseKMLCoords(el) {
   if (!el) return [];
-  return el.textContent
-    .trim()
-    .split(/\s+/)
-    .map((pair) => {
-      const [lon, lat] = pair.split(",").map(Number);
-      return [lon, lat];
-    })
-    .filter((c) => !isNaN(c[0]) && !isNaN(c[1]));
+  return parseKMLCoordsText(el.textContent);
 }
 
 const readU16 = (buf, o) => buf[o] | (buf[o + 1] << 8);

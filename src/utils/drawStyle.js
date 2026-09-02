@@ -75,3 +75,27 @@ export function ensurePointSymbolImages(map) {
     console.warn("خطا در ساخت نماد نقطه:", e);
   }
 }
+
+// نماد نقطه رأس پلی‌گان به شکل مربع کوچک (شبیه ArcGIS)
+export const VERTEX_SQUARE_IMAGE = "kroki-vertex-square";
+
+export function ensureVertexSquareImage(map) {
+  if (!map || !map.hasImage || map.hasImage(VERTEX_SQUARE_IMAGE)) return;
+  try {
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    // یک مربع ساده (SDF سفید) — رنگ آن از طریق icon-color تنظیم می‌شود
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(size * 0.15, size * 0.15, size * 0.7, size * 0.7);
+    map.addImage(
+      VERTEX_SQUARE_IMAGE,
+      ctx.getImageData(0, 0, canvas.width, canvas.height),
+      { sdf: true },
+    );
+  } catch (e) {
+    console.warn("خطا در ساخت نماد مربع رأس:", e);
+  }
+}

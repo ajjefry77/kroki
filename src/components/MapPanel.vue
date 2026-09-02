@@ -61,7 +61,7 @@
     <!-- جستجوی آدرس / مختصات -->
     <MapSearchBox :map="mapProxy" v-model:open="searchOpen" />
 
-    <!-- فرم ذخیره ترسیم -->
+    <!-- فرم ذخیره ترسیم (پس از پایان ترسیم با Enter نمایش داده می‌شود) -->
     <Transition name="modal">
       <div
         v-if="drawing?.showForm"
@@ -75,8 +75,21 @@
           </button>
         </div>
 
+        <div class="text-[11px] text-[var(--text-muted)] space-y-1 mb-3 bg-[var(--surface2)] rounded p-2">
+          <div class="flex justify-between">
+            <span>تعداد نقاط</span><span class="font-semibold text-[var(--text)]">{{ drawing.livePointCount }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span>طول کل</span><span class="font-semibold text-[var(--text)]">{{ drawing.liveTotalLength }}</span>
+          </div>
+          <div v-if="drawing.drawMode === 'polygon' || drawing.shape?.type === 'polygon'" class="flex justify-between">
+            <span>مساحت کل</span><span class="font-semibold text-[var(--accent)]">{{ drawing.liveArea }}</span>
+          </div>
+        </div>
+
         <label class="block mb-1 text-xs text-[var(--text-muted)]">نام ترسیم *</label>
         <input
+          ref="nameInputRef"
           v-model="drawing.formData.name"
           type="text"
           class="input !py-1.5 text-xs mb-2"
@@ -91,30 +104,15 @@
           placeholder="توضیح اختیاری"
         ></textarea>
 
-        <div class="text-[11px] text-[var(--text-muted)] space-y-1 mb-3 bg-[var(--surface2)] rounded p-2">
-          <div class="flex justify-between">
-            <span>تعداد نقاط</span><span class="font-semibold text-[var(--text)]">{{ drawing.livePointCount }}</span>
-          </div>
-          <div class="flex justify-between">
-            <span>طول کل</span><span class="font-semibold text-[var(--text)]">{{ drawing.liveTotalLength }}</span>
-          </div>
-          <div v-if="drawing.drawMode === 'polygon'" class="flex justify-between">
-            <span>مساحت</span><span class="font-semibold text-[var(--text)]">{{ drawing.liveArea }}</span>
-          </div>
-          <div v-if="drawing.drawMode === 'circle'" class="flex justify-between">
-            <span>شعاع</span><span class="font-semibold text-[var(--text)]">{{ drawing.liveRadius }}</span>
-          </div>
-        </div>
-
         <div class="text-[10px] text-[var(--text-faint)] mb-2 leading-5">
-          کلیک: افزودن نقطه | Delete: حذف آخرین | Enter: پایان و ذخیره
+          برای جابه‌جایی: نقاط (رأس) یا مرکز (کل شکل) را روی نقشه درگ کنید.
         </div>
 
         <div class="flex justify-end gap-2">
           <button class="btn btn-ghost btn-xs" @click="drawing.cancelForm()">لغو</button>
           <button
             class="btn btn-primary btn-xs"
-            :disabled="!drawing.formData.name.trim() || (!drawing.isSaveEnabled && !drawing.canFinishDrawing)"
+            :disabled="!drawing.formData.name.trim()"
             @click="drawing.handleSave()"
           >
             <i class="fas fa-save ml-1"></i>
@@ -124,36 +122,75 @@
       </div>
     </Transition>
 
-    <Loading :active="loading" />
+    <!-- نمایشگر مختصات مکان‌نما و زوم -->
+    <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 rounded-md bg-black/55 text-white text-[11px] font-medium flex items-center gap-3 pointer-events-none select-none" dir="ltr">
+      <span v-if="hud.lng !== null" class="tracking-tight">
+        <i class="fas fa-location-crosshairs ml-1 text-[10px]"></i>{{ hud.lng.toFixed(6) }}, {{ hud.lat.toFixed(6) }}
+      </span>
+      <span v-else>—</span>
+      <span class="w-px h-3 bg-white/30"></span>
+      <span class="flex items-center gap-1">
+        <i class="fas fa-magnifying-glass-plus text-[10px]"></i>
+        زوم: {{ hud.zoom.toFixed(1) }}
+      </span>
+    </div>
+
+    <Loading
+      :active="loading"
+      :title="loadingTitle"
+      :message="loadingMessage"
+      :progress="loadingProgress"
+      :progress-label="loadingProgressLabel"
+      :cancellable="loadingCancellable"
+      @cancel="cancelKmlLoad"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, reactive } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, reactive, watch } from "vue";
 import mapboxgl from "mapbox-gl";
 import DrawToolbar from "./DrawToolbar.vue";
 import MapSearchBox from "./MapSearchBox.vue";
 import Loading from "./Loading.vue";
 import { useDrawing } from "../composables/useDrawing";
-import { kmlToGeoJSON, parseKMLCoords, readKmlText } from "../utils/kml";
-import { registerLayersForSource, bringDrawingsToFront } from "../utils/layerOrder";
+import { kmlToGeoJSON, readKmlText } from "../utils/kml";
+import { registerDrawLayer, bringDrawingsToFront } from "../utils/layerOrder";
 import { renderPinOnMap } from "../utils/pinRenderer";
 
 const props = defineProps({
   pins: { type: Object, required: true },
 });
 
-const emit = defineEmits(["mapReady", "openKroki", "addPins"]);
+const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin"]);
 
 const mapContainerRef = ref(null);
 const kmlInput = ref(null);
 const loading = ref(false);
+const loadingTitle = ref("در حال بارگذاری فایل KML...");
+const loadingMessage = ref("");
+const loadingProgress = ref(null);
+const loadingProgressLabel = ref("");
+const loadingCancellable = ref(false);
 const initError = ref(null);
+let kmlCancelRequested = false;
 
 let map = null;
 const mapProxy = ref(null);
 const searchOpen = ref(false);
 const drawing = ref(null);
+const nameInputRef = ref(null);
+
+const hud = reactive({ lng: null, lat: null, zoom: 5 });
+
+watch(
+  () => drawing.value?.showForm,
+  (vis) => {
+    if (vis) {
+      nextTick(() => nameInputRef.value?.focus());
+    }
+  },
+);
 
 const drawHint = computed(() => {
   const mode = drawing.value?.drawMode;
@@ -192,38 +229,49 @@ function addGeoJSONSourceAndLayers(sourceId, geojson, pin) {
   });
 
   pin.shape._sourceIds = [sourceId];
-  registerLayersForSource(map, sourceId);
+  registerDrawLayer(sourceId + "-fill");
+  registerDrawLayer(sourceId + "-line");
+  registerDrawLayer(sourceId + "-point");
+}
 
-  const bounds = new mapboxgl.LngLatBounds();
-  const addCoords = (coords) => {
-    if (typeof coords[0] === "number") {
-      bounds.extend(coords);
-    } else {
-      coords.forEach(addCoords);
-    }
-  };
-  geojson.features.forEach((f) => addCoords(f.geometry.coordinates));
-
-  if (!bounds.isEmpty()) {
-    map.fitBounds(bounds, { padding: 50, duration: 2000 });
+function kmlExtendBounds(bounds, coords) {
+  if (typeof coords[0] === "number") {
+    bounds.extend(coords);
+  } else {
+    coords.forEach((c) => kmlExtendBounds(bounds, c));
   }
+}
+
+function cancelKmlLoad() {
+  kmlCancelRequested = true;
+  loadingCancellable.value = false;
+  loadingMessage.value = "در حال لغو...";
+}
+
+function yieldToUI() {
+  return new Promise((r) => setTimeout(r, 0));
 }
 
 async function onKmlChange(e) {
   const file = e.target.files[0];
   if (!file) return;
   e.target.value = "";
+  kmlCancelRequested = false;
+  loadingTitle.value = "در حال بارگذاری فایل KML...";
+  loadingMessage.value = "خواندن و استخراج داده‌های فایل...";
+  loadingProgress.value = null;
+  loadingProgressLabel.value = "";
+  loadingCancellable.value = true;
   loading.value = true;
+  const bounds = new mapboxgl.LngLatBounds();
   try {
-    const url = URL.createObjectURL(file);
-    const response = await fetch(url);
-    const blob = await response.blob();
-    URL.revokeObjectURL(url);
-
-    const text = await readKmlText(blob, file.name);
+    const text = await readKmlText(file, file.name);
+    if (kmlCancelRequested) return;
     const parser = new DOMParser();
     const doc = parser.parseFromString(text, "application/xml");
+    if (kmlCancelRequested) return;
     const geojson = kmlToGeoJSON(doc);
+    if (kmlCancelRequested) return;
 
     if (!geojson.features.length) {
       alert("هیچ هندسه‌ای در فایل KML پیدا نشد.");
@@ -231,7 +279,10 @@ async function onKmlChange(e) {
     }
 
     let added = 0;
-    for (const feature of geojson.features) {
+    const total = geojson.features.length;
+    for (let fi = 0; fi < total; fi++) {
+      if (kmlCancelRequested) return;
+      const feature = geojson.features[fi];
       const geom = feature.geometry;
       if (!geom) continue;
 
@@ -291,13 +342,28 @@ async function onKmlChange(e) {
         };
 
         const sourceId = "file-" + pin.id;
+        const feats = [
+          {
+            ...feature,
+            properties: { ...(feature.properties || {}), id: pin.id },
+          },
+        ];
         addGeoJSONSourceAndLayers(
           sourceId,
-          { type: "FeatureCollection", features: [feature] },
+          { type: "FeatureCollection", features: feats },
           pin,
         );
+        kmlExtendBounds(bounds, single.coordinates);
         props.pins.push(pin);
         added++;
+      }
+
+      // هر چند المان به مرورگر فرصت رندر و به‌روزرسانی پیشرفت را بده
+      if ((fi & 127) === 0) {
+        loadingMessage.value = `در حال افزودن به نقشه... (${added} هندسه)`;
+        loadingProgress.value = Math.round((fi / total) * 100);
+        loadingProgressLabel.value = `${fi}/${total}`;
+        await yieldToUI();
       }
     }
 
@@ -305,11 +371,59 @@ async function onKmlChange(e) {
       alert("هیچ خط یا پلی‌گانی در فایل KML پیدا نشد.");
       return;
     }
+
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { padding: 50, duration: 2000 });
+    }
   } catch (error) {
     console.error("خطا در بارگذاری فایل KML:", error);
     alert("خطا در بارگذاری فایل KML");
   } finally {
     loading.value = false;
+    loadingCancellable.value = false;
+  }
+}
+
+function findPinByPoint(point) {
+  const features = map.queryRenderedFeatures(point);
+  const id = features[0]?.properties?.id;
+  if (!id) return null;
+  const flat = [];
+  const walk = (arr) => {
+    for (const p of arr || []) {
+      if (p.type === "group" && Array.isArray(p.children)) walk(p.children);
+      else flat.push(p);
+    }
+  };
+  walk(props.pins);
+  return flat.find((p) => p.id === id && p.selected !== false) || null;
+}
+
+function onMapHover(e) {
+  if (!drawing.value) return;
+  if (
+    drawing.value.drawMode === "measure" ||
+    drawing.value.drawMode === "polygon" ||
+    drawing.value.drawMode === "polyline" ||
+    drawing.value.drawMode === "multi_point" ||
+    drawing.value.drawMode === "circle" ||
+    drawing.value.showForm ||
+    drawing.value.shape
+  ) {
+    map.getCanvas().style.cursor = "crosshair";
+    return;
+  }
+  map.getCanvas().style.cursor = findPinByPoint(e.point) ? "pointer" : "";
+}
+
+function onMapClick(e) {
+  const d = drawing.value;
+  if (!d) return;
+  if (d.shape || d.showForm) return;
+  const pin = findPinByPoint(e.point);
+  if (pin && pin.shape && (pin.shape.type === "polygon" || pin.shape.type === "polyline")) {
+    d.editExistingPin(pin);
+    emit("editPin", pin.id);
   }
 }
 
@@ -372,6 +486,16 @@ function initMap() {
         renderPinOnMap(map, p);
       }
     }
+    hud.zoom = map.getZoom();
+    map.on("mousemove", (e) => {
+      hud.lng = e.lngLat?.lng ?? null;
+      hud.lat = e.lngLat?.lat ?? null;
+    });
+    map.on("zoom", () => {
+      hud.zoom = map.getZoom();
+    });
+    map.on("click", onMapClick);
+    map.on("mousemove", onMapHover);
     emit("mapReady", { map, drawing: drawing.value });
   });
 

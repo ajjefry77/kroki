@@ -12,7 +12,7 @@
 
     <div class="p-3 space-y-4">
       <!-- ترسیم در حال انجام -->
-      <div v-if="draftRows.length" class="card !rounded-xl !p-3 ring-1 ring-[var(--accent)]/50">
+      <div v-if="draftRows.length && !isEditingExisting" class="card !rounded-xl !p-3 ring-1 ring-[var(--accent)]/50">
         <div class="flex items-center justify-between mb-2">
           <div class="text-xs font-semibold flex items-center gap-1.5">
             <i class="fas fa-pen-nib text-[var(--accent)] animate-pulse"></i>
@@ -90,7 +90,7 @@
       </div>
 
       <!-- ویرایش نقاط ترسیم فعال -->
-      <div v-if="activePin && pointRows.length" class="card !rounded-xl !p-3">
+      <div v-if="activePin && pointRows.length && !isDrawingFresh" class="card !rounded-xl !p-3">
         <div class="flex items-center justify-between mb-2">
           <div class="text-xs font-semibold truncate">
             <i class="fas fa-pen-to-square text-[var(--accent)] ml-1"></i>
@@ -163,7 +163,7 @@
         </button>
       </div>
 
-      <div v-else-if="activePin" class="card !rounded-xl !p-3 text-[11px] text-[var(--text-muted)]">
+      <div v-else-if="activePin && !isDrawingFresh" class="card !rounded-xl !p-3 text-[11px] text-[var(--text-muted)]">
         این ترسیم نقطه قابل ویرایش ندارد.
       </div>
 
@@ -291,6 +291,18 @@ function applyUtmEdit(row, key, value) {
 }
 
 const activePin = computed(() => flatten(props.pins).find((p) => p.id === props.activePinId) || null);
+
+// فقط یک جدول نقاط در هر لحظه نمایش داده می‌شود: هنگام ترسیم تازه، جدول «در حال
+// ترسیم»؛ هنگام ویرایش یک ترسیم موجود، جدول نقاط همان ترسیم (با نام آن). در
+// هر دو حالت جدول دیگر مخفی می‌ماند تا دو جدول هم‌زمان دیده نشوند.
+const isEditingExisting = computed(() => {
+  const d = props.drawing;
+  return !!(d && d.editingPin?.());
+});
+const isDrawingFresh = computed(() => {
+  const d = props.drawing;
+  return !!(d && d.drawMode && !d.editingPin?.());
+});
 
 const pointRows = computed(() => {
   const s = activePin.value?.shape;

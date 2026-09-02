@@ -3,7 +3,7 @@
     <main class="min-h-0 flex flex-col lg:flex-row lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
       <!-- نقشه -->
       <section class="relative flex-1 min-h-[340px] lg:min-h-0 border-b lg:border-b-0 border-[var(--border)]">
-        <MapPanel :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" />
+        <MapPanel :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" />
       </section>
 
       <!-- پنل کناری واحد با تب‌ها -->
@@ -39,6 +39,18 @@
           </div>
         </div>
 
+        <!-- مساحت شکل ترسیم‌شده -->
+        <div
+          v-if="areaInfo.show"
+          class="mx-3 mt-3 flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface2)] px-3 py-2"
+        >
+          <span class="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
+            <i class="fas fa-vector-square text-[var(--accent)]"></i>
+            مساحت کل شکل
+          </span>
+          <span class="text-sm font-bold text-[var(--accent)]">{{ areaInfo.text }}</span>
+        </div>
+
         <div class="flex-1 min-h-0 overflow-y-auto">
           <!-- تب جدول نقاط -->
           <PointsTable
@@ -70,24 +82,46 @@
               <div
                 v-for="p in flatPins"
                 :key="p.id"
-                class="flex items-center gap-2 rounded-lg px-2.5 py-2 bg-[var(--surface2)] border transition cursor-pointer"
+                class="flex items-center gap-2 rounded-lg px-2.5 py-2 bg-[var(--surface2)] border transition"
                 :class="[
-                  isKrokiEligible(p) ? 'border-[var(--border)]' : 'border-[var(--border)]/50 opacity-70',
+                  isKrokiEligible(p) ? 'border-[var(--border)]' : 'border-[var(--border)]/50 opacity-60',
                   activePinId === p.id ? 'ring-2 ring-[var(--accent)]' : '',
+                  (p.selected === false) ? 'cursor-default' : 'cursor-pointer',
                 ]"
-                @click="activePinId = p.id"
+                @click="selectPin(p)"
               >
                 <input
-                  v-if="isKrokiEligible(p)"
+                  v-if="canToggle(p)"
                   v-model="p.selected"
                   type="checkbox"
                   class="accent-[var(--accent)]"
-                  :title="p.selected === false ? 'شامل ساختن در کروکی' : 'حذف از کروکی'"
+                  :title="p.selected === false ? 'فعال‌سازی و نمایش روی نقشه' : 'غیرفعال‌سازی و مخفی کردن از نقشه'"
                   @click.stop
+                  @change="onToggle(p)"
                 />
                 <i class="w-4 text-center text-xs" :class="shapeIcon(p)"></i>
                 <div class="flex-1 min-w-0">
-                  <div class="text-xs font-medium truncate">{{ p.name || 'بدون نام' }}</div>
+                  <div v-if="editingNameId === p.id" class="flex items-center gap-1">
+                    <input
+                      ref="nameInputRef"
+                      v-model="editingName"
+                      type="text"
+                      class="input !py-0.5 !px-1 !text-[11px] w-full"
+                      @keydown.enter.prevent="saveName(p)"
+                      @keydown.esc.prevent="cancelName"
+                      @blur="saveName(p)"
+                    />
+                  </div>
+                  <div v-else class="flex items-center gap-1 min-w-0">
+                    <span class="text-xs font-medium truncate">{{ p.name || 'بدون نام' }}</span>
+                    <button
+                      class="text-gray-400 hover:text-[var(--accent)] text-[10px] px-0.5 shrink-0"
+                      title="ویرایش نام"
+                      @click.stop="startNameEdit(p)"
+                    >
+                      <i class="fas fa-pen"></i>
+                    </button>
+                  </div>
                   <div class="text-[10px] text-[var(--text-muted)]">
                     {{ typeLabel(p) }}
                     <template v-if="p.shape?.positions?.length">
@@ -117,7 +151,7 @@
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> برای آپلود فایل KML/KMZ از دکمه بالای نقشه استفاده کنید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> از جدول نقاط نیز می‌توانید با Import CSV یا وارد کردن دستی مختصات، ترسیم بسازید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی هر ترسیم (اینجا یا در جدول نقاط)، نقاط آن برای ویرایش نمایش داده می‌شود — نقاط KML نیز قابل ویرایش‌اند.</li>
-                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> تیک ترسیم‌هایی که می‌خواهید در کروکی بیاید فعال باشد.</li>
+                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> تیک ترسیم‌ها نمایش و شرکت آن‌ها در کروکی را کنترل می‌کند؛ با برداشتن تیک، ترسیم از نقشه محو و غیرفعال می‌شود.</li>
               </ul>
             </div>
 
@@ -158,7 +192,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import MapPanel from "../MapPanel.vue";
 import PointsTable from "../PointsTable.vue";
 import { eligiblePinsOf, isKrokiEligible } from "../../composables/useKrokiGenerator";
@@ -181,13 +215,128 @@ function onMapReady(payload) {
   emit("mapReady", payload);
 }
 
+function findPin(id) {
+  return flatPins.value.find((p) => p.id === id) || null;
+}
+
+function onEditPin(id) {
+  activePinId.value = id;
+}
+
+watch(activePinId, (id) => {
+  const d = drawingRef.value;
+  const m = mapRef.value;
+  if (!d) return;
+  const pin = findPin(id);
+  if (pin && pin.shape && (pin.shape.type === "polygon" || pin.shape.type === "polyline")) {
+    d.editExistingPin(pin);
+    zoomToPin(m, pin);
+  }
+});
+
+// با شروع یک ترسیم تازه، انتخاب قبلی باطل می‌شود تا جدول نقاط قبلی دیده نشود
+watch(
+  () => drawingRef.value?.drawMode,
+  (mode) => {
+    if (!mode) return;
+    const d = drawingRef.value;
+    if (d && !d.editingPin?.()) activePinId.value = null;
+  },
+  { flush: "sync" },
+);
+
+// زوم روی ترسیم انتخاب‌شده از لیست «ترسیم‌ها» بر اساس محدوده نقاط آن
+function zoomToPin(m, pin) {
+  if (!m) return;
+  const pos = pin?.shape?.positions;
+  if (!Array.isArray(pos) || pos.length < 2) return;
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  for (const p of pos) {
+    const lng = Number(p.lon ?? p.lng);
+    const lat = Number(p.lat);
+    if (!isFinite(lng) || !isFinite(lat)) return;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  }
+  try {
+    m.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+      padding: 80,
+      maxZoom: 19,
+      duration: 800,
+    });
+  } catch (e) {}
+}
+
 function onShapeCreated(pin) {
   activePinId.value = pin.id;
+}
+
+/* -------- ویرایش نام ترسیم -------- */
+const editingNameId = ref(null);
+const editingName = ref("");
+const nameInputRef = ref(null);
+
+function startNameEdit(p) {
+  editingNameId.value = p.id;
+  editingName.value = p.name || "";
+  nextTick(() => nameInputRef.value?.select());
+}
+function saveName(p) {
+  if (editingNameId.value !== p.id) return;
+  const name = editingName.value.trim();
+  if (name) p.name = name;
+  editingNameId.value = null;
+}
+function cancelName() {
+  editingNameId.value = null;
 }
 
 function onRemove(p) {
   if (activePinId.value === p.id) activePinId.value = null;
   emit("removePin", p);
+}
+
+// آیا این ترسیم چک‌باکس فعال/غیرفعال دارد؟ (پلی‌گان و خط قابل ویرایش)
+function canToggle(p) {
+  return (
+    p.type === "draw" &&
+    !!p.shape &&
+    ["polygon", "polyline"].includes(p.shape.type) &&
+    Array.isArray(p.shape.positions)
+  );
+}
+
+function selectPin(p) {
+  if (p.selected === false) return;
+  activePinId.value = p.id;
+}
+
+function setPinVisibility(pin, visible) {
+  const m = mapRef.value;
+  if (!m || !pin?.shape) return;
+  const ids = pin.shape._sourceIds || [];
+  for (const sid of ids) {
+    for (const suffix of ["-fill", "-line", "-point", "-points"]) {
+      const lid = sid + suffix;
+      try {
+        if (m.getLayer(lid))
+          m.setLayoutProperty(lid, "visibility", visible ? "visible" : "none");
+      } catch (e) {}
+    }
+  }
+}
+
+// قطع/وصل تیک چک‌باکس: نمایش/مخفی‌سازی روی نقشه و فعال/غیرفعال‌سازی ترسیم
+function onToggle(p) {
+  const visible = p.selected !== false;
+  if (p.shape) p.shape.show = visible;
+  if (!visible && activePinId.value === p.id) {
+    drawingRef.value?.exitPinEdit?.();
+    activePinId.value = null;
+  }
+  setPinVisibility(p, visible);
 }
 
 function flatten(list) {
@@ -201,6 +350,18 @@ function flatten(list) {
 
 const flatPins = computed(() => flatten(props.pins));
 const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
+
+const areaInfo = computed(() => {
+  const d = drawingRef.value;
+  if (!d) return { show: false, text: "" };
+  const mode = d.drawMode;
+  const shapeType = d.shape?.type;
+  const isPolygon = mode === "polygon" || shapeType === "polygon";
+  const count = d.livePointCount || 0;
+  const min = isPolygon ? 3 : 0;
+  if (!isPolygon || count < min) return { show: false, text: "" };
+  return { show: true, text: d.liveArea || "0 m²" };
+});
 
 function typeLabel(p) {
   if (p.type === "file") return "فایل KML";
