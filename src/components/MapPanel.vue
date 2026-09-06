@@ -195,7 +195,7 @@ watch(
 
 const drawHint = computed(() => {
   const mode = drawing.value?.drawMode;
-  if (mode === "polygon") return "در حال ترسیم پلی‌گان... (Enter: پایان | کلیک راست: حذف آخرین نقطه)";
+  if (mode === "polygon") return "در حال ترسیم پلی‌گان... (بستن: کلیک روی نقطه شروع یا Enter | کلیک راست: حذف آخرین نقطه)";
   if (mode === "polyline") return "در حال ترسیم خط... (Enter: پایان | کلیک راست: حذف آخرین نقطه)";
   if (mode === "multi_point") return "در حال افزودن چند نقطه... (Enter: پایان)";
   if (mode === "circle") return "در حال ترسیم دایره... (کلیک اول مرکز، کلیک دوم شعاع)";
@@ -327,12 +327,12 @@ async function onKmlChange(e) {
           if (!ring || ring.length < 3) continue;
           shapeType = "polygon";
           const pts = ring.map((c) => ({ lon: c[0], lat: c[1], height: 0 }));
-          if (
-            pts.length > 2 &&
-            pts[0].lon === pts[pts.length - 1].lon &&
-            pts[0].lat === pts[pts.length - 1].lat
-          ) {
-            pts.pop();
+          if (pts.length > 2) {
+            const f0 = pts[0];
+            const l0 = pts[pts.length - 1];
+            if (Math.abs(f0.lon - l0.lon) < 1e-9 && Math.abs(f0.lat - l0.lat) < 1e-9) {
+              pts.pop();
+            }
           }
           positions = pts;
         } else {
@@ -444,6 +444,8 @@ function onMapClick(e) {
   const d = drawing.value;
   if (!d) return;
   if (d.shape || d.showForm) return;
+  // هنگام ترسیم تازه، کلیک روی ترسیم قدیمی نباید پیش‌نویس جاری را از بین ببرد
+  if (d.drawMode && d.positions?.length) return;
   const pin = findPinByPoint(e.point);
   if (pin && pin.shape && (pin.shape.type === "polygon" || pin.shape.type === "polyline")) {
     d.editExistingPin(pin);
@@ -596,6 +598,12 @@ function initMap() {
     });
     map.on("click", onMapClick);
     map.on("mousemove", onMapHover);
+    if (import.meta.env.DEV) {
+      window.__kroki = window.__kroki || {};
+      window.__kroki.map = map;
+      window.__kroki.drawing = drawing.value;
+      window.__kroki.pins = props.pins;
+    }
     emit("mapReady", { map, drawing: drawing.value });
   });
 

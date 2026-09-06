@@ -63,9 +63,50 @@ export function useDrawing(map, pins) {
   let dragKind = ""; // "vertex" | "center"
   let dragCenterRef = null; // {lng,lat} شروع درگ مرکز
   let dragOrigPts = []; // نقطه‌های اولیه هنگام درگ مرکز
+  let downXY = null; // موقعیت پیکسلی mousedown برای تشخیص درگ از کلیک
+  let suppressClick = false; // کلیکِ بعد از درگ نباید نقطه اضافه کند
   let lastClickTs = 0;
   let rectStart = null;
   let placeHandlers = null;
+
+  function screenDist(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  // حذف نقاط تکراری پشت سر هم (با تلرانس ~۱ سانتی‌متر) تا یال صفرطول («خط اضافه») ساخته نشود
+  function dedupeRing(pos) {
+    const out = [];
+    for (const p of pos) {
+      const prev = out[out.length - 1];
+      const plng = p.lng ?? p.lon;
+      if (
+        prev &&
+        Math.abs((prev.lng ?? prev.lon) - plng) < 1e-7 &&
+        Math.abs(prev.lat - p.lat) < 1e-7
+      )
+        continue;
+      out.push(p);
+    }
+    if (out.length > 1) {
+      const f = out[0];
+      const l = out[out.length - 1];
+      if (
+        Math.abs((f.lng ?? f.lon) - (l.lng ?? l.lon)) < 1e-7 &&
+        Math.abs(f.lat - l.lat) < 1e-7
+      )
+        out.pop();
+    }
+    return out;
+  }
+
+  // آیا نقطه جدید عملاً روی نقطه قبلی افتاده؟ (کلیک تکراری/دوبار‌فایر)
+  function isDupOfLast(arr, lngLat, tolPx = 4) {
+    if (!arr.length) return false;
+    const last = arr[arr.length - 1];
+    const a = map.project({ lng: last.lng ?? last.lon, lat: last.lat });
+    const b = map.project(lngLat);
+    return screenDist(a, b) < tolPx;
+  }
 
   function currentColor() {
     if (editingPin) return DRAFT_COLOR;
@@ -242,6 +283,8 @@ export function useDrawing(map, pins) {
     dragKind = "";
     dragCenterRef = null;
     dragOrigPts = [];
+    downXY = null;
+    suppressClick = false;
     rectStart = null;
   }
 
@@ -392,11 +435,15 @@ export function useDrawing(map, pins) {
   }
 
   function nearestPointIndex(lngLat, threshold) {
+    // باید روی نقاط در حال ویرایش جستجو شود (در حالت ویرایش: shape.positions)،
+    // نه روی کپی قدیمی positions که بعد از درگ کهنه می‌شود
+    const arr = editingPointsRef();
+    if (!arr) return -1;
     const p = map.project(lngLat);
     let best = -1;
     let bestDist = threshold;
-    for (let i = 0; i < positions.length; i++) {
-      const cp = map.project({ lng: positions[i].lng, lat: positions[i].lat });
+    for (let i = 0; i < arr.length; i++) {
+      const cp = map.project({ lng: arr[i].lng ?? arr[i].lon, lat: arr[i].lat });
       const dx = p.x - cp.x;
       const dy = p.y - cp.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -748,6 +795,7 @@ export function useDrawing(map, pins) {
       hs.mousedown = (e) => {
         if (placingPoint.value) return;
         if (e.originalEvent.button !== 0) return;
+        downXY = e.point ? { x: e.point.x, y: e.point.y } : null;
         const pts = editingPointsRef();
         if (!pts || !pts.length) return;
         const idx = nearestPointIndex(e.lngLat, 14);
@@ -771,6 +819,9 @@ export function useDrawing(map, pins) {
       };
       hs.mouseMove = (e) => {
         if (dragActive) {
+          if (downXY && e.point && screenDist(downXY, e.point) > 4) {
+            suppressClick = true;
+          }
           const pts = editingPointsRef();
           if (dragKind === "vertex" && draggingIndex >= 0) {
             setEditablePoint(draggingIndex, { lng: e.lngLat.lng, lat: e.lngLat.lat });
@@ -801,8 +852,13 @@ export function useDrawing(map, pins) {
           dragCenterRef = null;
           dragOrigPts = [];
         }
+        downXY = null;
       };
       hs.click = (e) => {
+        if (suppressClick) {
+          suppressClick = false;
+          return;
+        }
         if (dragActive || placingPoint.value || shape.value) return;
         if (e.originalEvent?.button !== undefined && e.originalEvent.button !== 0) return;
         const now = Date.now();
@@ -810,6 +866,7 @@ export function useDrawing(map, pins) {
         lastClickTs = now;
         const idx = nearestPointIndex(e.lngLat, 14);
         if (idx >= 0) return;
+        if (isDupOfLast(positions, e.lngLat)) return;
         positions.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
         updateTempSource(positions);
         updateLineLabels(positions);
@@ -856,6 +913,7 @@ export function useDrawing(map, pins) {
       hs.mousedown = (e) => {
         if (placingPoint.value) return;
         if (e.originalEvent.button !== 0) return;
+        downXY = e.point ? { x: e.point.x, y: e.point.y } : null;
         const pts = editingPointsRef();
         if (!pts || !pts.length) return;
         const idx = nearestPointIndex(e.lngLat, 14);
@@ -879,6 +937,9 @@ export function useDrawing(map, pins) {
       };
       hs.mouseMove = (e) => {
         if (dragActive) {
+          if (downXY && e.point && screenDist(downXY, e.point) > 4) {
+            suppressClick = true;
+          }
           if (dragKind === "vertex" && draggingIndex >= 0) {
             setEditablePoint(draggingIndex, { lng: e.lngLat.lng, lat: e.lngLat.lat });
             renderEditable(true);
@@ -911,15 +972,31 @@ export function useDrawing(map, pins) {
           dragCenterRef = null;
           dragOrigPts = [];
         }
+        downXY = null;
       };
       hs.click = (e) => {
+        if (suppressClick) {
+          suppressClick = false;
+          return;
+        }
         if (dragActive || placingPoint.value || shape.value) return;
         if (e.originalEvent?.button !== undefined && e.originalEvent.button !== 0) return;
         const now = Date.now();
         if (now - lastClickTs < 280) return;
+        // بستن پلی‌گان با کلیک روی نقطه شروع (اسنپ ۱۶ پیکسل)
+        if (positions.length >= 3 && e.point) {
+          const f = positions[0];
+          const fp = map.project({ lng: f.lng, lat: f.lat });
+          if (screenDist(fp, e.point) <= 16) {
+            lastClickTs = now;
+            finishCurrentDrawing();
+            return;
+          }
+        }
         lastClickTs = now;
         const idx = nearestPointIndex(e.lngLat, 14);
         if (idx >= 0) return;
+        if (isDupOfLast(positions, e.lngLat)) return;
         positions.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
         updateTempSource(positions, true);
         updatePolygonLabels(positions);
@@ -1027,14 +1104,14 @@ export function useDrawing(map, pins) {
     } else if (draw === "polyline") {
       shape.value = {
         type: draw,
-        positions: pos.map((p) => ({ lon: p.lng, lat: p.lat, height: 0 })),
+        positions: dedupeRing(pos.map((p) => ({ lon: p.lng, lat: p.lat, height: 0 }))),
         color: DONE_COLOR,
         opacity: defaultOpacity,
         width: 3,
         show: true,
       };
     } else if (draw === "polygon" || draw === "rectangle") {
-      const coords = pos.map((p) => ({ lon: p.lng, lat: p.lat, height: 0 }));
+      const coords = dedupeRing(pos.map((p) => ({ lon: p.lng, lat: p.lat, height: 0 })));
       shape.value = {
         type: "polygon",
         positions: coords,
@@ -1095,6 +1172,8 @@ export function useDrawing(map, pins) {
   }
 
   function setDrawMode(mode) {
+    // کلیک مجدد روی ابزار فعال نباید ترسیم جاری را پاک یا هندلر تکراری بسازد
+    if (drawMode.value === mode && !editingPin) return;
     if (drawMode.value === mode && showForm.value) return;
     if (editingPin) exitPinEdit();
     measureActive.value = false;
@@ -1519,6 +1598,13 @@ export function useDrawing(map, pins) {
     }
     if (t.isShape) {
       const s = shape.value;
+      if (
+        (s.type === "polygon" || s.type === "polyline") &&
+        isDupOfLast(s.positions.map((p) => ({ lng: p.lon ?? p.lng, lat: p.lat })), lngLat)
+      ) {
+        disarmAddPoint();
+        return;
+      }
       s.positions.push(
         s.type === "multi_point"
           ? { lon: lngLat.lng, lat: lngLat.lat, height: 0, color: color.value }
@@ -1527,6 +1613,13 @@ export function useDrawing(map, pins) {
     } else if (drawMode.value === "multi_point") {
       positions.push({ lng: lngLat.lng, lat: lngLat.lat, color: color.value });
     } else {
+      if (
+        (drawMode.value === "polygon" || drawMode.value === "polyline") &&
+        isDupOfLast(positions, lngLat)
+      ) {
+        disarmAddPoint();
+        return;
+      }
       positions.push({ lng: lngLat.lng, lat: lngLat.lat });
     }
     renderDraftLayers();

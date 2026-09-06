@@ -32,7 +32,13 @@ export function kmlToGeoJSON(doc) {
         : "";
       const ring = outerText ? parseKMLCoordsText(outerText) : [];
       if (ring.length >= 3) {
-        ring.push(ring[0]);
+        // حلقه KML معمولاً از قبل بسته است (نقطه اول == آخر)؛ فقط در صورت
+        // باز بودن ببند تا نقطه تکراری و یال صفرطول («خط اضافه») ساخته نشود
+        const f = ring[0];
+        const l = ring[ring.length - 1];
+        if (Math.abs(f[0] - l[0]) > 1e-9 || Math.abs(f[1] - l[1]) > 1e-9) {
+          ring.push([f[0], f[1]]);
+        }
         out.push({
           type: "Feature",
           properties: { name, description },

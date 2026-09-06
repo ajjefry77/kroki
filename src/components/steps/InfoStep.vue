@@ -46,6 +46,36 @@
             <input v-model="form.client" type="text" class="input" placeholder="نام متقاضی" />
           </div>
           <div>
+            <label class="block mb-1.5 font-medium text-xs">شماره همراه متقاضی</label>
+            <input
+              v-model="form.clientPhone"
+              type="tel"
+              inputmode="numeric"
+              dir="ltr"
+              maxlength="11"
+              class="input text-center"
+              :class="phoneError ? '!border-[var(--danger)]' : ''"
+              placeholder="09123456789"
+              @input="form.clientPhone = faToEn(form.clientPhone).replace(/[^\d]/g, '').slice(0, 11)"
+            />
+            <p v-if="phoneError" class="text-[10px] text-[var(--danger)] mt-1">{{ phoneError }}</p>
+          </div>
+          <div>
+            <label class="block mb-1.5 font-medium text-xs">کد ملی متقاضی</label>
+            <input
+              v-model="form.clientNationalId"
+              type="text"
+              inputmode="numeric"
+              dir="ltr"
+              maxlength="10"
+              class="input text-center"
+              :class="nationalError ? '!border-[var(--danger)]' : ''"
+              placeholder="0012345678"
+              @input="form.clientNationalId = faToEn(form.clientNationalId).replace(/[^\d]/g, '').slice(0, 10)"
+            />
+            <p v-if="nationalError" class="text-[10px] text-[var(--danger)] mt-1">{{ nationalError }}</p>
+          </div>
+          <div>
             <label class="block mb-1.5 font-medium text-xs">کارشناس / نقشه‌بردار</label>
             <input v-model="form.surveyor" type="text" class="input" placeholder="نام کارشناس (اختیاری)" />
           </div>
@@ -232,6 +262,33 @@ const selected = computed({
 
 const logoInput = ref(null);
 
+function faToEn(s) {
+  return String(s ?? "").replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
+}
+
+function isValidNational(code) {
+  if (!/^\d{10}$/.test(code)) return false;
+  if (/^(\d)\1{9}$/.test(code)) return false;
+  const check = +code[9];
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += +code[i] * (10 - i);
+  const r = sum % 11;
+  return (r < 2 && check === r) || (r >= 2 && check === 11 - r);
+}
+
+const phoneError = computed(() => {
+  const v = faToEn(props.form.clientPhone).trim();
+  if (!v) return "";
+  return /^09\d{9}$/.test(v) ? "" : "شماره همراه باید ۱۱ رقم و با 09 شروع شود.";
+});
+
+const nationalError = computed(() => {
+  const v = faToEn(props.form.clientNationalId).trim();
+  if (!v) return "";
+  if (!/^\d{10}$/.test(v)) return "کد ملی باید ۱۰ رقم باشد.";
+  return isValidNational(v) ? "" : "کد ملی معتبر نیست.";
+});
+
 function onLogoChange(e) {
   const file = e.target.files[0];
   e.target.value = "";
@@ -267,6 +324,8 @@ const valid = computed(() => {
     f.title.trim() &&
       f.client.trim() &&
       f.date.trim() &&
+      !phoneError.value &&
+      !nationalError.value &&
       eligiblePinsOf(props.pins).length,
   );
 });

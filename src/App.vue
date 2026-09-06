@@ -136,6 +136,8 @@ const gen = useKrokiGenerator();
 const krokiForm = reactive({
   title: "پلان وضعیت موجود",
   client: "",
+  clientPhone: "",
+  clientNationalId: "",
   address: "",
   date: getTodayJalali(),
   surveyor: "",
@@ -349,6 +351,8 @@ function restart() {
   trackingCode.value = "";
   krokiForm.title = "پلان وضعیت موجود";
   krokiForm.client = "";
+  krokiForm.clientPhone = "";
+  krokiForm.clientNationalId = "";
   krokiForm.address = "";
   krokiForm.surveyor = "";
   krokiForm.plaque = "";

@@ -771,7 +771,7 @@ export function useKrokiGenerator() {
     }
     if (t.titleBlock !== "official") return;
 
-    const bh = 96;
+    const bh = 120;
     const bx = 24,
       by = H - bh - 22,
       bw = W - 48;
@@ -800,7 +800,7 @@ export function useKrokiGenerator() {
       by + 12,
     );
 
-    const rowH = (bh - 24) / 3;
+    const rowH = (bh - 24) / 4;
     ctx.fillStyle = "#333";
     ctx.font = "600 11px Vazirmatn, Tahoma, sans-serif";
     // ردیف دوم: سیستم مختصات (راست) / مساحت (چپ)
@@ -833,13 +833,26 @@ export function useKrokiGenerator() {
       mid + 6,
       by + 24 + rowH * 1.5,
     );
-    // ردیف چهارم: نشانی (راست، پرعرض) / عرض معبر (چپ)
+    // ردیف چهارم: کد ملی (راست) / شماره همراه (چپ)
+    ctx.textAlign = "right";
+    ctx.fillText(
+      truncateText(ctx, "کد ملی: " + (form.clientNationalId || "—"), half - 16),
+      mid - 6,
+      by + 24 + rowH * 2.5,
+    );
+    ctx.textAlign = "left";
+    ctx.fillText(
+      truncateText(ctx, "همراه: " + (form.clientPhone || "—"), half - 16),
+      mid + 6,
+      by + 24 + rowH * 2.5,
+    );
+    // ردیف پنجم: نشانی (راست، پرعرض) / عرض معبر (چپ)
     ctx.fillStyle = "#555";
     ctx.textAlign = "right";
     ctx.fillText(
       truncateText(ctx, "نشانی: " + (form.address || "—"), bw * 0.7 - 20),
       bx + bw - 10,
-      by + 24 + rowH * 2.5,
+      by + 24 + rowH * 3.5,
     );
     ctx.textAlign = "left";
     ctx.fillText(
@@ -849,7 +862,7 @@ export function useKrokiGenerator() {
         bw * 0.26 - 12,
       ),
       bx + 10,
-      by + 24 + rowH * 2.5,
+      by + 24 + rowH * 3.5,
     );
   }
 
@@ -914,7 +927,7 @@ export function useKrokiGenerator() {
 
     const titleBlockH =
       t.titleBlock === "official"
-        ? 118
+        ? 142
         : t.titleBlock === "technical"
           ? 54
           : 30;
@@ -1233,6 +1246,8 @@ export function useKrokiGenerator() {
 
     const infoRows = [
       ["متقاضی", escapeHtml(last.form.client)],
+      ["کد ملی متقاضی", escapeHtml(last.form.clientNationalId) || "—"],
+      ["شماره همراه متقاضی", escapeHtml(last.form.clientPhone) || "—"],
       ["نشانی ملک", escapeHtml(last.form.address)],
       ["سیستم مختصات", `WGS84 / UTM — Zone: ${state.utmZone ?? "—"}`],
       ["مساحت کل", `${state.areaM2.toFixed(2)} متر مربع`],
@@ -1242,7 +1257,7 @@ export function useKrokiGenerator() {
       ["شماره پلاک ثبتی", escapeHtml(last.form.plaque) || "—"],
     ];
     const infoTable2col = `<table class="info-table"><tbody>${Array.from(
-      { length: 4 },
+      { length: 5 },
       (_, r) =>
         `<tr>${infoRows
           .slice(r * 2, r * 2 + 2)

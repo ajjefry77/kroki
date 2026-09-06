@@ -46,7 +46,7 @@
 
         <div v-if="mode === 'register'">
           <label class="block mb-1.5 text-xs font-medium">نام و نام خانوادگی</label>
-          <input v-model="fields.name" type="text" class="input" placeholder="مثلاً علی رضایی" />
+          <input v-model="fields.name" type="text" class="input" placeholder="نام و نام خانوادگی" />
         </div>
 
         <div>

@@ -57,6 +57,18 @@
           <div
             class="flex items-center justify-between bg-[var(--surface2)] rounded-lg px-3 py-2.5"
           >
+            <span class="text-[var(--text-muted)]">شماره همراه</span>
+            <span class="font-medium" dir="ltr">{{ form.clientPhone || "—" }}</span>
+          </div>
+          <div
+            class="flex items-center justify-between bg-[var(--surface2)] rounded-lg px-3 py-2.5"
+          >
+            <span class="text-[var(--text-muted)]">کد ملی</span>
+            <span class="font-medium" dir="ltr">{{ form.clientNationalId || "—" }}</span>
+          </div>
+          <div
+            class="flex items-center justify-between bg-[var(--surface2)] rounded-lg px-3 py-2.5"
+          >
             <span class="text-[var(--text-muted)]">تاریخ برداشت</span>
             <span class="font-medium">{{ form.date }}</span>
           </div>

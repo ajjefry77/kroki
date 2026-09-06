@@ -151,7 +151,7 @@
               </div>
               <ul class="space-y-1">
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> از تولبار سمت چپ نقشه، ابزار ترسیم را انتخاب کنید.</li>
-                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی نقشه نقاط را اضافه کنید و با Enter پایان دهید.</li>
+                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی نقشه نقاط را اضافه کنید و با Enter یا کلیک روی نقطه شروع، پلی‌گان را ببندید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> برای آپلود فایل KML/KMZ از دکمه بالای نقشه استفاده کنید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> از جدول نقاط نیز می‌توانید با Import CSV یا وارد کردن دستی مختصات، ترسیم بسازید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی هر ترسیم (اینجا یا در جدول نقاط)، نقاط آن برای ویرایش نمایش داده می‌شود — نقاط KML نیز قابل ویرایش‌اند.</li>

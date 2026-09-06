@@ -4,9 +4,7 @@
     <header class="sticky top-0 z-50 backdrop-blur-md bg-[var(--bg)]/85 border-b border-[var(--border)]">
       <div class="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow-strong)]">
-            <i class="fas fa-drafting-compass text-[#241a05] text-lg"></i>
-          </div>
+          <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-10 h-10 rounded-xl object-contain shadow-lg shadow-[var(--accent-glow-strong)]" />
           <div>
             <div class="font-extrabold text-lg leading-tight">سامانه کروکی</div>
             <div class="text-[11px] text-[var(--text-muted)]">تولید حرفه‌ای کروکی نقشه ملک</div>
@@ -296,7 +294,7 @@
     <footer class="border-t border-[var(--border)] py-6 bg-[var(--bg-elevated)]/70">
       <div class="max-w-7xl mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
         <div class="flex items-center gap-2">
-          <i class="fas fa-drafting-compass text-[var(--accent)]"></i>
+          <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-5 h-5 object-contain" />
           <span>سامانه تولید کروکی نقشه — نسخه آزمایشی</span>
         </div>
         <div class="flex items-center gap-4">

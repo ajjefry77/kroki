@@ -1,9 +1,7 @@
 <template>
   <header class="wizard-header h-16 flex items-center px-4 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-40">
     <div class="flex items-center gap-3 flex-shrink-0">
-      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center shadow-md shadow-[var(--accent-glow-strong)]">
-        <i class="fas fa-drafting-compass text-[#241a05] text-sm"></i>
-      </div>
+      <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-9 h-9 rounded-lg object-contain shadow-md shadow-[var(--accent-glow-strong)]" />
       <div class="hidden sm:block">
         <div class="font-extrabold text-sm leading-tight">سامانه کروکی</div>
         <div class="text-[10px] text-[var(--text-muted)]">تولید کروکی نقشه</div>
