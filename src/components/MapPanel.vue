@@ -33,16 +33,16 @@
         ref="kmlInput"
         type="file"
         class="hidden"
-        accept=".kml,.kmz"
+        accept=".kml,.kmz,.csv,text/csv"
         @change="onKmlChange"
       />
       <button
         @click="kmlInput?.click()"
         class="px-3 py-1.5 rounded-lg shadow-md text-sm font-medium bg-accent text-white hover:brightness-110 transition"
-        title="آپلود فایل KML / KMZ"
+        title="آپلود فایل KML / KMZ / CSV"
       >
         <i class="fas fa-file-upload ml-1"></i>
-        آپلود KML
+        آپلود KML / CSV
       </button>
     </div>
 
@@ -162,7 +162,7 @@ const props = defineProps({
   pins: { type: Object, required: true },
 });
 
-const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin"]);
+const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin", "csvFile"]);
 
 const mapContainerRef = ref(null);
 const kmlInput = ref(null);
@@ -174,6 +174,7 @@ const loadingProgressLabel = ref("");
 const loadingCancellable = ref(false);
 const initError = ref(null);
 let kmlCancelRequested = false;
+let csvOverlayOn = false;
 
 let map = null;
 const mapProxy = ref(null);
@@ -248,6 +249,22 @@ function cancelKmlLoad() {
   loadingMessage.value = "در حال لغو...";
 }
 
+function setCsvLoading(on) {
+  if (on) {
+    loadingTitle.value = "در حال خواندن فایل CSV...";
+    loadingMessage.value = "لطفاً صبر کنید";
+    loadingProgress.value = null;
+    loadingProgressLabel.value = "";
+    loadingCancellable.value = false;
+    csvOverlayOn = true;
+    loading.value = true;
+    return;
+  }
+  if (!csvOverlayOn) return;
+  csvOverlayOn = false;
+  loading.value = false;
+}
+
 function yieldToUI() {
   return new Promise((r) => setTimeout(r, 0));
 }
@@ -256,6 +273,11 @@ async function onKmlChange(e) {
   const file = e.target.files[0];
   if (!file) return;
   e.target.value = "";
+  if (/\.csv$/i.test(file.name)) {
+    setCsvLoading(true);
+    emit("csvFile", file);
+    return;
+  }
   kmlCancelRequested = false;
   loadingTitle.value = "در حال بارگذاری فایل KML...";
   loadingMessage.value = "خواندن و استخراج داده‌های فایل...";
@@ -417,6 +439,8 @@ function onMapHover(e) {
 }
 
 function onMapClick(e) {
+  const btn = e.originalEvent?.button;
+  if (btn !== undefined && btn !== 0) return;
   const d = drawing.value;
   if (!d) return;
   if (d.shape || d.showForm) return;
@@ -425,6 +449,78 @@ function onMapClick(e) {
     d.editExistingPin(pin);
     emit("editPin", pin.id);
   }
+}
+
+let midPan = null;
+let touchPan = null;
+
+function onMidDown(e) {
+  if (!map || e.button !== 1) return;
+  e.preventDefault();
+  midPan = { x: e.clientX, y: e.clientY };
+}
+function onMidMove(e) {
+  if (!midPan || !map) return;
+  const dx = e.clientX - midPan.x;
+  const dy = e.clientY - midPan.y;
+  midPan = { x: e.clientX, y: e.clientY };
+  try {
+    map.panBy([-dx, -dy], { animate: false });
+  } catch (err) {}
+}
+function onMidUp() {
+  midPan = null;
+}
+function onTouchPanStart(e) {
+  if (e.touches.length !== 1) {
+    touchPan = null;
+    return;
+  }
+  const t = e.touches[0];
+  touchPan = { x: t.clientX, y: t.clientY, id: t.identifier };
+}
+function onTouchPanMove(e) {
+  if (!touchPan || !map || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  if (t.identifier !== touchPan.id) return;
+  e.preventDefault();
+  const dx = t.clientX - touchPan.x;
+  const dy = t.clientY - touchPan.y;
+  touchPan = { x: t.clientX, y: t.clientY, id: t.identifier };
+  try {
+    map.panBy([-dx, -dy], { animate: false });
+  } catch (err) {}
+}
+function onTouchPanEnd(e) {
+  if (!e.touches.length) touchPan = null;
+}
+
+function setupCustomPan() {
+  const canvas = map.getCanvas();
+  canvas.addEventListener("mousedown", onMidDown);
+  window.addEventListener("mousemove", onMidMove);
+  window.addEventListener("mouseup", onMidUp);
+  canvas.addEventListener("touchstart", onTouchPanStart, { passive: true });
+  canvas.addEventListener("touchmove", onTouchPanMove, { passive: false });
+  canvas.addEventListener("touchend", onTouchPanEnd, { passive: true });
+  canvas.addEventListener("touchcancel", onTouchPanEnd, { passive: true });
+}
+
+function teardownCustomPan() {
+  try {
+    const canvas = map?.getCanvas?.();
+    if (canvas) {
+      canvas.removeEventListener("mousedown", onMidDown);
+      canvas.removeEventListener("touchstart", onTouchPanStart);
+      canvas.removeEventListener("touchmove", onTouchPanMove);
+      canvas.removeEventListener("touchend", onTouchPanEnd);
+      canvas.removeEventListener("touchcancel", onTouchPanEnd);
+    }
+  } catch (e) {}
+  window.removeEventListener("mousemove", onMidMove);
+  window.removeEventListener("mouseup", onMidUp);
+  midPan = null;
+  touchPan = null;
 }
 
 function initMap() {
@@ -480,6 +576,10 @@ function initMap() {
 
   map.on("load", () => {
     mapProxy.value = map;
+    try {
+      if (map.dragPan) map.dragPan.disable();
+    } catch (e) {}
+    setupCustomPan();
     drawing.value = reactive(useDrawing(map, props.pins));
     for (const p of props.pins || []) {
       if (p.shape && p.shape.type && p.type === "draw") {
@@ -510,11 +610,12 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  teardownCustomPan();
   if (map) {
     map.remove();
     map = null;
   }
 });
 
-defineExpose({ map: () => map, drawing: () => drawing.value });
+defineExpose({ map: () => map, drawing: () => drawing.value, setCsvLoading });
 </script>

@@ -3,7 +3,7 @@
     <main class="min-h-0 flex flex-col lg:flex-row lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
       <!-- نقشه -->
       <section class="relative flex-1 min-h-[340px] lg:min-h-0 border-b lg:border-b-0 border-[var(--border)]">
-        <MapPanel :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" />
+        <MapPanel ref="mapPanelRef" :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" @csvFile="onCsvFile" />
       </section>
 
       <!-- پنل کناری واحد با تب‌ها -->
@@ -55,6 +55,7 @@
           <!-- تب جدول نقاط -->
           <PointsTable
             v-show="activeTab === 'points'"
+            ref="pointsTableRef"
             :pins="pins"
             :active-pin-id="activePinId"
             :drawing="drawingRef"
@@ -127,6 +128,9 @@
                     <template v-if="p.shape?.positions?.length">
                       — {{ p.shape.positions.length }} نقطه
                     </template>
+                    <template v-if="pinStat(p)">
+                      — {{ pinStat(p) }}
+                    </template>
                   </div>
                 </div>
                 <button
@@ -151,6 +155,8 @@
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> برای آپلود فایل KML/KMZ از دکمه بالای نقشه استفاده کنید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> از جدول نقاط نیز می‌توانید با Import CSV یا وارد کردن دستی مختصات، ترسیم بسازید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی هر ترسیم (اینجا یا در جدول نقاط)، نقاط آن برای ویرایش نمایش داده می‌شود — نقاط KML نیز قابل ویرایش‌اند.</li>
+                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> جابه‌جایی نقشه با نگه داشتن غلتک (دکمه وسط) موس انجام می‌شود؛ نگه داشتن کلیک چپ نقشه را جابه‌جا نمی‌کند.</li>
+                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> در حالت ویرایش، با راست‌کلیک روی یک نقطه روی نقشه حذف می‌شود و با دکمه «افزودن نقطه با کلیک روی نقشه» می‌توانید با کلیک روی نقشه نقطه اضافه کنید.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> تیک ترسیم‌ها نمایش و شرکت آن‌ها در کروکی را کنترل می‌کند؛ با برداشتن تیک، ترسیم از نقشه محو و غیرفعال می‌شود.</li>
               </ul>
             </div>
@@ -196,6 +202,13 @@ import { ref, computed, watch, nextTick } from "vue";
 import MapPanel from "../MapPanel.vue";
 import PointsTable from "../PointsTable.vue";
 import { eligiblePinsOf, isKrokiEligible } from "../../composables/useKrokiGenerator";
+import {
+  toUTMInZone,
+  computeCentroid,
+  measureDistance,
+  formatArea,
+  formatDistance,
+} from "../../utils/useDrawingHelpers";
 
 const props = defineProps({
   pins: { type: Object, required: true },
@@ -208,6 +221,17 @@ const activePinId = ref(null);
 const activeTab = ref("points");
 const mapRef = ref(null);
 const drawingRef = ref(null);
+const pointsTableRef = ref(null);
+const mapPanelRef = ref(null);
+
+function onCsvFile(file) {
+  activeTab.value = "points";
+  const hide = () => mapPanelRef.value?.setCsvLoading?.(false);
+  nextTick(() => {
+    const ok = pointsTableRef.value?.importCsvFile?.(file, hide);
+    if (!ok) hide();
+  });
+}
 
 function onMapReady(payload) {
   mapRef.value = payload?.map || null;
@@ -269,7 +293,11 @@ function zoomToPin(m, pin) {
   } catch (e) {}
 }
 
-function onShapeCreated(pin) {
+function onShapeCreated(pin, opts) {
+  if (opts?.edit === false) {
+    if (pin) zoomToPin(mapRef.value, pin);
+    return;
+  }
   activePinId.value = pin.id;
 }
 
@@ -362,6 +390,39 @@ const areaInfo = computed(() => {
   if (!isPolygon || count < min) return { show: false, text: "" };
   return { show: true, text: d.liveArea || "0 m²" };
 });
+
+function pinStat(p) {
+  const s = p?.shape;
+  if (!s || !Array.isArray(s.positions)) return "";
+  const pts = s.positions
+    .map((pt) => ({ lon: Number(pt.lon ?? pt.lng), lat: Number(pt.lat) }))
+    .filter((pt) => Number.isFinite(pt.lon) && Number.isFinite(pt.lat));
+  if (s.type === "polygon") {
+    if (pts.length < 3) return "";
+    const c = computeCentroid(pts);
+    const zone = c ? Math.floor((c.lon + 180) / 6) + 1 : 39;
+    const northern = c ? c.lat >= 0 : true;
+    const coords = pts.map((pt) => {
+      const { x, y } = toUTMInZone(pt.lon, pt.lat, zone, northern);
+      return [x, y];
+    });
+    let area = 0;
+    for (let i = 0; i < coords.length; i++) {
+      const j = (i + 1) % coords.length;
+      area += coords[i][0] * coords[j][1] - coords[j][0] * coords[i][1];
+    }
+    return "مساحت: " + formatArea(Math.abs(area) / 2);
+  }
+  if (s.type === "polyline") {
+    if (pts.length < 2) return "";
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      total += measureDistance([pts[i - 1].lon, pts[i - 1].lat], [pts[i].lon, pts[i].lat]);
+    }
+    return "طول: " + formatDistance(total);
+  }
+  return "";
+}
 
 function typeLabel(p) {
   if (p.type === "file") return "فایل KML";

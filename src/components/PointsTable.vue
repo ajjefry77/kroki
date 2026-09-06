@@ -80,11 +80,15 @@
           </table>
         </div>
 
-        <button class="btn btn-ghost btn-xs w-full mt-2" @click="addDraftPoint">
-          <i class="fas fa-plus ml-1"></i>
-          افزودن نقطه به این ترسیم
+        <button class="btn btn-ghost btn-xs w-full mt-2" @click="addDraftOnMap">
+          <i class="fas ml-1" :class="isPlacing ? 'fa-ban' : 'fa-plus'"></i>
+          {{ isPlacing ? "لغو افزودن نقطه" : "افزودن نقطه با کلیک روی نقشه" }}
         </button>
-        <p class="text-[9px] text-[var(--text-faint)] mt-1.5 leading-4">
+        <p v-if="isPlacing" class="text-[10px] text-[var(--accent)] mt-1.5 leading-4">
+          <i class="fas fa-crosshairs ml-1"></i>
+          روی نقشه کلیک کنید تا نقطه اضافه شود (راست‌کلیک یا Esc برای لغو)
+        </p>
+        <p v-else class="text-[9px] text-[var(--text-faint)] mt-1.5 leading-4">
           با ویرایش مختصات در جدول، نقطه‌ها بلافاصله روی نقشه به‌روزرسانی می‌شوند.
         </p>
       </div>
@@ -157,10 +161,14 @@
           </table>
         </div>
 
-        <button class="btn btn-ghost btn-xs w-full mt-2" @click="addPointToActive">
-          <i class="fas fa-plus ml-1"></i>
-          افزودن نقطه به این ترسیم
+        <button class="btn btn-ghost btn-xs w-full mt-2" @click="addActiveOnMap">
+          <i class="fas ml-1" :class="isPlacing ? 'fa-ban' : 'fa-plus'"></i>
+          {{ isPlacing ? "لغو افزودن نقطه" : "افزودن نقطه با کلیک روی نقشه" }}
         </button>
+        <p v-if="isPlacing" class="text-[10px] text-[var(--accent)] mt-1.5 leading-4">
+          <i class="fas fa-crosshairs ml-1"></i>
+          روی نقشه کلیک کنید تا نقطه اضافه شود (راست‌کلیک یا Esc برای لغو)
+        </p>
       </div>
 
       <div v-else-if="activePin && !isDrawingFresh" class="card !rounded-xl !p-3 text-[11px] text-[var(--text-muted)]">
@@ -229,8 +237,9 @@
             <button class="btn btn-ghost btn-xs flex-1" @click="builderPoints.push({ lat: '', lon: '', utmX: '', utmY: '', utmZone: '' })">
               <i class="fas fa-plus ml-1"></i> افزودن ردیف
             </button>
-            <button class="btn btn-ghost btn-xs flex-1" @click="csvInput?.click()">
-              <i class="fas fa-file-import ml-1"></i> Import CSV
+            <button class="btn btn-ghost btn-xs flex-1" :disabled="csvLoading" @click="csvInput?.click()">
+              <i class="fas ml-1" :class="csvLoading ? 'fa-circle-notch fa-spin' : 'fa-file-import'"></i>
+              {{ csvLoading ? "در حال خواندن..." : "Import CSV" }}
             </button>
             <input ref="csvInput" type="file" accept=".csv,text/csv" class="hidden" @change="onCsvChange" />
           </div>
@@ -245,11 +254,72 @@
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="csvModalOpen"
+        class="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/50"
+        @click.self="csvModalOpen = false"
+      >
+        <div class="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl">
+          <div class="font-bold text-sm mb-1 flex items-center gap-2">
+            <i class="fas fa-file-csv text-[var(--accent)]"></i>
+            نوع ترسیم فایل CSV
+          </div>
+          <p class="text-[11px] text-[var(--text-muted)] mb-4 leading-5">
+            {{ csvRows.length }} نقطه خوانده شد. مشخص کنید این نقاط چه شکلی روی نقشه بسازند:
+          </p>
+          <div class="grid grid-cols-2 gap-2 mb-4">
+            <button
+              type="button"
+              class="rounded-xl border-2 p-3 text-center transition"
+              :class="csvType === 'polygon' ? 'border-[var(--accent)] bg-[var(--accent-glow)]' : 'border-[var(--border)]'"
+              @click="csvType = 'polygon'"
+            >
+              <i class="fas fa-draw-polygon text-lg block mb-1" :class="csvType === 'polygon' ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'"></i>
+              <div class="text-xs font-bold">پلی‌گان</div>
+              <div class="text-[9px] text-[var(--text-muted)] mt-0.5">بسته (مثل KML)</div>
+            </button>
+            <button
+              type="button"
+              class="rounded-xl border-2 p-3 text-center transition"
+              :class="csvType === 'polyline' ? 'border-[var(--accent)] bg-[var(--accent-glow)]' : 'border-[var(--border)]'"
+              @click="csvType = 'polyline'"
+            >
+              <i class="fas fa-minus text-lg block mb-1" :class="csvType === 'polyline' ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'"></i>
+              <div class="text-xs font-bold">خط</div>
+              <div class="text-[9px] text-[var(--text-muted)] mt-0.5">باز، بدون اتصال اول و آخر</div>
+            </button>
+          </div>
+          <label class="block mb-1 text-[11px] font-medium">نام ترسیم</label>
+          <input v-model="csvName" type="text" class="input !py-1.5 !text-xs mb-4" placeholder="مثلاً حد شمالی" />
+          <div class="flex gap-2">
+            <button class="btn btn-ghost flex-1" @click="csvModalOpen = false">انصراف</button>
+            <button class="btn btn-primary flex-1" @click="confirmCsvCreate">
+              <i class="fas fa-check ml-1"></i>
+              ایجاد روی نقشه
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="csvLoading && !csvModalOpen"
+        class="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 pointer-events-none"
+      >
+        <div class="rounded-2xl bg-[var(--surface)] border border-[var(--border)] px-5 py-4 shadow-2xl flex items-center gap-3 text-sm font-medium">
+          <i class="fas fa-circle-notch fa-spin text-[var(--accent)]"></i>
+          در حال خواندن فایل CSV...
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onUnmounted } from "vue";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
 import { toUTM, fromUTM } from "../utils/useDrawingHelpers";
 import { logger } from "../utils/logger";
@@ -328,6 +398,7 @@ function updatePoint(i, key, value) {
       s.positions[i].lon = ll.lon;
     }
     updatePinGeometry(props.map, activePin.value);
+    syncEditMap();
     logger.info("draw", "ویرایش دستی مختصات UTM", { pin: activePin.value.name, index: i, key, value });
     return;
   }
@@ -339,16 +410,22 @@ function updatePoint(i, key, value) {
     s.positions[i][key] = num;
   }
   updatePinGeometry(props.map, activePin.value);
+  syncEditMap();
   logger.info("draw", "ویرایش دستی مختصات نقطه", { pin: activePin.value.name, index: i, key, value: num });
 }
 
 function removePoint(i) {
+  if (isEditingExisting.value && props.drawing?.removeDraftPoint) {
+    props.drawing.removeDraftPoint(i);
+    return;
+  }
   const s = activePin.value?.shape;
   if (!s || !Array.isArray(s.positions)) return;
   const minPts = s.type === "polygon" ? 3 : 2;
   if (s.positions.length <= minPts) return;
   s.positions.splice(i, 1);
   updatePinGeometry(props.map, activePin.value);
+  syncEditMap();
 }
 
 function addPointToActive() {
@@ -360,7 +437,38 @@ function addPointToActive() {
   const dLon = (last.lon - prev.lon) || 0.0002;
   s.positions.push({ lat: last.lat + dLat, lon: last.lon + dLon, height: 0 });
   updatePinGeometry(props.map, activePin.value);
+  syncEditMap();
 }
+
+const isPlacing = computed(() => !!props.drawing?.placingPoint?.value);
+
+function syncEditMap() {
+  if (isEditingExisting.value) props.drawing?.renderDraftLayers?.();
+}
+
+function addDraftOnMap() {
+  const d = props.drawing;
+  if (isPlacing.value) {
+    d?.disarmAddPoint?.();
+    return;
+  }
+  if (d?.armAddPoint?.()) return;
+  if (draftRows.value.length) addDraftPoint();
+}
+
+function addActiveOnMap() {
+  const d = props.drawing;
+  if (isPlacing.value) {
+    d?.disarmAddPoint?.();
+    return;
+  }
+  if (d?.armAddPoint?.()) return;
+  addPointToActive();
+}
+
+onUnmounted(() => {
+  props.drawing?.disarmAddPoint?.();
+});
 
 /* -------- ساخت ترسیم جدید با نقاط دستی / CSV -------- */
 const builderOpen = ref(false);
@@ -372,6 +480,11 @@ const builderPoints = ref([
   { lat: "", lon: "", utmX: "", utmY: "", utmZone: "" },
 ]);
 const csvInput = ref(null);
+
+const csvModalOpen = ref(false);
+const csvRows = ref([]);
+const csvName = ref("");
+const csvType = ref("polygon");
 
 const canCreate = computed(() => {
   const valid = builderPoints.value.filter((p) => {
@@ -439,26 +552,101 @@ function onCsvChange(e) {
   const file = e.target.files[0];
   e.target.value = "";
   if (!file) return;
+  importCsvFile(file);
+}
+
+const csvLoading = ref(false);
+
+function importCsvFile(file, onDone) {
+  if (!file || csvLoading.value) {
+    onDone?.();
+    return false;
+  }
+  csvLoading.value = true;
   const reader = new FileReader();
   reader.onload = () => {
-    try {
-      const rows = parseCsv(String(reader.result || ""));
-      if (!rows.length) {
-        alert("نقطه معتبری در فایل CSV پیدا نشد. ستون‌های lat و lon را بررسی کنید.");
-        return;
+    setTimeout(() => {
+      try {
+        const rows = parseCsv(String(reader.result || ""));
+        if (!rows.length) {
+          alert("نقطه معتبری در فایل CSV پیدا نشد. ستون‌های lat و lon را بررسی کنید.");
+          return;
+        }
+        if (rows.length < 2) {
+          alert("فایل CSV باید حداقل ۲ نقطه معتبر داشته باشد.");
+          return;
+        }
+        csvRows.value = rows;
+        csvName.value = builderName.value || rows[0]?.name || "";
+        csvType.value = rows.length >= 3 ? "polygon" : "polyline";
+        csvModalOpen.value = true;
+        logger.info("draw", "بارگذاری نقاط از CSV", { count: rows.length });
+      } catch (err) {
+        alert("خطا در خواندن فایل CSV");
+      } finally {
+        csvLoading.value = false;
+        onDone?.();
       }
-      builderPoints.value = rows.map((r) => ({
-        lat: r.lat,
-        lon: r.lon,
-        ...utmFieldsOf(r),
-      }));
-      if (!builderName.value && rows[0]?.name) builderName.value = rows[0].name;
-      logger.info("draw", "بارگذاری نقاط از CSV", { count: rows.length });
-    } catch (err) {
-      alert("خطا در خواندن فایل CSV");
-    }
+    }, 30);
+  };
+  reader.onerror = () => {
+    csvLoading.value = false;
+    onDone?.();
+    alert("خطا در خواندن فایل CSV");
   };
   reader.readAsText(file, "utf-8");
+  return true;
+}
+
+defineExpose({ importCsvFile });
+
+function confirmCsvCreate() {
+  const rows = csvRows.value.filter(
+    (r) => Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon)),
+  );
+  const minPts = csvType.value === "polygon" ? 3 : 2;
+  if (rows.length < minPts) {
+    alert(
+      csvType.value === "polygon"
+        ? "برای پلی‌گان حداقل ۳ نقطه لازم است."
+        : "برای خط حداقل ۲ نقطه لازم است.",
+    );
+    return;
+  }
+  const positions = rows.map((r) => ({
+    lat: Number(r.lat),
+    lon: Number(r.lon),
+    height: 0,
+  }));
+  const pin = {
+    id: crypto.randomUUID(),
+    name:
+      csvName.value.trim() ||
+      (csvType.value === "polygon" ? "پلی‌گان CSV" : "خط CSV"),
+    date: new Date(),
+    save: -1,
+    type: "draw",
+    selected: true,
+    shape: {
+      type: csvType.value,
+      positions,
+      color: "#ff0000",
+      outlineColor: "#ff0000",
+      opacity: 0.7,
+      width: 3,
+      show: true,
+    },
+  };
+  props.pins.push(pin);
+  if (props.map) renderPinOnMap(props.map, pin);
+  csvModalOpen.value = false;
+  csvRows.value = [];
+  emit("created", pin, { edit: false });
+  logger.info("draw", "ایجاد ترسیم از CSV", {
+    name: pin.name,
+    type: csvType.value,
+    points: positions.length,
+  });
 }
 
 /* -------- ویرایش نقاط ترسیم در حال انجام -------- */

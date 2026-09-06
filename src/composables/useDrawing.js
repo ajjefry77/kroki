@@ -18,6 +18,7 @@ import {
 } from "../utils/useDrawingHelpers";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
 import { ensureVertexSquareImage, VERTEX_SQUARE_IMAGE } from "../utils/drawStyle";
+import { logger } from "../utils/logger";
 
 // رنگ ترسیم: قرمز هنگام در حال ترسیم، سبز پس از پایان
 export const DRAFT_COLOR = "#ff0000";
@@ -36,6 +37,7 @@ export function useDrawing(map, pins) {
   const measurePoints = reactive([]);
   const coordinateSystem = ref("utm");
   const nameError = ref(false);
+  const placingPoint = ref(false);
 
   const hs = {
     mouseMove: null,
@@ -63,6 +65,7 @@ export function useDrawing(map, pins) {
   let dragOrigPts = []; // نقطه‌های اولیه هنگام درگ مرکز
   let lastClickTs = 0;
   let rectStart = null;
+  let placeHandlers = null;
 
   function currentColor() {
     if (editingPin) return DRAFT_COLOR;
@@ -225,6 +228,7 @@ export function useDrawing(map, pins) {
   }
 
   function cleanupHandlers() {
+    disarmAddPoint();
     if (hs.mouseMove) { map.off("mousemove", hs.mouseMove); hs.mouseMove = null; }
     if (hs.click) { map.off("click", hs.click); hs.click = null; }
     if (hs.dblClick) { map.off("dblclick", hs.dblClick); hs.dblClick = null; }
@@ -709,6 +713,8 @@ export function useDrawing(map, pins) {
         src.setData({ type: "FeatureCollection", features });
       };
       hs.click = (e) => {
+        if (placingPoint.value) return;
+        if (e.originalEvent?.button !== undefined && e.originalEvent.button !== 0) return;
         positions.push({
           lng: e.lngLat.lng,
           lat: e.lngLat.lat,
@@ -718,6 +724,7 @@ export function useDrawing(map, pins) {
       };
       hs.rightClick = (e) => {
         e.preventDefault();
+        if (placingPoint.value) return;
         if (positions.length < 1) return;
         cleanupHandlers();
         finishDrawing("multi_point", [...positions]);
@@ -739,6 +746,7 @@ export function useDrawing(map, pins) {
       addTempSource();
       addPolylineLayers();
       hs.mousedown = (e) => {
+        if (placingPoint.value) return;
         if (e.originalEvent.button !== 0) return;
         const pts = editingPointsRef();
         if (!pts || !pts.length) return;
@@ -792,11 +800,11 @@ export function useDrawing(map, pins) {
           draggingIndex = -1;
           dragCenterRef = null;
           dragOrigPts = [];
-          m.dragPan.enable();
         }
       };
       hs.click = (e) => {
-        if (dragActive || shape.value) return;
+        if (dragActive || placingPoint.value || shape.value) return;
+        if (e.originalEvent?.button !== undefined && e.originalEvent.button !== 0) return;
         const now = Date.now();
         if (now - lastClickTs < 280) return;
         lastClickTs = now;
@@ -808,6 +816,7 @@ export function useDrawing(map, pins) {
       };
       hs.rightClick = (e) => {
         e.preventDefault();
+        if (placingPoint.value) return;
         if (shape.value) return; // پس از پایان، حذف فقط از جدول
         if (positions.length > 0) {
           positions.pop();
@@ -845,6 +854,7 @@ export function useDrawing(map, pins) {
       addTempSource();
       addPolygonLayers();
       hs.mousedown = (e) => {
+        if (placingPoint.value) return;
         if (e.originalEvent.button !== 0) return;
         const pts = editingPointsRef();
         if (!pts || !pts.length) return;
@@ -900,11 +910,11 @@ export function useDrawing(map, pins) {
           draggingIndex = -1;
           dragCenterRef = null;
           dragOrigPts = [];
-          m.dragPan.enable();
         }
       };
       hs.click = (e) => {
-        if (dragActive || shape.value) return;
+        if (dragActive || placingPoint.value || shape.value) return;
+        if (e.originalEvent?.button !== undefined && e.originalEvent.button !== 0) return;
         const now = Date.now();
         if (now - lastClickTs < 280) return;
         lastClickTs = now;
@@ -916,6 +926,7 @@ export function useDrawing(map, pins) {
       };
       hs.rightClick = (e) => {
         e.preventDefault();
+        if (placingPoint.value) return;
         if (shape.value) return;
         if (positions.length > 0) {
           positions.pop();
@@ -954,6 +965,7 @@ export function useDrawing(map, pins) {
       addRectangleLayers();
       rectStart = null;
       hs.click = (e) => {
+        if (e.originalEvent?.button !== undefined && e.originalEvent.button !== 0) return;
         if (!rectStart) {
           rectStart = { lng: e.lngLat.lng, lat: e.lngLat.lat };
           positions.length = 0;
@@ -1100,6 +1112,7 @@ export function useDrawing(map, pins) {
   }
 
   function toggleMeasure() {
+    disarmAddPoint();
     measureActive.value = !measureActive.value;
     if (measureActive.value) {
       drawMode.value = "measure";
@@ -1192,6 +1205,7 @@ export function useDrawing(map, pins) {
       return { type: "FeatureCollection", features };
     };
     hs.click = (e) => {
+      if (e.originalEvent?.button !== undefined && e.originalEvent.button !== 0) return;
       measurePoints.push([e.lngLat.lng, e.lngLat.lat]);
       const src = m.getSource(tempId);
       if (src) src.setData(buildMeasureFeatures());
@@ -1465,6 +1479,91 @@ export function useDrawing(map, pins) {
     renderDraftLayers();
   }
 
+  function addPointTarget() {
+    const t = shape.value?.type || drawMode.value;
+    if (t !== "polygon" && t !== "polyline" && t !== "multi_point") return null;
+    if (shape.value && Array.isArray(shape.value.positions)) return { isShape: true };
+    if (Array.isArray(positions) && drawMode.value) return { isShape: false };
+    return null;
+  }
+
+  function disarmAddPoint() {
+    placingPoint.value = false;
+    if (placeHandlers) {
+      try {
+        map?.off("click", placeHandlers.onClick);
+      } catch (e) {}
+      try {
+        map?.off("contextmenu", placeHandlers.onCtx);
+      } catch (e) {}
+      window.removeEventListener("keydown", placeHandlers.onKey);
+      placeHandlers = null;
+    }
+    try {
+      if (map?.getCanvas?.()) {
+        map.getCanvas().style.cursor =
+          shape.value || drawMode.value ? "crosshair" : "default";
+      }
+    } catch (e) {}
+  }
+
+  function placePointAt(lngLat) {
+    if (!lngLat) {
+      disarmAddPoint();
+      return;
+    }
+    const t = addPointTarget();
+    if (!t) {
+      disarmAddPoint();
+      return;
+    }
+    if (t.isShape) {
+      const s = shape.value;
+      s.positions.push(
+        s.type === "multi_point"
+          ? { lon: lngLat.lng, lat: lngLat.lat, height: 0, color: color.value }
+          : { lon: lngLat.lng, lat: lngLat.lat, height: 0 },
+      );
+    } else if (drawMode.value === "multi_point") {
+      positions.push({ lng: lngLat.lng, lat: lngLat.lat, color: color.value });
+    } else {
+      positions.push({ lng: lngLat.lng, lat: lngLat.lat });
+    }
+    renderDraftLayers();
+    disarmAddPoint();
+  }
+
+  function armAddPoint() {
+    if (!map) return false;
+    if (!addPointTarget()) return false;
+    if (placingPoint.value) return true;
+    disarmAddPoint();
+    placingPoint.value = true;
+    try {
+      map.getCanvas().style.cursor = "crosshair";
+    } catch (e) {}
+    const onClick = (e) => {
+      const btn = e.originalEvent?.button;
+      if (btn !== undefined && btn !== 0) return;
+      placePointAt(e.lngLat);
+    };
+    const onCtx = (e) => {
+      e.preventDefault();
+      disarmAddPoint();
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        disarmAddPoint();
+      }
+    };
+    map.on("click", onClick);
+    map.on("contextmenu", onCtx);
+    window.addEventListener("keydown", onKey);
+    placeHandlers = { onClick, onCtx, onKey };
+    return true;
+  }
+
   let editingPin = null;
 
   function setPinLayersVisible(pin, visible) {
@@ -1485,6 +1584,7 @@ export function useDrawing(map, pins) {
     cleanupHandlers();
     const m = map;
     hs.mousedown = (e) => {
+      if (placingPoint.value) return;
       if (e.originalEvent.button !== 0) return;
       const pts = editingPointsRef();
       if (!pts || pts.length < 2) return;
@@ -1530,12 +1630,15 @@ export function useDrawing(map, pins) {
         draggingIndex = -1;
         dragCenterRef = null;
         dragOrigPts = [];
-        m.dragPan.enable();
       }
     };
     hs.key = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        if (placingPoint.value) {
+          disarmAddPoint();
+          return;
+        }
         exitPinEdit();
       } else if (event.key === "Enter") {
         event.preventDefault();
@@ -1546,6 +1649,21 @@ export function useDrawing(map, pins) {
     m.on("mousedown", hs.mousedown);
     m.on("mousemove", hs.mouseMove);
     m.on("mouseup", hs.mouseup);
+    hs.rightClick = (e) => {
+      e.preventDefault();
+      if (dragActive || placingPoint.value) return;
+      const pts = editingPointsRef();
+      if (!pts || !Array.isArray(pts)) return;
+      const idx = nearestPointIndex(e.lngLat, 16);
+      if (idx < 0) return;
+      const t = shape.value?.type;
+      const min = t === "polygon" ? 3 : t === "multi_point" ? 1 : 2;
+      if (pts.length <= min) return;
+      pts.splice(idx, 1);
+      renderDraftLayers();
+      logger.info("draw", "حذف نقطه از روی نقشه در حالت ویرایش", { index: idx });
+    };
+    m.on("contextmenu", hs.rightClick);
   }
 
   // ورود به حالت ویرایش یک شکل موجود (رسمی مثلث/خط یا KML آپلودشده) روی نقشه
@@ -1590,6 +1708,7 @@ export function useDrawing(map, pins) {
     color,
     measureActive,
     positions,
+    placingPoint,
     formData,
     showForm,
     shape,
@@ -1614,6 +1733,9 @@ export function useDrawing(map, pins) {
     updateDraftPoint,
     removeDraftPoint,
     addDraftPoint,
+    armAddPoint,
+    disarmAddPoint,
+    renderDraftLayers,
     editExistingPin,
     exitPinEdit,
     isEditingPin,

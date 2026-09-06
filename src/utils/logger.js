@@ -183,6 +183,8 @@ export function downloadLogFile(format = "txt") {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   a.href = url;
   a.download = `kroki-logs-${stamp}.${format}`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }

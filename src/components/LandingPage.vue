@@ -84,11 +84,6 @@
               </div>
             </Transition>
           </div>
-
-          <button class="btn btn-primary" @click="$emit('start')">
-            <i class="fas fa-play ml-1"></i>
-            شروع
-          </button>
         </div>
       </div>
     </header>

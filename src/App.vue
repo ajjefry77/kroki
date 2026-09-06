@@ -94,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed } from "vue";
+import { ref, reactive, watch, computed, onMounted, onUnmounted } from "vue";
 import { useKrokiGenerator, getTodayJalali } from "./composables/useKrokiGenerator";
 import { logger } from "./utils/logger";
 import { auth } from "./stores/auth";
@@ -149,7 +149,18 @@ watch(step, (s) => {
   logger.info("step", "تغییر مرحله", { step: s });
 });
 
+const krokiIds = steps.map((s) => s.id);
+
+function openAuth(returnTo) {
+  authReturn.value = returnTo;
+  page.value = "auth";
+}
+
 function go(id) {
+  if (id !== "landing" && !auth.isAuthenticated.value) {
+    openAuth("start");
+    return;
+  }
   const idx = steps.findIndex((s) => s.id === id);
   if (idx !== -1) {
     reachedIndex.value = Math.max(reachedIndex.value, idx);
@@ -161,31 +172,40 @@ function navigate(id) {
   go(id);
 }
 
-/* ---------- احراز هویت و صفحات ---------- */
 function goHome() {
   page.value = "app";
   step.value = "landing";
 }
 
-function openAuth(returnTo) {
-  authReturn.value = returnTo;
-  page.value = "auth";
-}
-
 function onAuthSuccess() {
-  if (authReturn.value === "start") {
+  const ret = authReturn.value;
+  if (ret === "start") {
     page.value = "app";
     start();
+  } else if (ret === "panel") {
+    page.value = "app";
+    openPanel();
+  } else if (ret === "admin") {
+    page.value = "app";
+    openAdmin();
   } else {
     goHome();
   }
 }
 
 function openPanel() {
+  if (!auth.isAuthenticated.value) {
+    openAuth("panel");
+    return;
+  }
   page.value = "panel";
 }
 
 function openAdmin() {
+  if (!auth.isAuthenticated.value) {
+    openAuth("admin");
+    return;
+  }
   page.value = auth.isAdmin.value ? "admin" : "panel";
 }
 
@@ -201,9 +221,69 @@ function start() {
     return;
   }
   logger.info("step", "شروع فرآیند ساخت کروکی");
+  page.value = "app";
   reachedIndex.value = 0;
   step.value = "draw";
 }
+
+watch(
+  () => auth.isAuthenticated.value,
+  (ok) => {
+    if (ok || page.value === "auth") return;
+    const insideKroki = page.value === "app" && step.value !== "landing";
+    if (!insideKroki && page.value !== "panel" && page.value !== "admin") return;
+    authReturn.value =
+      page.value === "panel" ? "panel" : page.value === "admin" ? "admin" : "start";
+    page.value = "auth";
+  },
+);
+
+function syncHash() {
+  const h =
+    page.value === "panel"
+      ? "#/panel"
+      : page.value === "admin"
+        ? "#/admin"
+        : page.value === "auth"
+          ? "#/auth"
+          : step.value === "landing"
+            ? "#/"
+            : "#/" + step.value;
+  if (window.location.hash !== h) window.history.replaceState(null, "", h);
+}
+
+function enforceFromHash() {
+  const h = (window.location.hash || "").replace(/^#\/?/, "");
+  if (h === "panel") {
+    openPanel();
+  } else if (h === "admin") {
+    openAdmin();
+  } else if (h === "auth") {
+    if (auth.isAuthenticated.value) goHome();
+    else page.value = "auth";
+  } else if (krokiIds.includes(h)) {
+    if (!auth.isAuthenticated.value) {
+      step.value = "landing";
+      page.value = "app";
+      openAuth("start");
+    } else {
+      page.value = "app";
+      go("draw");
+    }
+  }
+  syncHash();
+}
+
+onMounted(() => {
+  enforceFromHash();
+  window.addEventListener("hashchange", enforceFromHash);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("hashchange", enforceFromHash);
+});
+
+watch([page, step], syncHash);
 
 function onMapReady({ map: m }) {
   map.value = m;

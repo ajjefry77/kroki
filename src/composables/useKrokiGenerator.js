@@ -583,7 +583,7 @@ export function useKrokiGenerator() {
       }
     }
 
-    const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>کروکی - ${last.form?.title || "بدون عنوان"}</name><Folder><name>ترسیمات</name>${placemarks}</Folder></Document></kml>`;
+    const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>کروکی - ${escapeHtml(last.form?.title) || "بدون عنوان"}</name><Folder><name>ترسیمات</name>${placemarks}</Folder></Document></kml>`;
     const blob = new Blob([kml], {
       type: "application/vnd.google-earth.kml+xml;charset=utf-8",
     });
@@ -591,8 +591,10 @@ export function useKrokiGenerator() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `kroki-${Date.now()}.kml`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   // ─────────────── DXF Export ───────────────
@@ -642,8 +644,10 @@ export function useKrokiGenerator() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `kroki-${Date.now()}.dxf`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   // ------------------------------------
 
