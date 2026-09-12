@@ -81,47 +81,47 @@
       </div>
 
       <template v-else-if="gen.state.ready">
-        <!-- تصاویر -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div class="card !rounded-2xl !p-3">
-            <div class="flex items-center justify-between px-1 mb-2">
-              <span class="text-xs font-semibold flex items-center gap-1.5">
-                <i class="fas fa-satellite text-[var(--accent)]"></i>
-                تصویر نقشه
-              </span>
-              <button class="text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition" title="دانلود" @click="downloadMap">
-                <i class="fas fa-download"></i>
-              </button>
+        <!-- خروجی اصلی — کمی تار -->
+        <div class="card !rounded-2xl !p-3">
+          <div class="flex items-center justify-between px-1 mb-2">
+            <span class="text-xs font-semibold flex items-center gap-1.5">
+              <i class="fas fa-file-lines text-[var(--accent)]"></i>
+              پیش‌نمایش خروجی نهایی ({{ gen.state.orientation === 'landscape' ? 'افقی' : 'عمودی' }})
+            </span>
+            <span class="text-[10px] text-[var(--text-faint)] flex items-center gap-1">
+              <i class="fas fa-lock"></i>
+              نسخه نهایی پس از پرداخت با کیفیت کامل
+            </span>
+          </div>
+          <div class="relative select-none">
+            <iframe
+              v-if="previewDoc"
+              :srcdoc="previewDoc"
+              class="preview-sheet-frame preview-blur"
+              :class="gen.state.orientation === 'landscape' ? 'is-landscape' : 'is-portrait preview-blur-more'"
+              tabindex="-1"
+              title="پیش‌نمایش خروجی نهایی"
+            ></iframe>
+            <div v-else class="preview-fallback">
+              <canvas
+                ref="fallbackCanvasRef"
+                class="w-full h-auto border border-[var(--border)] rounded-lg bg-white preview-blur"
+                :width="canvasW"
+                :height="canvasH"
+              ></canvas>
+              <p class="text-[11px] text-[var(--text-faint)] text-center mt-2">در حال آماده‌سازی پیش‌نمایش…</p>
             </div>
-            <img
-              v-if="gen.state.mapImage"
-              :src="gen.state.mapImage"
-              class="w-full border border-[var(--border)] rounded-lg bg-[var(--surface2)]"
-              alt="تصویر نقشه"
-            />
-            <div v-else class="h-64 flex items-center justify-center text-xs text-[var(--text-faint)]">
-              تصویر نقشه در دسترس نیست
+            <div class="preview-watermark">
+              <span>پیش‌نمایش</span>
             </div>
           </div>
-
-          <div class="card !rounded-2xl !p-3">
-            <div class="flex items-center justify-between px-1 mb-2">
-              <span class="text-xs font-semibold flex items-center gap-1.5">
-                <i class="fas fa-drafting-compass text-[var(--accent)]"></i>
-                {{ currentTemplate?.subtitle }}
-              </span>
-              <button class="text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition" title="دانلود" @click="downloadSketch">
-                <i class="fas fa-download"></i>
-              </button>
-            </div>
-            <canvas
-              ref="sketchCanvasRef"
-              class="w-full h-auto border border-[var(--border)] rounded-lg bg-white"
-              :width="canvasW"
-              :height="canvasH"
-            ></canvas>
-          </div>
+          <p class="text-[10px] text-[var(--text-faint)] text-center mt-2 leading-5">
+            خروجی اصلی با کمی تاری نمایش داده شده است
+          </p>
         </div>
+
+        <!-- کانواس مخفی برای تولید تصویر کروکی (خارج از دید ولی قابل رندر) -->
+        <canvas ref="sketchCanvasRef" class="preview-offscreen" :width="canvasW" :height="canvasH"></canvas>
 
         <!-- شخصی‌سازی ظاهر کروکی -->
         <div class="card !rounded-2xl">
@@ -219,43 +219,6 @@
           </div>
         </div>
 
-        <!-- جدول مختصات -->
-        <div class="card !rounded-2xl">
-          <div class="font-semibold text-sm mb-3 flex items-center gap-2">
-            <i class="fas fa-table text-[var(--accent)]"></i>
-            مختصات UTM — Zone: {{ gen.state.utmZone || '—' }}
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs">
-              <thead>
-                <tr>
-                  <th>شماره نقطه</th>
-                  <th>X</th>
-                  <th>Y</th>
-                  <th>Zone</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(p, i) in gen.state.utmPoints" :key="i">
-                  <td class="text-center">{{ i + 1 }}</td>
-                  <td class="text-center" dir="ltr">{{ p.x.toFixed(2) }}</td>
-                  <td class="text-center" dir="ltr">{{ p.y.toFixed(2) }}</td>
-                  <td class="text-center">{{ p.zone ?? gen.state.utmZone }}</td>
-                </tr>
-                <tr v-if="gen.state.centerUtm" class="font-semibold">
-                  <td class="text-center">مرکز</td>
-                  <td class="text-center" dir="ltr">{{ gen.state.centerUtm.x.toFixed(2) }}</td>
-                  <td class="text-center" dir="ltr">{{ gen.state.centerUtm.y.toFixed(2) }}</td>
-                  <td class="text-center">{{ gen.state.centerUtm.zone ?? gen.state.utmZone }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="mt-3 text-xs text-[var(--text-muted)]">
-            <i class="fas fa-arrows-to-circle ml-1 text-[var(--accent)]"></i>
-            مساحت کل: <span class="font-semibold text-[var(--text)]">{{ gen.state.areaM2.toFixed(2) }}</span> متر مربع
-          </div>
-        </div>
       </template>
     </div>
 
@@ -288,9 +251,11 @@ const props = defineProps({
 const emit = defineEmits(["back", "pay"]);
 
 const sketchCanvasRef = ref(null);
+const fallbackCanvasRef = ref(null);
 const canvasW = ref(700);
 const canvasH = ref(700);
 const customizeOpen = ref(false);
+const previewDoc = ref("");
 
 const currentTemplate = computed(() => getTemplate(props.templateId));
 
@@ -317,9 +282,7 @@ function resetStyles() {
 }
 
 function rerender() {
-  nextTick(() => {
-    props.gen.renderSketch(sketchCanvasRef.value);
-  });
+  updatePreview();
 }
 
 function sizeCanvas() {
@@ -335,34 +298,137 @@ function sizeCanvas() {
 }
 
 function renderSketchNow() {
+  updatePreview();
+}
+
+function updatePreview() {
   nextTick(() => {
-    props.gen.renderSketch(sketchCanvasRef.value);
+    nextTick(() => {
+      const canvas = sketchCanvasRef.value;
+      if (!canvas) return;
+      try {
+        props.gen.renderSketch(canvas);
+      } catch (e) {
+        logger.error("preview", "خطا در رندر کروکی", e?.message);
+        return;
+      }
+      // رندر فالبک هم تا اگر iframe آماده نشد صفحه خالی نماند
+      try {
+        if (fallbackCanvasRef.value) props.gen.renderSketch(fallbackCanvasRef.value);
+      } catch (e) {}
+      try {
+        const sketchImg = canvas.toDataURL("image/jpeg", 0.85) || "";
+        const { html } = props.gen.buildPrintHtml();
+        const landscape = props.gen.state.orientation === "landscape";
+        const css =
+          typeof props.gen.printCss === "function"
+            ? props.gen.printCss(landscape)
+            : "";
+        const finalHtml = html.replace("__SKETCH__", sketchImg);
+        previewDoc.value = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><style>${css}html,body{margin:0;padding:0;background:#fff;}.sheet{width:100% !important;height:auto !important;min-height:100%;}</style></head><body>${finalHtml}</body></html>`;
+      } catch (e) {
+        logger.error("preview", "خطا در ساخت پیش‌نمایش", e?.message);
+      }
+    });
   });
 }
 
-onMounted(() => {
+onMounted(async () => {
   sizeCanvas();
-  renderSketchNow();
+  await nextTick();
+  updatePreview();
   logger.info("step", "مشاهده پیش‌نمایش کروکی", { template: props.templateId });
 });
 
 watch(
   () => props.templateId,
   () => {
-    renderSketchNow();
+    updatePreview();
   },
 );
 
-function downloadMap() {
-  const url = props.gen.state.mapImage;
-  if (!url) return;
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "kroki-map.png";
-  a.click();
-}
+watch(
+  () => props.gen.state.orientation,
+  () => {
+    updatePreview();
+  },
+);
 
-function downloadSketch() {
-  props.gen.downloadCanvasImage(sketchCanvasRef.value, "kroki-sketch.png");
-}
+watch(
+  () => props.gen.state.styleOverrides,
+  () => {
+    updatePreview();
+  },
+  { deep: true },
+);
+
+watch(
+  () => props.gen.state.edgeTexts,
+  () => {
+    updatePreview();
+  },
+  { deep: true },
+);
+
+watch(
+  () => props.gen.state.mapImage,
+  () => {
+    updatePreview();
+  },
+);
 </script>
+
+<style scoped>
+.preview-offscreen {
+  position: fixed;
+  right: -10000px;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  opacity: 0;
+  pointer-events: none;
+}
+.preview-fallback {
+  width: 100%;
+}
+.preview-sheet-frame {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  pointer-events: none;
+  user-select: none;
+}
+.preview-sheet-frame.is-portrait {
+  aspect-ratio: 210 / 297;
+}
+.preview-sheet-frame.is-landscape {
+  aspect-ratio: 297 / 210;
+}
+.preview-blur {
+  filter: blur(0.9px) saturate(0.92);
+  opacity: 0.98;
+}
+.preview-blur-more {
+  filter: blur(2px) saturate(0.9);
+}
+.preview-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.preview-watermark span {
+  transform: rotate(-18deg);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+</style>

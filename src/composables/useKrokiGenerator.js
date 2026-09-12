@@ -1599,6 +1599,7 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
     downloadCanvasImage,
     openPrint,
     buildPrintHtml,
+    printCss,
     getTodayJalali,
     computeCanvasSize,
     buildGeometry,

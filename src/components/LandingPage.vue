@@ -292,15 +292,8 @@
     </section>
 
     <footer class="border-t border-[var(--border)] py-6 bg-[var(--bg-elevated)]/70">
-      <div class="max-w-7xl mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
-        <div class="flex items-center gap-2">
-          <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-5 h-5 object-contain" />
-          <span>سامانه تولید کروکی نقشه — نسخه آزمایشی</span>
-        </div>
-        <div class="flex items-center gap-4">
-          <span class="flex items-center gap-1.5"><i class="fas fa-shield-halved text-[var(--success)]"></i> امن و مطمئن</span>
-          <span class="flex items-center gap-1.5"><i class="fas fa-bolt text-[var(--warning)]"></i> سریع و دقیق</span>
-        </div>
+      <div class="max-w-7xl mx-auto px-5 text-center text-sm md:text-base font-semibold text-[var(--text-muted)]">
+        کلیه حقوق مادی و معنوی متعلق به شرکت ساج گستر کاسپین می‌باشد
       </div>
     </footer>
   </div>
