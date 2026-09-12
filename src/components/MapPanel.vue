@@ -149,11 +149,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, reactive, watch } from "vue";
-import mapboxgl from "mapbox-gl";
 import DrawToolbar from "./DrawToolbar.vue";
 import MapSearchBox from "./MapSearchBox.vue";
 import Loading from "./Loading.vue";
 import { useDrawing } from "../composables/useDrawing";
+import { loadMap } from "../utils/loadMapbox";
 import { kmlToGeoJSON, readKmlText } from "../utils/kml";
 import { registerDrawLayer, bringDrawingsToFront } from "../utils/layerOrder";
 import { renderPinOnMap } from "../utils/pinRenderer";
@@ -177,6 +177,7 @@ let kmlCancelRequested = false;
 let csvOverlayOn = false;
 
 let map = null;
+let mapboxgl = null;
 const mapProxy = ref(null);
 const searchOpen = ref(false);
 const drawing = ref(null);
@@ -526,6 +527,14 @@ function teardownCustomPan() {
 }
 
 function initMap() {
+  initMapAsync().catch((e) => {
+    console.error("خطا در راه‌اندازی نقشه:", e);
+    initError.value = "خطا در راه‌اندازی نقشه: " + (e.message || "اطلاعات بیشتر در کنسول مرورگر");
+  });
+}
+
+async function initMapAsync() {
+  mapboxgl = await loadMap();
   mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
   if (!mapboxgl.supported()) {

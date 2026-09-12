@@ -388,7 +388,7 @@ const areaInfo = computed(() => {
   const count = d.livePointCount || 0;
   const min = isPolygon ? 3 : 0;
   if (!isPolygon || count < min) return { show: false, text: "" };
-  return { show: true, text: d.liveArea || "0 m²" };
+  return { show: true, text: d.liveArea || "0 متر مربع" };
 });
 
 function pinStat(p) {

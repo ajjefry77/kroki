@@ -19,9 +19,7 @@ export function formatDistance(meters) {
 }
 
 export function formatArea(squareMeters) {
-  if (squareMeters >= 1000)
-    return (squareMeters / 10000).toFixed(2) + " هکتار";
-  return squareMeters.toFixed(2) + " m²";
+  return squareMeters.toFixed(2) + " متر مربع";
 }
 
 export function formatVertexLabel(lng, lat, coordinateSystem) {

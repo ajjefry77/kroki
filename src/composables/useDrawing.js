@@ -207,9 +207,9 @@ export function useDrawing(map, pins) {
   });
   const liveArea = computed(() => {
     if (shape.value) return calculateArea();
-    if (drawMode.value !== "polygon" && drawMode.value !== "rectangle") return "0 m²";
+    if (drawMode.value !== "polygon" && drawMode.value !== "rectangle") return "0 متر مربع";
     const points = livePoints.value;
-    if (points.length < 3) return "0 m²";
+    if (points.length < 3) return "0 متر مربع";
     const coords = points.map((p) => {
       const { x, y } = toUTM(p.lon, p.lat);
       return [x, y];
@@ -1417,9 +1417,9 @@ export function useDrawing(map, pins) {
     return formatDistance(total);
   }
   function calculateArea() {
-    if (!shape.value || shape.value.type !== "polygon") return "0 m²";
+    if (!shape.value || shape.value.type !== "polygon") return "0 متر مربع";
     const points = getAllPoints();
-    if (points.length < 3) return "0 m²";
+    if (points.length < 3) return "0 متر مربع";
     const centroid = computeCentroid(points);
     const refZone = toUTM(centroid.lon, centroid.lat).zone;
     const coords = points.map((p) => {

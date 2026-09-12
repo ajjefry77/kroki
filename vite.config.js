@@ -13,7 +13,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           "mapbox": ["mapbox-gl"],
-          "vendor": ["vue", "proj4"],
+          "vendor": ["vue"],
         },
       },
     },

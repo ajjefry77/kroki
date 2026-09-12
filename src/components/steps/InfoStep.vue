@@ -334,7 +334,7 @@ const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 
 const areaPreview = computed(() => {
   const sel = eligiblePinsOf(props.pins).filter((p) => p.shape?.type === "polygon");
-  return sel.length ? "—" : "۰ m²";
+  return sel.length ? "—" : "۰ متر مربع";
 });
 
 function select(id) {

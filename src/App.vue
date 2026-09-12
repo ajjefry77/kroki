@@ -57,7 +57,7 @@
             />
 
             <PreviewStep
-              v-else-if="step === 'preview'"
+              v-else-if="step === 'preview' && gen"
               key="preview"
               :gen="gen"
               :template-id="templateId"
@@ -66,7 +66,7 @@
             />
 
             <PaymentStep
-              v-else-if="step === 'payment'"
+              v-else-if="step === 'payment' && gen"
               key="payment"
               :gen="gen"
               :pins="pins"
@@ -77,7 +77,7 @@
             />
 
             <DownloadStep
-              v-else-if="step === 'done'"
+              v-else-if="step === 'done' && gen"
               key="done"
               :gen="gen"
               :form="krokiForm"
@@ -86,6 +86,10 @@
               @restart="restart"
               @home="go('landing')"
             />
+
+            <div v-else-if="step === 'preview' || step === 'payment' || step === 'done'" key="gen-loading" class="flex-1 flex items-center justify-center">
+              <Loading :active="true" title="در حال آماده‌سازی..." message="لطفاً چند لحظه صبر کنید" />
+            </div>
           </Transition>
         </div>
       </template>
@@ -94,22 +98,24 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed, onMounted, onUnmounted } from "vue";
-import { useKrokiGenerator, getTodayJalali } from "./composables/useKrokiGenerator";
+import { ref, reactive, watch, computed, onMounted, onUnmounted, defineAsyncComponent, shallowRef } from "vue";
+import { getTodayJalali } from "./utils/jalali";
 import { logger } from "./utils/logger";
 import { auth } from "./stores/auth";
 
 import LandingPage from "./components/LandingPage.vue";
-import WizardHeader from "./components/WizardHeader.vue";
-import LogPanel from "./components/LogPanel.vue";
-import AuthView from "./components/AuthView.vue";
-import UserPanel from "./components/UserPanel.vue";
-import AdminPanel from "./components/AdminPanel.vue";
-import DrawStep from "./components/steps/DrawStep.vue";
-import InfoStep from "./components/steps/InfoStep.vue";
-import PreviewStep from "./components/steps/PreviewStep.vue";
-import PaymentStep from "./components/steps/PaymentStep.vue";
-import DownloadStep from "./components/steps/DownloadStep.vue";
+import Loading from "./components/Loading.vue";
+
+const WizardHeader = defineAsyncComponent(() => import("./components/WizardHeader.vue"));
+const LogPanel = defineAsyncComponent(() => import("./components/LogPanel.vue"));
+const AuthView = defineAsyncComponent(() => import("./components/AuthView.vue"));
+const UserPanel = defineAsyncComponent(() => import("./components/UserPanel.vue"));
+const AdminPanel = defineAsyncComponent(() => import("./components/AdminPanel.vue"));
+const DrawStep = defineAsyncComponent(() => import("./components/steps/DrawStep.vue"));
+const InfoStep = defineAsyncComponent(() => import("./components/steps/InfoStep.vue"));
+const PreviewStep = defineAsyncComponent(() => import("./components/steps/PreviewStep.vue"));
+const PaymentStep = defineAsyncComponent(() => import("./components/steps/PaymentStep.vue"));
+const DownloadStep = defineAsyncComponent(() => import("./components/steps/DownloadStep.vue"));
 
 const steps = [
   { id: "draw", label: "ترسیم نقشه" },
@@ -131,7 +137,21 @@ const trackingCode = ref("");
 const logOpen = ref(false);
 const logStats = computed(() => logger.getStats());
 
-const gen = useKrokiGenerator();
+const gen = shallowRef(null);
+let genPromise = null;
+function ensureGen() {
+  if (gen.value) return Promise.resolve(gen.value);
+  if (!genPromise) {
+    genPromise = import("./composables/useKrokiGenerator").then((m) => {
+      gen.value = m.useKrokiGenerator();
+      return gen.value;
+    }).catch((e) => {
+      genPromise = null;
+      throw e;
+    });
+  }
+  return genPromise;
+}
 
 const krokiForm = reactive({
   title: "پلان وضعیت موجود",
@@ -163,6 +183,7 @@ function go(id) {
     openAuth("start");
     return;
   }
+  if (id !== "landing") ensureGen().catch(() => {});
   const idx = steps.findIndex((s) => s.id === id);
   if (idx !== -1) {
     reachedIndex.value = Math.max(reachedIndex.value, idx);
@@ -225,6 +246,7 @@ function start() {
   logger.info("step", "شروع فرآیند ساخت کروکی");
   page.value = "app";
   reachedIndex.value = 0;
+  ensureGen().catch(() => {});
   step.value = "draw";
 }
 
@@ -240,22 +262,26 @@ watch(
   },
 );
 
+let lastHash = "";
+
+function currentHash() {
+  if (page.value === "panel") return "#/panel";
+  if (page.value === "admin") return "#/admin";
+  if (page.value === "auth") return "#/auth";
+  if (step.value === "landing") return "#/";
+  return "#/" + step.value;
+}
+
 function syncHash() {
-  const h =
-    page.value === "panel"
-      ? "#/panel"
-      : page.value === "admin"
-        ? "#/admin"
-        : page.value === "auth"
-          ? "#/auth"
-          : step.value === "landing"
-            ? "#/"
-            : "#/" + step.value;
-  if (window.location.hash !== h) window.history.replaceState(null, "", h);
+  const h = currentHash();
+  if (window.location.hash === h || lastHash === h) return;
+  lastHash = h;
+  window.history.pushState(null, "", h);
 }
 
 function enforceFromHash() {
-  const h = (window.location.hash || "").replace(/^#\/?/, "");
+  lastHash = window.location.hash || "";
+  const h = lastHash.replace(/^#\/?/, "");
   if (h === "panel") {
     openPanel();
   } else if (h === "admin") {
@@ -263,6 +289,9 @@ function enforceFromHash() {
   } else if (h === "auth") {
     if (auth.isAuthenticated.value) goHome();
     else page.value = "auth";
+  } else if (h === "" || h === "/") {
+    page.value = "app";
+    step.value = "landing";
   } else if (krokiIds.includes(h)) {
     if (!auth.isAuthenticated.value) {
       step.value = "landing";
@@ -270,10 +299,16 @@ function enforceFromHash() {
       openAuth("start");
     } else {
       page.value = "app";
-      go("draw");
+      step.value = h;
+      reachedIndex.value = Math.max(reachedIndex.value, krokiIds.indexOf(h));
+      ensureGen().catch(() => {});
     }
   }
-  syncHash();
+  const norm = currentHash();
+  if ((window.location.hash || "") !== norm) {
+    lastHash = norm;
+    window.history.replaceState(null, "", norm);
+  }
 }
 
 onMounted(() => {
@@ -320,10 +355,11 @@ function removePin(pin) {
 }
 
 async function onDrawSubmit() {
-  const geom = gen.buildGeometry(pins);
+  const g = await ensureGen();
+  const geom = g.buildGeometry(pins);
   if (!geom) return;
   try {
-    gen.state.mapImage = await gen.captureMapImage(map.value, pins, geom.allPositions);
+    g.state.mapImage = await g.captureMapImage(map.value, pins, geom.allPositions);
     logger.info("draw", "ثبت ترسیم‌ها و برداشت تصویر نقشه", {
       shapes: geom.metas.length,
       points: geom.allPositions.length,
@@ -335,8 +371,9 @@ async function onDrawSubmit() {
 }
 
 async function onInfoSubmit() {
-  gen.setTemplate(templateId.value);
-  const ok = await gen.computeGeometry(pins, krokiForm);
+  const g = await ensureGen();
+  g.setTemplate(templateId.value);
+  const ok = await g.computeGeometry(pins, krokiForm);
   if (ok) go("preview");
 }
 

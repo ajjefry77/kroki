@@ -276,7 +276,7 @@
 
 <script setup>
 import { ref, reactive, watch, onUnmounted } from "vue";
-import mapboxgl from "mapbox-gl";
+import { loadMapbox } from "../utils/loadMapbox";
 import proj4 from "proj4";
 
 const props = defineProps({
@@ -430,11 +430,12 @@ function attachMarkerContextDelete(marker) {
   });
 }
 
-function flyToLocation(item) {
+async function flyToLocation(item) {
   if (!props.map || !item.geom) return;
   const [lng, lat] = item.geom.coordinates;
   props.map.flyTo({ center: [lng, lat], zoom: 16, essential: true });
   clearCoordMarker();
+  const mapboxgl = await loadMapbox();
   searchMarker = new mapboxgl.Marker({ color: "#e07b39" })
     .setLngLat([lng, lat])
     .setPopup(new mapboxgl.Popup().setText(item.title || "مکان انتخاب شده"))
@@ -459,9 +460,10 @@ const clearResults = () => {
   error.value = null;
 };
 
-function placeCoordMarker(lon, lat) {
+async function placeCoordMarker(lon, lat) {
   if (!props.map) return;
   clearSearchMarker();
+  const mapboxgl = await loadMapbox();
   coordMarker = new mapboxgl.Marker({ color: "#ea580c" })
     .setLngLat([lon, lat])
     .addTo(props.map);

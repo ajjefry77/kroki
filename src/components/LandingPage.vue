@@ -2,20 +2,20 @@
   <div class="landing min-h-screen flex flex-col overflow-x-hidden">
     <!-- نوار بالا -->
     <header class="sticky top-0 z-50 backdrop-blur-md bg-[var(--bg)]/85 border-b border-[var(--border)]">
-      <div class="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
-        <div class="flex items-center gap-3">
+      <div class="max-w-7xl mx-auto px-5 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
+        <div class="flex items-center gap-3 justify-self-start">
           <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-10 h-10 rounded-xl object-contain shadow-lg shadow-[var(--accent-glow-strong)]" />
           <div>
             <div class="font-extrabold text-lg leading-tight">سامانه کروکی</div>
             <div class="text-[11px] text-[var(--text-muted)]">تولید حرفه‌ای کروکی نقشه ملک</div>
           </div>
         </div>
-        <div class="hidden md:flex items-center gap-6 text-sm text-[var(--text-muted)]">
+        <div class="hidden md:flex items-center gap-6 text-sm text-[var(--text-muted)] justify-self-center">
           <a href="#features" class="hover:text-[var(--text)] transition">امکانات</a>
           <a href="#how" class="hover:text-[var(--text)] transition">مراحل کار</a>
           <a href="#templates" class="hover:text-[var(--text)] transition">قالب‌ها</a>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 justify-self-end">
           <button v-if="!authed" class="btn btn-ghost h-9" @click="$emit('login')">
             <i class="fas fa-right-to-bracket ml-1"></i>
             ورود / ثبت‌نام
