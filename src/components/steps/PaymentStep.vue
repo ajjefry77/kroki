@@ -20,7 +20,7 @@
               <i class="fas fa-gift ml-1"></i>از کروکی رایگان شما استفاده شد ({{ remainingFree }} عدد باقی‌مانده)
             </span>
           </p>
-          <button class="btn btn-primary !px-10 !py-3.5 !text-base !rounded-xl" @click="$emit('done')">
+          <button class="btn btn-primary !px-10 !py-3.5 !text-base !rounded-xl" @click="emit('done', { trackingCode, kroki })">
             <i class="fas fa-download ml-2"></i>
             مشاهده و دانلود کروکی
           </button>
@@ -166,13 +166,18 @@
                     </div>
 
                     <label class="block mb-1.5 text-xs font-medium">مبلغ (تومان)</label>
-                    <input v-model.number="charge.amount" type="number" min="10000" step="10000" class="input mb-3" dir="ltr" placeholder="مبلغ دلخواه" />
+                    <input v-model.number="charge.amount" type="number" min="1000" step="5000" class="input mb-3" dir="ltr" placeholder="مبلغ دلخواه" />
 
                     <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
                     <input v-model="charge.paymentId" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" maxlength="16" placeholder="شناسه ۱۶ رقمی پیامک شده" @input="formatPaymentId" />
 
-                    <button class="btn btn-primary w-full !py-2.5" :disabled="!chargeValid" @click="submitCharge">
-                      <i class="fas fa-paper-plane ml-1"></i> ثبت درخواست شارژ
+                    <label class="block mb-1.5 text-xs font-medium">شماره کارت واریزکننده *</label>
+                    <input v-model="charge.card" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" placeholder="شماره کارت مبدا شما" @input="formatCard" />
+
+                    <button class="btn btn-primary w-full !py-2.5" :disabled="!chargeValid || chargeSaving" @click="submitCharge">
+                      <i v-if="chargeSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
+                      <i v-else class="fas fa-paper-plane ml-1"></i>
+                      {{ chargeSaving ? "در حال ارسال..." : "ثبت درخواست شارژ" }}
                     </button>
                     <p class="text-[11px] text-[var(--text-faint)] mt-3 leading-5 text-center">
                       درخواست شما برای مدیر ارسال می‌شود. پس از تأیید، موجودی به صورت خودکار قابل مشاهده است.
@@ -186,6 +191,12 @@
                   </div>
                 </div>
               </Teleport>
+            </Transition>
+
+            <Transition name="modal">
+              <div v-if="payError" class="mt-4 rounded-xl px-4 py-3 text-sm font-medium bg-[var(--danger-glow)] border border-[var(--danger)]/30 text-[var(--danger)]">
+                <i class="fas fa-circle-xmark ml-1"></i>{{ payError }}
+              </div>
             </Transition>
 
             <div v-if="processing" class="mt-6 py-4 flex flex-col items-center gap-3">
@@ -206,10 +217,11 @@
         </div>
 
         <div class="flex items-center justify-between mt-6">
-          <button class="btn btn-ghost" @click="$emit('back')">
+          <button class="btn btn-ghost" @click="emit('back')">
             <i class="fas fa-arrow-right ml-1"></i>
             بازگشت به پیش‌نمایش
           </button>
+          <span v-if="processing" class="text-[11px] text-[var(--text-faint)]">تا لحظاتی دیگر...</span>
         </div>
       </template>
     </div>
@@ -239,15 +251,19 @@ const cardOwner = auth.CARD_OWNER;
 const processing = ref(false);
 const success = ref(false);
 const trackingCode = ref("");
+const krokiRef = ref(null);
+const remainingFree = ref(0);
 const chargeOpen = ref(false);
+const chargeSaving = ref(false);
 const chargeMsg = ref("");
 const chargeMsgOk = ref(true);
 const copied = ref(false);
+const payError = ref("");
 
 const isAdmin = computed(() => auth.isAdmin.value);
 const payMode = ref(isAdmin.value ? "admin" : "wallet");
 
-const charge = reactive({ amount: price, paymentId: "" });
+const charge = reactive({ amount: price, paymentId: "", card: "" });
 
 const freeKroki = computed(() => auth.freeOf());
 const wallet = computed(() => auth.walletOf());
@@ -255,7 +271,7 @@ const wallet = computed(() => auth.walletOf());
 const currentTemplate = computed(() => getTemplate(props.templateId));
 const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 
-const chargeValid = computed(() => Number(charge.amount) >= 10000 && String(charge.paymentId).replace(/\D/g, "").length >= 8);
+const chargeValid = computed(() => Number(charge.amount) >= 1000 && String(charge.paymentId).replace(/\D/g, "").length >= 8 && /^\d{16}$/.test(String(charge.card).replace(/\D/g, "")));
 
 function canPay(mode) {
   if (mode === "admin") return true;
@@ -271,6 +287,10 @@ function formatPaymentId() {
   charge.paymentId = charge.paymentId.replace(/[^\d]/g, "").slice(0, 16);
 }
 
+function formatCard() {
+  charge.card = charge.card.replace(/[^\d]/g, "").slice(0, 16);
+}
+
 async function copyCard() {
   try {
     await navigator.clipboard.writeText(bankCard);
@@ -279,31 +299,92 @@ async function copyCard() {
   } catch {}
 }
 
-function submitCharge() {
-  const res = auth.requestCharge({ amount: charge.amount, paymentId: charge.paymentId });
+async function submitCharge() {
+  chargeMsg.value = "";
+  chargeMsgOk.value = true;
+  chargeSaving.value = true;
+  const res = await auth.requestCharge({ amount: charge.amount, paymentId: charge.paymentId, card: charge.card });
+  chargeSaving.value = false;
   chargeMsgOk.value = res.success;
   chargeMsg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
   if (res.success) {
     charge.paymentId = "";
+    charge.card = "";
     charge.amount = price;
   }
 }
 
-function pay() {
+function geometryPoints() {
+  const geom = props.gen.buildGeometry(props.pins);
+  if (!geom || !geom.allPositions || geom.allPositions.length < 3) return null;
+  return geom.allPositions.map((p) => ({ lat: Number(p.lat), lon: Number(p.lon ?? p.lng) }));
+}
+
+async function pay() {
+  if (payError.value) payError.value = "";
+  if (!props.form.client) {
+    payError.value = "ابتدا نام متقاضی را در مرحله اطلاعات وارد کنید.";
+    return;
+  }
+  const pts = geometryPoints();
+  if (!pts) {
+    payError.value = "ترسیم معتبری ثبت نشده است؛ لطفاً به مرحله ترسیم برگردید.";
+    return;
+  }
+
   processing.value = true;
-  setTimeout(() => {
-    const res = auth.payForKroki();
-    processing.value = false;
-    if (!res.success) {
-      alert((res.error || "پرداخت انجام نشد") + (res.need ? " — کمبود " + formatPrice(res.need) : ""));
-      if (res.error && res.error.includes("وارد")) window.location.reload();
-      return;
+  try {
+    const payload = {
+      title: props.form.title || "پلان وضعیت موجود",
+      survey_date: props.form.date || "",
+      client_name: props.form.client,
+      client_phone: props.form.clientPhone || "",
+      client_national_id: props.form.clientNationalId || "",
+      surveyor: props.form.surveyor || "",
+      plaque: props.form.plaque || "",
+      address: props.form.address || "",
+      street_width: props.form.streetWidth || "",
+      description: props.form.description || "",
+      logo_url: props.form.logo || "",
+      geometry_points: pts,
+    };
+
+    const created = await auth.createKroki(payload, props.templateId);
+    if (!created.success) throw new Error(created.error);
+    const id = created.kroki?.id;
+    if (!id) throw new Error("پاسخ سرور نامعتبر است");
+
+    let kroki;
+    if (isAdmin.value) {
+      const issued = await auth.issueKroki(id);
+      if (!issued.success) throw new Error(issued.error);
+      kroki = issued.kroki;
+    } else {
+      const mode = payMode.value === "free" ? "free" : "wallet";
+      const paid = await auth.payKroki(id, mode);
+      if (!paid.success) throw new Error(paid.error);
+      const issued = await auth.issueKroki(id);
+      if (!issued.success) throw new Error(issued.error);
+      kroki = issued.kroki;
     }
-    payMode.value = res.mode;
+
+    payMode.value = isAdmin.value ? "admin" : payMode.value;
     success.value = true;
-    trackingCode.value = "KRK-" + Date.now().toString(36).toUpperCase().slice(-8);
-    logger.info("payment", "پرداخت کروکی انجام شد", { mode: res.mode, code: trackingCode.value });
-  }, isAdmin.value ? 400 : 1200);
+    krokiRef.value = kroki;
+    trackingCode.value = kroki?.tracking_code || "";
+    remainingFree.value = auth.freeOf();
+    logger.info("payment", "پرداخت و صدور کروکی انجام شد", {
+      id,
+      mode: payMode.value,
+      code: trackingCode.value,
+    });
+    await auth.myKrokis();
+  } catch (e) {
+    processing.value = false;
+    payError.value = e.message || "خطا در پردازش پرداخت";
+    logger.error("payment", "خطا در پرداخت کروکی", payError.value);
+    if (/وارد|نشست/.test(payError.value)) window.location.reload();
+  }
 }
 
 onMounted(() => {

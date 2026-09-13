@@ -326,6 +326,7 @@ function enforceFromHash() {
 onMounted(() => {
   enforceFromHash();
   window.addEventListener("hashchange", enforceFromHash);
+  auth.syncUser();
 });
 
 onUnmounted(() => {
@@ -389,8 +390,8 @@ async function onInfoSubmit() {
   if (ok) go("preview");
 }
 
-function onPaymentDone(code) {
-  trackingCode.value = code || "KRK-" + Date.now().toString(36).toUpperCase().slice(-8);
+function onPaymentDone(result) {
+  trackingCode.value = result?.trackingCode || "";
   go("done");
 }
 

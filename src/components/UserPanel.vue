@@ -57,7 +57,7 @@
 
       <!-- تب‌ها -->
       <div class="tabs-container mb-6">
-        <div class="tabs-wrapper">
+        <div class="tabs-wrapper tabs-scroll">
           <button
             v-for="tab in tabs"
             :key="tab.id"
@@ -109,16 +109,21 @@
               {{ fmtMoney(p) }}
             </button>
           </div>
-          <input v-model.number="amount" type="number" min="10000" step="10000" class="input mb-4" dir="ltr" placeholder="مبلغ دلخواه" />
+          <input v-model.number="amount" type="number" min="1000" step="5000" class="input mb-4" dir="ltr" placeholder="مبلغ دلخواه" />
 
           <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
           <input v-model="paymentId" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="شناسه ۱۶ رقمی پیامک شده" maxlength="16" @input="formatPaymentId" />
 
+          <label class="block mb-1.5 text-xs font-medium">شماره کارت واریزکننده *</label>
+          <input v-model="card" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="شماره کارت مبدا شما" maxlength="16" @input="formatCard" />
+
           <label class="block mb-1.5 text-xs font-medium">توضیحات (اختیاری)</label>
           <input v-model="note" type="text" class="input mb-4" placeholder="کد پیگیری یا توضیحات" />
 
-          <button class="btn btn-primary w-full !py-3" :disabled="!validCharge" @click="submitCharge">
-            <i class="fas fa-paper-plane ml-1"></i> ثبت درخواست شارژ
+          <button class="btn btn-primary w-full !py-3" :disabled="!validCharge || chargeSaving" @click="submitCharge">
+            <i v-if="chargeSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
+            <i v-else class="fas fa-paper-plane ml-1"></i>
+            {{ chargeSaving ? "در حال ارسال..." : "ثبت درخواست شارژ" }}
           </button>
           <p class="text-[11px] text-[var(--text-faint)] mt-3 leading-5 text-center">
             پس از واریز، درخواست شما برای مدیر ارسال می‌شود و پس از تأیید بلافاصله به کیف پول شما افزوده می‌شود.
@@ -129,6 +134,26 @@
               <i class="fas ml-1" :class="msgOk ? 'fa-circle-check' : 'fa-circle-xmark'"></i>{{ msg }}
             </div>
           </Transition>
+
+          <!-- درخواست‌های شارژ من -->
+          <div class="mt-6 pt-4 border-t border-[var(--border)]">
+            <div class="font-bold text-sm mb-3 flex items-center gap-2">
+              <i class="fas fa-clock-rotate-left text-[var(--accent)]"></i> درخواست‌های شارژ من
+            </div>
+            <ul v-if="myCharges.length" class="space-y-2.5">
+              <li v-for="c in myCharges" :key="c.id" class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold" dir="ltr">{{ fmtMoney(c.amount) }} تومان</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold" :class="chargeStatusClass(c.status)">{{ chargeStatusLabel(c.status) }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2 mt-1.5">
+                  <span class="text-[10px] text-[var(--text-faint)]">{{ fmtDate(c.at) }}</span>
+                  <span class="text-[10px] text-[var(--text-faint)]" dir="ltr">{{ c.card || "—" }}</span>
+                </div>
+              </li>
+            </ul>
+            <p v-else class="text-[var(--text-faint)] text-xs text-center py-4">درخواست شارژی ثبت نشده است</p>
+          </div>
         </div>
 
         <div class="card !rounded-2xl h-fit">
@@ -201,6 +226,118 @@
           </div>
         </template>
       </section>
+
+      <!-- کروکی‌های من -->
+      <section v-else-if="activeTab === 'krokis'">
+        <div class="card !rounded-2xl p-4 mb-4">
+          <div class="font-bold text-sm mb-3 flex items-center gap-2">
+            <i class="fas fa-magnifying-glass text-[var(--accent)]"></i> پیگیری کروکی با کد
+          </div>
+          <div class="flex items-center gap-2">
+            <input v-model="trackQuery" type="text" class="input" dir="ltr" placeholder="کد پیگیری، مانند KRK-XXXX" @keyup.enter="track" />
+            <button class="btn btn-primary btn-sm shrink-0" :disabled="!trackQuery" @click="track">
+              <i class="fas fa-search ml-1"></i> پیگیری
+            </button>
+          </div>
+          <Transition name="modal">
+            <div v-if="trackMsg" class="mt-3 rounded-xl px-4 py-3 text-sm font-medium" :class="trackMsgOk ? 'bg-[var(--success-glow)] border border-[var(--success)]/30 text-[var(--success)]' : 'bg-[var(--danger-glow)] border border-[var(--danger)]/30 text-[var(--danger)]'">
+              <i class="fas ml-1" :class="trackMsgOk ? 'fa-circle-check' : 'fa-circle-xmark'"></i>{{ trackMsg }}
+            </div>
+          </Transition>
+          <div v-if="tracked" class="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4 text-xs">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-bold text-[var(--accent-soft)]" dir="ltr">{{ tracked.tracking_code }}</span>
+              <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="krokiStatusClass(tracked.status)">{{ krokiStatusLabel(tracked.status) }}</span>
+            </div>
+            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px]">
+              <div class="flex justify-between"><span class="text-[var(--text-muted)]">عنوان</span><span class="font-semibold">{{ tracked.title }}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-muted)]">متقاضی</span><span class="font-semibold">{{ tracked.client_name }}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-muted)]">تاریخ</span><span class="font-semibold">{{ fmtDate(tracked.created_at) }}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-muted)]">مبلغ</span><span class="font-semibold" dir="ltr">{{ fmtMoney(tracked.price_paid) }} تومان</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="font-bold text-sm mb-3 flex items-center gap-2">
+          <i class="fas fa-drafting-compass text-[var(--accent)]"></i> کروکی‌های من
+        </div>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کد پیگیری</th>
+                  <th>عنوان</th>
+                  <th>متقاضی</th>
+                  <th>تاریخ</th>
+                  <th>وضعیت</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="myKrokis.length === 0">
+                  <td colspan="5" class="text-center text-[var(--text-faint)] py-10">کروکی‌ای ثبت نشده است</td>
+                </tr>
+                <tr v-for="k in myKrokis" :key="k.id">
+                  <td class="text-xs font-bold text-[var(--accent-soft)]" dir="ltr">{{ k.tracking_code }}</td>
+                  <td class="text-xs font-semibold">{{ k.title }}</td>
+                  <td class="text-xs">{{ k.client_name }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(k.created_at) }}</td>
+                  <td>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="krokiStatusClass(k.status)">{{ krokiStatusLabel(k.status) }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- معرفی -->
+      <section v-else-if="activeTab === 'referrals'">
+        <div class="card !rounded-2xl p-4 mb-4">
+          <div class="font-bold text-sm mb-3 flex items-center gap-2">
+            <i class="fas fa-ticket text-[var(--accent)]"></i> فعال‌سازی کد معرف
+          </div>
+          <div class="flex items-center gap-2">
+            <input v-model="referralCode" type="text" class="input" dir="ltr" placeholder="کد معرف دوستان خود" @keyup.enter="redeem" />
+            <button class="btn btn-primary btn-sm shrink-0" :disabled="!referralCode" @click="redeem">
+              <i class="fas fa-gift ml-1"></i> فعال‌سازی
+            </button>
+          </div>
+          <Transition name="modal">
+            <div v-if="referralMsg" class="mt-3 rounded-xl px-4 py-3 text-sm font-medium" :class="referralMsgOk ? 'bg-[var(--success-glow)] border border-[var(--success)]/30 text-[var(--success)]' : 'bg-[var(--danger-glow)] border border-[var(--danger)]/30 text-[var(--danger)]'">
+              <i class="fas ml-1" :class="referralMsgOk ? 'fa-circle-check' : 'fa-circle-xmark'"></i>{{ referralMsg }}
+            </div>
+          </Transition>
+        </div>
+
+        <div class="font-bold text-sm mb-3 flex items-center gap-2">
+          <i class="fas fa-clock-rotate-left text-[var(--accent)]"></i> معرفی‌های من
+        </div>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کد</th>
+                  <th>کروکی هدیه</th>
+                  <th>تاریخ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="myReferrals.length === 0">
+                  <td colspan="3" class="text-center text-[var(--text-faint)] py-10">هنوز کد معرفی فعال نکرده‌اید</td>
+                </tr>
+                <tr v-for="r in myReferrals" :key="r.id">
+                  <td class="text-xs font-bold tracking-widest" dir="ltr">{{ r.code }}</td>
+                  <td class="text-xs">{{ r.free_kroki_granted }} عدد</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="border-t border-[var(--border)] py-4 text-center text-[11px] text-[var(--text-faint)] bg-[var(--bg-elevated)]/60">
@@ -210,7 +347,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, reactive, computed, onMounted, watch } from "vue";
 import { auth, fmtMoney, fmtDate } from "../stores/auth";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS } from "../utils/templates";
 import TemplateDesigner from "./TemplateDesigner.vue";
@@ -227,6 +364,8 @@ const activeTab = ref("wallet");
 const tabs = [
   { id: "wallet", label: "کیف پول", icon: "fa-wallet" },
   { id: "templates", label: "قالب‌های من", icon: "fa-layers" },
+  { id: "krokis", label: "کروکی‌های من", icon: "fa-drafting-compass" },
+  { id: "referrals", label: "معرفی", icon: "fa-ticket" },
 ];
 
 const bankCard = auth.WALLET_CARD;
@@ -236,14 +375,22 @@ const presets = [50000, 100000, 200000, 500000, 1000000];
 
 const amount = ref(100000);
 const paymentId = ref("");
+const card = ref("");
 const note = ref("");
 const msg = ref("");
 const msgOk = ref(true);
+const chargeSaving = ref(false);
 
-const validCharge = computed(() => Number(amount.value) >= 10000 && String(paymentId.value).replace(/\D/g, "").length >= 8);
+const validCharge = computed(() => Number(amount.value) >= 1000 && String(paymentId.value).replace(/\D/g, "").length >= 8 && /^\d{16}$/.test(String(card.value).replace(/\D/g, "")));
+
+const myCharges = computed(() => auth.requestsOf(user.value?.id || "none").slice(0, 20));
 
 function formatPaymentId() {
   paymentId.value = paymentId.value.replace(/[^\d]/g, "").slice(0, 16);
+}
+
+function formatCard() {
+  card.value = card.value.replace(/[^\d]/g, "").slice(0, 16);
 }
 
 async function copyCard() {
@@ -254,28 +401,34 @@ async function copyCard() {
   } catch {}
 }
 
-function submitCharge() {
-  const res = auth.requestCharge({ amount: amount.value, paymentId: paymentId.value, note: note.value });
+async function submitCharge() {
+  msg.value = "";
+  msgOk.value = true;
+  chargeSaving.value = true;
+  const res = await auth.requestCharge({ amount: amount.value, paymentId: paymentId.value, card: card.value, note: note.value });
+  chargeSaving.value = false;
   msgOk.value = res.success;
   msg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
   if (res.success) {
     amount.value = 100000;
     paymentId.value = "";
+    card.value = "";
     note.value = "";
   }
 }
 
 function txSign(tx) {
   if (tx.status === "rejected") return "—";
-  if (tx.type === "charge" || tx.type === "charge_request") return "+";
+  if (tx.type === "charge_request") return "";
   if (tx.type === "spend") return "−";
-  if (tx.type === "free") return "0";
+  if (tx.type === "free" || tx.type === "referral") return "0";
   return "+";
 }
 function txColor(tx) {
   if (tx.status === "rejected") return "text-[var(--danger)]";
   if (tx.type === "spend") return "text-[var(--danger)]";
-  if (tx.type === "free") return "text-[var(--info)]";
+  if (tx.type === "free" || tx.type === "referral") return "text-[var(--info)]";
+  if (tx.type === "charge_request") return "text-[var(--warning)]";
   return "text-[var(--success)]";
 }
 function statusClass(s) {
@@ -291,12 +444,25 @@ function statusLabel(s) {
   return s || "موفق";
 }
 
+function chargeStatusClass(s) {
+  if (s === "approved") return "bg-[var(--success-glow)] text-[var(--success)]";
+  if (s === "pending") return "bg-[var(--warning-glow)] text-[var(--warning)]";
+  return "bg-[var(--danger-glow)] text-[var(--danger)]";
+}
+function chargeStatusLabel(s) {
+  if (s === "approved") return "تأیید شد";
+  if (s === "pending") return "در انتظار";
+  return "رد شده";
+}
+
 function loadTx() {
-  transactions.value = auth.txList(user.value?.id);
+  auth.loadTransactions().then((res) => {
+    if (res.success) transactions.value = auth.txList();
+  });
 }
 
 // قالب‌ها
-const customTemplates = computed(() => auth.userTemplates(user.value?.id));
+const customTemplates = computed(() => auth.userTemplates());
 const builtinCards = computed(() => SKETCH_TEMPLATES.map((t) => ({ ...t, icon: TEMPLATE_ICONS[t.id] || "fa-drafting-compass" })));
 
 const designing = ref(false);
@@ -312,13 +478,65 @@ function edit(t) {
   isNewTpl.value = false;
   designing.value = true;
 }
-function onTplSave(t) {
-  auth.saveUserTemplate(t);
-  designing.value = false;
-  editingTpl.value = null;
+async function onTplSave(t) {
+  const res = await auth.saveUserTemplate(t, user.value?.id);
+  if (res.success) {
+    designing.value = false;
+    editingTpl.value = null;
+  } else {
+    alert(res.error || "خطا در ذخیره قالب");
+  }
 }
-function remove(id) {
-  auth.deleteUserTemplate(id);
+async function remove(id) {
+  const res = await auth.deleteUserTemplate(id);
+  if (!res.success) alert(res.error || "خطا در حذف قالب");
+}
+
+// کروکی‌های من
+const myKrokis = computed(() => auth.state.myKrokis);
+const trackQuery = ref("");
+const trackMsg = ref("");
+const trackMsgOk = ref(true);
+const tracked = ref(null);
+
+async function track() {
+  trackMsg.value = "";
+  tracked.value = null;
+  const res = await auth.trackKroki(String(trackQuery.value).trim());
+  trackMsgOk.value = res.success;
+  if (res.success) {
+    tracked.value = res.kroki;
+    trackMsg.value = "کروکی یافت شد.";
+  } else {
+    trackMsg.value = res.error || "کروکی یافت نشد";
+  }
+}
+
+function krokiStatusClass(s) {
+  if (s === "issued") return "bg-[var(--success-glow)] text-[var(--success)]";
+  if (s === "paid") return "bg-[var(--info-glow)] text-[var(--info)]";
+  return "bg-[var(--warning-glow)] text-[var(--warning)]";
+}
+function krokiStatusLabel(s) {
+  if (s === "issued") return "صادر شده";
+  if (s === "paid") return "پرداخت شده";
+  return "پیش‌نویس";
+}
+
+// معرفی
+const referralCode = ref("");
+const referralMsg = ref("");
+const referralMsgOk = ref(true);
+const myReferrals = computed(() => auth.state.myReferrals);
+
+async function redeem() {
+  referralMsg.value = "";
+  const res = await auth.redeemReferral(String(referralCode.value).trim());
+  referralMsgOk.value = res.success;
+  referralMsg.value = res.success
+    ? `کد معرف فعال شد؛ ${res.freeKroki ?? ""} عدد کروکی رایگان دریافت کردید.`
+    : res.error;
+  if (res.success) referralCode.value = "";
 }
 
 function hexToRgb(hex) {
@@ -334,11 +552,26 @@ function logout() {
   location.reload();
 }
 
-watch(activeTab, () => {
-  if (activeTab.value === "wallet") loadTx();
+watch(activeTab, (tab) => {
+  if (tab === "wallet") {
+    loadTx();
+    auth.loadMyCharges();
+  } else if (tab === "templates") {
+    auth.loadTemplates();
+  } else if (tab === "krokis") {
+    auth.myKrokis();
+  } else if (tab === "referrals") {
+    auth.loadMyReferrals();
+  }
 });
 
-onMounted(() => loadTx());
+onMounted(() => {
+  loadTx();
+  auth.loadMyCharges();
+  auth.loadTemplates();
+  auth.myKrokis();
+  auth.loadMyReferrals();
+});
 </script>
 
 <style scoped>
@@ -354,6 +587,10 @@ onMounted(() => loadTx());
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+}
+
+.tabs-scroll {
+  flex-wrap: wrap;
 }
 
 .tab-btn {

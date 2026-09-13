@@ -133,14 +133,21 @@ export const SKETCH_TEMPLATES = [
   },
 ];
 
+let templatesProvider = null;
+
+export function setUserTemplatesProvider(fn) {
+  templatesProvider = typeof fn === "function" ? fn : null;
+}
+
 export function getTemplate(id) {
-  const builtin = SKETCH_TEMPLATES.find((t) => t.id === id);
+  const builtin = SKETCH_TEMPLATES.find((t) => String(t.id) === String(id));
   if (builtin) return builtin;
-  const custom = getUserTemplates().find((t) => t.id === id);
+  const custom = getUserTemplates().find((t) => String(t.id) === String(id));
   return custom || SKETCH_TEMPLATES[0];
 }
 
 export function getUserTemplates() {
+  if (templatesProvider) return templatesProvider();
   try {
     const uid = localStorage.getItem("kroki_session");
     if (!uid) return [];
@@ -149,6 +156,54 @@ export function getUserTemplates() {
   } catch {
     return [];
   }
+}
+
+export function templateToApi(t) {
+  return {
+    name: String(t?.name || "قالب").trim(),
+    frame: t?.frame || "default",
+    title_block: t?.titleBlock || "default",
+    header_color: t?.headerColor || "#1e3a5f",
+    polygon_color: t?.polygonColor || "#ff0000",
+    center_color: t?.centerColor || "#0000ff",
+    text_color: t?.textColor || "#000000",
+    vertex_labels: t?.vertexLabels || "numbers",
+    grid: Boolean(t?.grid),
+    scale_bar: Boolean(t?.scaleBar),
+    north_arrow: Boolean(t?.northArrow),
+    coordinate_table: (t?.coordinateTable ?? "full") === "none" ? "none" : "full",
+  };
+}
+
+export function templateFromApi(row) {
+  if (!row) return null;
+  const frame = row.frame || "default";
+  const coordinateTable = row.coordinate_table === "none" ? "none" : "html";
+  return {
+    id: row.id,
+    name: row.name,
+    subtitle: row.name,
+    org: row.name,
+    description: "قالب شخصی ذخیره‌شده در سامانه",
+    frame,
+    titleBlock: row.title_block || "default",
+    headerColor: row.header_color || "#1e3a5f",
+    polygonColor: row.polygon_color || "#ff0000",
+    centerColor: row.center_color || "#0000ff",
+    textColor: row.text_color || "#000000",
+    vertexLabels: row.vertex_labels || "numbers",
+    grid: Boolean(row.grid),
+    scaleBar: Boolean(row.scale_bar),
+    northArrow: Boolean(row.north_arrow),
+    coordinateTable,
+    handDrawn: frame === "hand",
+    colorful: frame === "color",
+    user_id: row.user_id,
+  };
+}
+
+export function isBackendTemplateId(id) {
+  return /^\d+$/.test(String(id ?? ""));
 }
 
 export function customTemplateId() {
