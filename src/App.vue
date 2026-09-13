@@ -4,8 +4,6 @@
 
     <AuthView v-if="page === 'auth'" @back="goHome" @success="onAuthSuccess" />
 
-    <UserPanel v-else-if="page === 'panel'" @home="goHome" />
-
     <AdminPanel v-else-if="page === 'admin'" @home="goHome" />
 
     <template v-else>
@@ -19,7 +17,6 @@
         @start="start"
         @toggleLog="logOpen = !logOpen"
         @login="openAuth('landing')"
-        @panel="openPanel"
         @admin="openAdmin"
         @logout="logout"
       />
@@ -109,7 +106,6 @@ import Loading from "./components/Loading.vue";
 const WizardHeader = defineAsyncComponent(() => import("./components/WizardHeader.vue"));
 const LogPanel = defineAsyncComponent(() => import("./components/LogPanel.vue"));
 const AuthView = defineAsyncComponent(() => import("./components/AuthView.vue"));
-const UserPanel = defineAsyncComponent(() => import("./components/UserPanel.vue"));
 const AdminPanel = defineAsyncComponent(() => import("./components/AdminPanel.vue"));
 const DrawStep = defineAsyncComponent(() => import("./components/steps/DrawStep.vue"));
 const InfoStep = defineAsyncComponent(() => import("./components/steps/InfoStep.vue"));
@@ -205,9 +201,6 @@ function onAuthSuccess() {
   if (ret === "start") {
     page.value = "app";
     start();
-  } else if (ret === "panel") {
-    page.value = "app";
-    openPanel();
   } else if (ret === "admin") {
     page.value = "app";
     openAdmin();
@@ -216,20 +209,13 @@ function onAuthSuccess() {
   }
 }
 
-function openPanel() {
-  if (!auth.isAuthenticated.value) {
-    openAuth("panel");
-    return;
-  }
-  page.value = "panel";
-}
-
 function openAdmin() {
   if (!auth.isAuthenticated.value) {
     openAuth("admin");
     return;
   }
-  page.value = auth.isAdmin.value ? "admin" : "panel";
+  if (!auth.isAdmin.value) return;
+  page.value = "admin";
 }
 
 function logout() {
@@ -255,9 +241,8 @@ watch(
   (ok) => {
     if (ok || page.value === "auth") return;
     const insideKroki = page.value === "app" && step.value !== "landing";
-    if (!insideKroki && page.value !== "panel" && page.value !== "admin") return;
-    authReturn.value =
-      page.value === "panel" ? "panel" : page.value === "admin" ? "admin" : "start";
+    if (!insideKroki && page.value !== "admin") return;
+    authReturn.value = page.value === "admin" ? "admin" : "start";
     page.value = "auth";
   },
 );
@@ -265,7 +250,6 @@ watch(
 let lastHash = "";
 
 function currentHash() {
-  if (page.value === "panel") return "#/panel";
   if (page.value === "admin") return "#/admin";
   if (page.value === "auth") return "#/auth";
   if (step.value === "landing") return "#/";
@@ -282,9 +266,7 @@ function syncHash() {
 function enforceFromHash() {
   lastHash = window.location.hash || "";
   const h = lastHash.replace(/^#\/?/, "");
-  if (h === "panel") {
-    openPanel();
-  } else if (h === "admin") {
+  if (h === "admin") {
     openAdmin();
   } else if (h === "auth") {
     if (auth.isAuthenticated.value) goHome();
