@@ -2,7 +2,7 @@ import { reactive, ref, nextTick } from "vue";
 import proj4 from "proj4";
 import { getTemplate, vertexLabel } from "../utils/templates";
 import { loadMapbox } from "../utils/loadMapbox";
-import { getTodayJalali } from "../utils/jalali";
+import { getTodayJalali, makeExportFilename } from "../utils/jalali";
 import { logger } from "../utils/logger";
 
 export { getTodayJalali };
@@ -558,7 +558,7 @@ export function useKrokiGenerator() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `kroki-${Date.now()}.kml`;
+    a.download = makeExportFilename("mapiq", 1) + ".kml";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -611,7 +611,7 @@ export function useKrokiGenerator() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `kroki-${Date.now()}.dxf`;
+    a.download = makeExportFilename("mapiq", 1) + ".dxf";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1082,37 +1082,6 @@ export function useKrokiGenerator() {
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 2;
       ctx.stroke();
-
-      const cent = state.shapeCentroids[m]?.utm || null;
-      if (cent && !t.handDrawn) {
-        ctx.font = "700 14px Vazirmatn, Tahoma, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        const maxW = 260;
-        const lines = ["X: " + cent.x.toFixed(2), "Y: " + cent.y.toFixed(2)];
-        const lineH = 21;
-        const padV = 4;
-        const padH = 10;
-        let boxW = 0;
-        for (const line of lines)
-          boxW = Math.max(boxW, ctx.measureText(line).width);
-        boxW = Math.min(boxW + padH * 2, W - 12);
-        const boxH = lines.length * lineH + padV * 2;
-        const halfW = Math.min(boxW / 2, W / 2 - 6);
-        const bx = Math.max(halfW + 6, Math.min(cp.x, W - halfW - 6));
-        let by = cp.y + 12;
-        if (by + boxH > H - 8) by = cp.y - boxH - 14;
-
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
-        ctx.fillRect(bx - boxW / 2, by - padV, boxW, boxH);
-        ctx.strokeStyle = "rgba(0,0,0,0.25)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(bx - boxW / 2, by - padV, boxW, boxH);
-        ctx.fillStyle = t.centerColor;
-        lines.forEach((line, i) => {
-          ctx.fillText(line, bx, by + i * lineH);
-        });
-      }
     }
 
     // شمال

@@ -61,6 +61,10 @@
                   </div>
                 </div>
 
+                <button class="menu-item" @click="$emit('profile'); menuOpen = false">
+                  <i class="fas fa-user-gear text-[var(--accent)]"></i>
+                  پنل کاربری
+                </button>
                 <button v-if="isAdmin" class="menu-item" @click="$emit('admin'); menuOpen = false">
                   <i class="fas fa-shield-halved text-[var(--accent)]"></i>
                   پنل مدیریت
@@ -304,7 +308,7 @@ const props = defineProps({
   free: { type: Number, default: 0 },
 });
 
-defineEmits(["start", "toggleLog", "login", "admin", "logout"]);
+defineEmits(["start", "toggleLog", "login", "admin", "logout", "profile"]);
 
 const features = [
   { icon: "fa-map-marked-alt", title: "ترسیم تعاملی روی نقشه", desc: "خط، پلی‌گان، دایره و نقاط چندگانه را مستقیم روی تصویر ماهواره‌ای ترسیم کنید." },

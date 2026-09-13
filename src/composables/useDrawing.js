@@ -1185,6 +1185,12 @@ export function useDrawing(map, pins) {
     shape.value = null;
     // در حالت ترسیم فرم نام نمایش داده نمی‌شود؛ پس از Enter ظاهر می‌شود
     showForm.value = false;
+
+    if (mode === "eraser") {
+      if (map) map.getCanvas().style.cursor = "crosshair";
+      return;
+    }
+
     setTimeout(() => {
       startDrawing();
     }, 100);

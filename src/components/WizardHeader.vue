@@ -1,5 +1,5 @@
 <template>
-  <header class="wizard-header h-16 flex items-center px-4 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-40">
+  <header class="wizard-header h-14 flex items-center px-4 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-40">
     <div class="flex items-center gap-3 flex-shrink-0">
       <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-9 h-9 rounded-lg object-contain shadow-md shadow-[var(--accent-glow-strong)]" />
       <div class="hidden sm:block">
@@ -10,7 +10,7 @@
 
     <!-- استپر -->
     <nav class="flex-1 flex items-center justify-center overflow-x-auto px-2 min-w-0">
-      <div class="flex items-center min-w-0">
+      <div class="flex items-center min-w-0 h-12">
         <template v-for="(s, i) in steps" :key="s.id">
           <button
             class="flex items-center gap-2 group shrink-0"
@@ -49,7 +49,7 @@
       </div>
     </nav>
 
-    <!-- نشان اعتبار + گزارش -->
+    <!-- نشان اعتبار + پروفایل + گزارش -->
     <div class="hidden md:flex items-center gap-2 text-[11px] text-[var(--text-muted)] px-2 flex-shrink-0">
       <span class="flex items-center gap-1.5">
         <i class="fas fa-shield-halved text-[var(--success)]"></i>
@@ -67,21 +67,66 @@
           class="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[var(--danger)] text-white text-[9px] font-bold flex items-center justify-center"
         >{{ logCount }}</span>
       </button>
+
+      <div class="relative" v-if="userName">
+        <button
+          class="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition"
+          title="حساب کاربری"
+          @click.stop="menuOpen = !menuOpen"
+        >
+          <i class="fas fa-user text-sm"></i>
+        </button>
+
+        <Transition name="drop">
+          <div
+            v-if="menuOpen"
+            class="absolute left-0 mt-2 w-56 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden z-50"
+          >
+            <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50">
+              <div class="flex items-center gap-3">
+                <span class="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[var(--accent)]">
+                  <i class="fas fa-user"></i>
+                </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-bold truncate">{{ userName }}</div>
+                </div>
+              </div>
+            </div>
+            <button class="menu-item" @click="$emit('profile'); menuOpen = false">
+              <i class="fas fa-user-gear text-[var(--accent)]"></i>
+              پنل کاربری
+            </button>
+            <button v-if="isAdmin" class="menu-item" @click="$emit('admin'); menuOpen = false">
+              <i class="fas fa-shield-halved text-[var(--accent)]"></i>
+              پنل مدیریت
+            </button>
+            <div class="border-t border-[var(--border)]"></div>
+            <button class="menu-item !text-[var(--danger)]" @click="$emit('logout')">
+              <i class="fas fa-right-from-bracket"></i>
+              خروج
+            </button>
+          </div>
+        </Transition>
+      </div>
     </div>
   </header>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { ref, computed } from "vue";
 
 const props = defineProps({
   steps: { type: Array, required: true },
   current: { type: String, required: true },
   reachedIndex: { type: Number, default: 0 },
   logCount: { type: Number, default: 0 },
+  userName: { type: String, default: "" },
+  isAdmin: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["navigate", "toggleLog"]);
+const emit = defineEmits(["navigate", "toggleLog", "admin", "logout", "profile"]);
+
+const menuOpen = ref(false);
 
 const currentIndex = computed(() =>
   Math.max(0, props.steps.findIndex((s) => s.id === props.current)),
@@ -120,4 +165,24 @@ function dotClass(i, id) {
   border-color: var(--border);
   color: var(--text-faint);
 }
+:deep(.menu-item) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+:deep(.menu-item:hover) {
+  background: var(--surface2);
+}
+.drop-enter-active { animation: drop-in 0.15s ease-out; }
+.drop-leave-active { animation: drop-in 0.1s ease-in reverse; }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 </style>

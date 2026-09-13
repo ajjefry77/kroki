@@ -7,9 +7,7 @@
 
     <div class="relative w-full max-w-md p-8 rounded-2xl card !rounded-2xl shadow-xl auth-card">
       <div class="text-center mb-6">
-        <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow-strong)] mb-4">
-          <i class="fas fa-drafting-compass text-2xl text-[#241a05]"></i>
-        </div>
+        <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-14 h-14 mx-auto rounded-2xl object-contain shadow-lg shadow-[var(--accent-glow-strong)] mb-4" />
         <h2 class="text-2xl font-extrabold">{{ mode === "login" ? "خوش آمدید" : "ثبت‌نام در سامانه" }}</h2>
         <p class="mt-2 text-sm text-[var(--text-muted)]">
           {{ mode === "login" ? "برای ورود نام کاربری و رمز عبور را وارد کنید" : "حساب کاربری بسازید تا کروکی بسازید و کیف پول داشته باشید" }}

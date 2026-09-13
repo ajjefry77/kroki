@@ -33,3 +33,19 @@ export function getTodayJalali() {
   const pad = (n) => String(n).padStart(2, "0");
   return `${jy}/${pad(jm)}/${pad(jd)}`;
 }
+
+export function getTodayJalaliCompact() {
+  const d = new Date();
+  const { jy, jm, jd } = toJalali(
+    d.getFullYear(),
+    d.getMonth() + 1,
+    d.getDate(),
+  );
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${jy}${pad(jm)}${pad(jd)}`;
+}
+
+export function makeExportFilename(prefix = "mapiq", index = 1) {
+  const date = getTodayJalaliCompact();
+  return `${prefix}_${index}_${date}`;
+}

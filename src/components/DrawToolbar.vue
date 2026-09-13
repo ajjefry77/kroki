@@ -65,6 +65,20 @@
         <i class="far fa-square"></i>
       </button>
 
+      <!-- پاک کن -->
+      <button
+        @click="$emit('setDrawMode', 'eraser')"
+        :class="[
+          'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
+          drawMode === 'eraser'
+            ? 'text-white bg-[var(--danger)]'
+            : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--danger)] hover:text-white',
+        ]"
+        title="پاک کردن ترسیم"
+      >
+        <i class="fas fa-eraser"></i>
+      </button>
+
       <div class="w-full border-t border-[var(--border)] my-1"></div>
 
       <!-- جستجو -->

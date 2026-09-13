@@ -19,8 +19,8 @@ const LS = {
 };
 
 export const KROKI_PRICE = 150000;
-export const WALLET_CARD = "6037-9977-1234-5678";
-export const CARD_OWNER = "بانک ملت — به نام سامانه کروکی";
+export const WALLET_CARD = "5047-0611-3665-6671";
+export const CARD_OWNER = "جلیل باقرزاده";
 
 const API_BASE = (import.meta.env.VITE_SERVER || "").replace(/\/+$/, "") + "/api";
 

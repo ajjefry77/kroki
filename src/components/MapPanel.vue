@@ -21,7 +21,7 @@
       v-if="drawing?.drawMode && drawing.drawMode !== 'measure'"
       class="absolute top-3 right-1/2 translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded shadow-lg z-[600] flex items-center gap-2 pointer-events-none"
     >
-      <i class="fas fa-pen animate-pulse"></i>
+      <i :class="drawing.drawMode === 'eraser' ? 'fas fa-eraser' : 'fas fa-pen animate-pulse'"></i>
       <span class="text-sm font-medium whitespace-nowrap">
         {{ drawHint }}
       </span>
@@ -156,13 +156,13 @@ import { useDrawing } from "../composables/useDrawing";
 import { loadMap } from "../utils/loadMapbox";
 import { kmlToGeoJSON, readKmlText } from "../utils/kml";
 import { registerDrawLayer, bringDrawingsToFront } from "../utils/layerOrder";
-import { renderPinOnMap } from "../utils/pinRenderer";
+import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
 
 const props = defineProps({
   pins: { type: Object, required: true },
 });
 
-const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin", "csvFile"]);
+const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin", "csvFile", "removePin"]);
 
 const mapContainerRef = ref(null);
 const kmlInput = ref(null);
@@ -200,6 +200,7 @@ const drawHint = computed(() => {
   if (mode === "polyline") return "در حال ترسیم خط... (Enter: پایان | کلیک راست: حذف آخرین نقطه)";
   if (mode === "multi_point") return "در حال افزودن چند نقطه... (Enter: پایان)";
   if (mode === "circle") return "در حال ترسیم دایره... (کلیک اول مرکز، کلیک دوم شعاع)";
+  if (mode === "eraser") return "حالت پاک کن: روی ترسیم مورد نظر کلیک کنید تا حذف شود";
   return "";
 });
 
@@ -436,6 +437,10 @@ function onMapHover(e) {
     map.getCanvas().style.cursor = "crosshair";
     return;
   }
+  if (drawing.value.drawMode === "eraser") {
+    map.getCanvas().style.cursor = findPinByPoint(e.point) ? "pointer" : "not-allowed";
+    return;
+  }
   map.getCanvas().style.cursor = findPinByPoint(e.point) ? "pointer" : "";
 }
 
@@ -445,6 +450,39 @@ function onMapClick(e) {
   const d = drawing.value;
   if (!d) return;
   if (d.shape || d.showForm) return;
+
+  if (d.drawMode === "eraser") {
+    const pin = findPinByPoint(e.point);
+    if (!pin || !pin.shape) return;
+    const s = pin.shape;
+    const positions = s.positions;
+    if (!Array.isArray(positions) || positions.length === 0) return;
+
+    let bestIdx = -1;
+    let bestDist = 18;
+    const p = map.project(e.lngLat);
+    for (let i = 0; i < positions.length; i++) {
+      const cp = map.project({ lng: positions[i].lon ?? positions[i].lng, lat: positions[i].lat });
+      const dist = Math.hypot(p.x - cp.x, p.y - cp.y);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+
+    if (bestIdx === -1) return;
+
+    const minPoints = s.type === "polygon" ? 3 : 2;
+    if (positions.length <= minPoints) {
+      emit("removePin", pin);
+      return;
+    }
+
+    positions.splice(bestIdx, 1);
+    updatePinGeometry(map, pin);
+    return;
+  }
+
   // هنگام ترسیم تازه، کلیک روی ترسیم قدیمی نباید پیش‌نویس جاری را از بین ببرد
   if (d.drawMode && d.positions?.length) return;
   const pin = findPinByPoint(e.point);

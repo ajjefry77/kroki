@@ -216,13 +216,15 @@
 <script setup>
 import { ref, onMounted, nextTick } from "vue";
 import { getTemplate } from "../../utils/templates";
+import { makeExportFilename } from "../../utils/jalali";
 import { logger } from "../../utils/logger";
 
 const props = defineProps({
   gen: { type: Object, required: true },
-  form: { type: Object, required: true },
   templateId: { type: String, default: "technical" },
-  trackingCode: { type: String, default: "—" },
+  trackingCode: { type: String, default: "" },
+  form: { type: Object, default: () => ({}) },
+  formIndex: { type: Number, default: 1 },
 });
 
 const emit = defineEmits(["restart", "home"]);
@@ -255,16 +257,18 @@ onMounted(() => {
 });
 
 function downloadSketch() {
-  props.gen.downloadCanvasImage(hiddenCanvasRef.value, "kroki-sketch.png");
+  const name = makeExportFilename("mapiq", props.formIndex);
+  props.gen.downloadCanvasImage(hiddenCanvasRef.value, name + ".png");
   logger.info("download", "دانلود کروکی PNG");
 }
 
 function downloadMap() {
   const url = props.gen.state.mapImage;
   if (!url) return;
+  const name = makeExportFilename("mapiq_map", props.formIndex);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "kroki-map.png";
+  a.download = name + ".png";
   a.click();
   logger.info("download", "دانلود تصویر نقشه PNG");
 }

@@ -6,6 +6,8 @@
 
     <AdminPanel v-else-if="page === 'admin'" @home="goHome" />
 
+    <UserPanel v-else-if="page === 'userpanel'" @home="goHome" />
+
     <template v-else>
       <LandingPage
         v-if="step === 'landing'"
@@ -19,6 +21,7 @@
         @login="openAuth('landing')"
         @admin="openAdmin"
         @logout="logout"
+        @profile="openUserPanel"
       />
 
       <template v-else>
@@ -27,8 +30,13 @@
           :current="step"
           :reached-index="reachedIndex"
           :log-count="logStats.error"
+          :user-name="auth.state.user?.name || ''"
+          :is-admin="auth.isAdmin.value"
           @navigate="navigate"
           @toggleLog="logOpen = !logOpen"
+          @admin="openAdmin"
+          @logout="logout"
+          @profile="openUserPanel"
         />
 
         <div class="flex-1 min-h-0 flex flex-col">
@@ -80,6 +88,7 @@
               :form="krokiForm"
               :template-id="templateId"
               :tracking-code="trackingCode"
+              :form-index="1"
               @restart="restart"
               @home="go('landing')"
             />
@@ -107,6 +116,7 @@ const WizardHeader = defineAsyncComponent(() => import("./components/WizardHeade
 const LogPanel = defineAsyncComponent(() => import("./components/LogPanel.vue"));
 const AuthView = defineAsyncComponent(() => import("./components/AuthView.vue"));
 const AdminPanel = defineAsyncComponent(() => import("./components/AdminPanel.vue"));
+const UserPanel = defineAsyncComponent(() => import("./components/UserPanel.vue"));
 const DrawStep = defineAsyncComponent(() => import("./components/steps/DrawStep.vue"));
 const InfoStep = defineAsyncComponent(() => import("./components/steps/InfoStep.vue"));
 const PreviewStep = defineAsyncComponent(() => import("./components/steps/PreviewStep.vue"));
@@ -198,12 +208,21 @@ function goHome() {
 
 function onAuthSuccess() {
   const ret = authReturn.value;
+  if (ret === "admin") {
+    openAdmin();
+    return;
+  }
+  if (ret === "userpanel") {
+    openUserPanel();
+    return;
+  }
+  if (auth.isAdmin.value) {
+    openAdmin();
+    return;
+  }
   if (ret === "start") {
     page.value = "app";
     start();
-  } else if (ret === "admin") {
-    page.value = "app";
-    openAdmin();
   } else {
     goHome();
   }
@@ -216,6 +235,14 @@ function openAdmin() {
   }
   if (!auth.isAdmin.value) return;
   page.value = "admin";
+}
+
+function openUserPanel() {
+  if (!auth.isAuthenticated.value) {
+    openAuth("userpanel");
+    return;
+  }
+  page.value = "userpanel";
 }
 
 function logout() {
@@ -241,8 +268,8 @@ watch(
   (ok) => {
     if (ok || page.value === "auth") return;
     const insideKroki = page.value === "app" && step.value !== "landing";
-    if (!insideKroki && page.value !== "admin") return;
-    authReturn.value = page.value === "admin" ? "admin" : "start";
+    if (!insideKroki && page.value !== "admin" && page.value !== "userpanel") return;
+    authReturn.value = page.value === "admin" ? "admin" : page.value === "userpanel" ? "userpanel" : "start";
     page.value = "auth";
   },
 );
@@ -251,6 +278,7 @@ let lastHash = "";
 
 function currentHash() {
   if (page.value === "admin") return "#/admin";
+  if (page.value === "userpanel") return "#/userpanel";
   if (page.value === "auth") return "#/auth";
   if (step.value === "landing") return "#/";
   return "#/" + step.value;
@@ -268,6 +296,8 @@ function enforceFromHash() {
   const h = lastHash.replace(/^#\/?/, "");
   if (h === "admin") {
     openAdmin();
+  } else if (h === "userpanel") {
+    openUserPanel();
   } else if (h === "auth") {
     if (auth.isAuthenticated.value) goHome();
     else page.value = "auth";
