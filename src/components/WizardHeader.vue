@@ -92,7 +92,7 @@
                 </div>
               </div>
             </div>
-            <button class="menu-item" @click="$emit('profile'); menuOpen = false">
+            <button v-if="!isAdmin" class="menu-item" @click="$emit('profile'); menuOpen = false">
               <i class="fas fa-user-gear text-[var(--accent)]"></i>
               پنل کاربری
             </button>
@@ -152,7 +152,7 @@ function dotClass(i, id) {
   background: linear-gradient(135deg, var(--accent), var(--accent-soft));
   border-color: transparent;
   color: #241a05;
-  box-shadow: 0 0 0 4px var(--accent-glow), 0 3px 10px rgba(224, 123, 57, 0.18);
+  box-shadow: 0 0 0 4px var(--accent-glow), 0 3px 10px rgba(250, 108, 4, 0.18);
   transform: scale(1.05);
 }
 .step-done {

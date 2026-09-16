@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-20" style="background: radial-gradient(circle, #e07b39, transparent 70%)"></div>
+      <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-20" style="background: radial-gradient(circle, #FA6C04, transparent 70%)"></div>
       <div class="absolute -bottom-28 -left-28 w-[28rem] h-[28rem] rounded-full opacity-15" style="background: radial-gradient(circle, #2f6fd0, transparent 70%)"></div>
     </div>
 

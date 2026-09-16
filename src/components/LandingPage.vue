@@ -14,6 +14,9 @@
           <a href="#features" class="hover:text-[var(--text)] transition">امکانات</a>
           <a href="#how" class="hover:text-[var(--text)] transition">مراحل کار</a>
           <a href="#templates" class="hover:text-[var(--text)] transition">قالب‌ها</a>
+          <button v-if="authed && !isAdmin" class="hover:text-[var(--text)] transition font-semibold text-sm" @click="$emit('agencyRequest')">
+            <i class="fas fa-user-tie ml-1"></i> درخواست نمایندگی
+          </button>
         </div>
         <div class="flex items-center gap-2 justify-self-end">
           <button v-if="!authed" class="btn btn-ghost h-9" @click="$emit('login')">
@@ -61,7 +64,7 @@
                   </div>
                 </div>
 
-                <button class="menu-item" @click="$emit('profile'); menuOpen = false">
+                <button v-if="!isAdmin" class="menu-item" @click="$emit('profile'); menuOpen = false">
                   <i class="fas fa-user-gear text-[var(--accent)]"></i>
                   پنل کاربری
                 </button>
@@ -231,7 +234,7 @@
             :style="{ borderColor: t.headerColor + '66' }"
             title="قالب شخصی شما"
           >
-            <div class="w-10 h-10 mx-auto rounded-lg mb-3 flex items-center justify-center" style="background: rgba(224, 123, 57, 0.14); color: var(--accent)">
+            <div class="w-10 h-10 mx-auto rounded-lg mb-3 flex items-center justify-center" style="background: rgba(250, 108, 4, 0.14); color: var(--accent)">
               <i class="fas fa-crown"></i>
             </div>
             <div class="text-sm font-bold">{{ t.name }}</div>
@@ -274,21 +277,6 @@
       </div>
     </section>
 
-    <!-- درخواست اخذ نمایندگی -->
-    <section v-if="authed && !isAdmin && !isAgent" class="py-14 border-t border-[var(--border)] bg-[var(--bg-elevated)]/50">
-      <div class="max-w-2xl mx-auto px-5 text-center reveal">
-        <h2 class="text-xl md:text-2xl font-extrabold mb-2">درخواست اخذ نمایندگی</h2>
-        <p class="text-[var(--text-muted)] text-sm mb-6">با ثبت درخواست و تأیید مدیر سیستم، نماینده شوید و کد معرف اختصاصی دریافت کنید.</p>
-        <div v-if="agencyMsg" class="mb-4 text-sm font-medium" :class="agencyMsgOk ? 'text-[var(--success)]' : 'text-[var(--danger)]'">{{ agencyMsg }}</div>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-2">
-          <input v-model="agencyCity" type="text" class="input sm:max-w-xs" placeholder="نام شهر" />
-          <button class="btn btn-primary shrink-0" :disabled="agencyBusy || !agencyCity" @click="submitAgencyRequest">
-            <i class="fas fa-user-tie ml-1"></i> ثبت درخواست
-          </button>
-        </div>
-      </div>
-    </section>
-
     <!-- CTA پایانی -->
     <section class="py-16 md:py-24 border-t border-[var(--border)] relative overflow-hidden">
       <div class="absolute inset-0 hero-bg pointer-events-none"></div>
@@ -319,26 +307,11 @@ const props = defineProps({
   authed: { type: Boolean, default: false },
   userName: { type: String, default: "" },
   isAdmin: { type: Boolean, default: false },
-  isAgent: { type: Boolean, default: false },
   wallet: { type: Number, default: 0 },
   free: { type: Number, default: 0 },
 });
 
-defineEmits(["start", "toggleLog", "login", "admin", "logout", "profile"]);
-
-const agencyCity = ref("");
-const agencyBusy = ref(false);
-const agencyMsg = ref("");
-const agencyMsgOk = ref(true);
-async function submitAgencyRequest() {
-  agencyBusy.value = true;
-  agencyMsg.value = "";
-  const res = await auth.requestAgency(agencyCity.value);
-  agencyBusy.value = false;
-  agencyMsgOk.value = res.success;
-  agencyMsg.value = res.success ? "درخواست شما ثبت شد و پس از تأیید مدیر، نماینده خواهید شد." : res.error;
-  if (res.success) agencyCity.value = "";
-}
+defineEmits(["start", "toggleLog", "login", "admin", "logout", "profile", "agencyRequest"]);
 
 const features = [
   { icon: "fa-map-marked-alt", title: "ترسیم تعاملی روی نقشه", desc: "خط، پلی‌گان، دایره و نقاط چندگانه را مستقیم روی تصویر ماهواره‌ای ترسیم کنید." },
@@ -407,9 +380,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .hero-bg {
   background:
-    radial-gradient(circle at 20% 20%, rgba(224, 123, 57, 0.1), transparent 45%),
+    radial-gradient(circle at 20% 20%, rgba(250, 108, 4, 0.1), transparent 45%),
     radial-gradient(circle at 80% 30%, rgba(29, 58, 110, 0.07), transparent 50%),
-    radial-gradient(circle at 50% 90%, rgba(224, 123, 57, 0.07), transparent 45%);
+    radial-gradient(circle at 50% 90%, rgba(250, 108, 4, 0.07), transparent 45%);
 }
 
 .feature-card {
@@ -433,6 +406,19 @@ onBeforeUnmount(() => {
 .reveal.visible {
   opacity: 1;
   transform: none;
+}
+
+.landing {
+  animation: pageIn 0.4s var(--ease-out);
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .menu-item {

@@ -696,4 +696,20 @@ onMounted(() => {
 .tab-label {
   line-height: 1;
 }
+
+/* انیمیشن بخش‌ها */
+section {
+  animation: fadeSlideIn 0.35s var(--ease-out);
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 </style>

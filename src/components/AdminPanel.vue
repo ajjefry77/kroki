@@ -2,8 +2,11 @@
   <div class="min-h-screen flex flex-col bg-[var(--bg)]">
     <!-- سربرگ -->
     <header class="sticky top-0 z-40 bg-[var(--surface)] border-b border-[var(--border)] backdrop-blur-md">
-      <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between gap-3">
+      <div class="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
+          <button class="lg:hidden btn btn-ghost btn-sm" @click="sidebarOpen = !sidebarOpen">
+            <i class="fas fa-bars text-lg"></i>
+          </button>
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow-strong)]">
             <i class="fas fa-shield-halved text-[#241a05] text-lg"></i>
           </div>
@@ -23,53 +26,56 @@
       </div>
     </header>
 
-    <main class="flex-1 max-w-6xl w-full mx-auto px-5 py-6">
-      <!-- آمار -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div class="card !rounded-2xl p-4">
-          <div class="text-[11px] text-[var(--text-muted)] mb-1">کل کاربران</div>
-          <div class="font-extrabold text-2xl">{{ stats.users }}</div>
-        </div>
-        <div class="card !rounded-2xl p-4">
-          <div class="text-[11px] text-[var(--text-muted)] mb-1">کل کروکی‌ها</div>
-          <div class="font-extrabold text-2xl">{{ stats.krokis }}</div>
-        </div>
-        <div class="card !rounded-2xl p-4">
-          <div class="text-[11px] text-[var(--text-muted)] mb-1">شارژهای در انتظار</div>
-          <div class="font-extrabold text-2xl text-[var(--warning)]">{{ stats.pendingCharges }}</div>
-        </div>
-        <div class="card !rounded-2xl p-4">
-          <div class="text-[11px] text-[var(--text-muted)] mb-1">درآمد</div>
-          <div class="font-extrabold text-xl text-[var(--success)]" dir="ltr">{{ fmtMoney(stats.revenue) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></div>
-        </div>
-        <div class="card !rounded-2xl p-4">
-          <div class="text-[11px] text-[var(--text-muted)] mb-1">کروکی‌های پرداختی</div>
-          <div class="font-extrabold text-2xl text-[var(--info)]">{{ stats.paid }}</div>
-        </div>
-        <div class="card !rounded-2xl p-4">
-          <div class="text-[11px] text-[var(--text-muted)] mb-1">مجموع موجودی کیف پول‌ها</div>
-          <div class="font-extrabold text-xl text-[var(--accent-soft)]" dir="ltr">{{ fmtMoney(stats.walletTotal) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></div>
-        </div>
-      </div>
-
-      <!-- تب‌ها -->
-      <div class="tabs-container mb-6">
-        <div class="tabs-wrapper tabs-scroll">
+    <div class="flex-1 flex max-w-7xl w-full mx-auto">
+      <!-- سایدبار -->
+      <aside class="admin-sidebar" :class="{ open: sidebarOpen }">
+        <div class="sidebar-overlay lg:hidden" @click="sidebarOpen = false"></div>
+        <nav class="sidebar-nav">
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            class="tab-btn"
+            class="sidebar-item"
             :class="{ active: activeTab === tab.id }"
-            @click="activeTab = tab.id"
+            @click="activeTab = tab.id; sidebarOpen = false"
           >
-            <span class="tab-icon-wrap">
+            <span class="sidebar-icon">
               <i class="fas" :class="tab.icon"></i>
             </span>
-            <span class="tab-label">{{ tab.label }}</span>
-            <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
+            <span class="sidebar-label">{{ tab.label }}</span>
+            <span v-if="tab.badge" class="sidebar-badge">{{ tab.badge }}</span>
           </button>
+        </nav>
+      </aside>
+
+      <!-- محتوا -->
+      <main class="flex-1 min-w-0 px-5 py-6">
+        <!-- آمار -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">کل کاربران</div>
+            <div class="font-extrabold text-2xl">{{ stats.users }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">کل کروکی‌ها</div>
+            <div class="font-extrabold text-2xl">{{ stats.krokis }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">شارژهای در انتظار</div>
+            <div class="font-extrabold text-2xl text-[var(--warning)]">{{ stats.pendingCharges }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">درآمد</div>
+            <div class="font-extrabold text-xl text-[var(--success)]" dir="ltr">{{ fmtMoney(stats.revenue) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">کروکی‌های پرداختی</div>
+            <div class="font-extrabold text-2xl text-[var(--info)]">{{ stats.paid }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">مجموع موجودی کیف پول‌ها</div>
+            <div class="font-extrabold text-xl text-[var(--accent-soft)]" dir="ltr">{{ fmtMoney(stats.walletTotal) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></div>
+          </div>
         </div>
-      </div>
 
       <!-- درخواست‌های شارژ -->
       <section v-if="activeTab === 'requests'">
@@ -193,10 +199,25 @@
                     <div class="text-[10px] text-[var(--text-muted)]" dir="ltr">{{ u.username }}</div>
                   </td>
                   <td>
-                    <select :value="u.role" class="input !py-1.5 !px-2 text-xs w-28" @change="onRole(u, $event)">
-                      <option value="user">کاربر</option>
-                      <option value="admin">مدیر</option>
-                    </select>
+                    <div class="role-dropdown" :class="{ open: roleOpenId === u.id }">
+                      <button class="role-trigger" @click.stop="roleOpenId = roleOpenId === u.id ? null : u.id">
+                        <span class="role-dot" :class="u.role === 'admin' ? 'admin' : 'user'"></span>
+                        <span class="role-text">{{ u.role === 'admin' ? 'مدیر' : 'کاربر' }}</span>
+                        <i class="fas fa-chevron-down role-chevron"></i>
+                      </button>
+                      <Transition name="drop">
+                        <div v-if="roleOpenId === u.id" class="role-menu">
+                          <button class="role-option" :class="{ selected: u.role === 'user' }" @click="setRole(u, 'user'); roleOpenId = null">
+                            <span class="role-dot user"></span>
+                            کاربر
+                          </button>
+                          <button class="role-option" :class="{ selected: u.role === 'admin' }" @click="setRole(u, 'admin'); roleOpenId = null">
+                            <span class="role-dot admin"></span>
+                            مدیر
+                          </button>
+                        </div>
+                      </Transition>
+                    </div>
                   </td>
                   <td>
                     <div class="field-card wallet-field">
@@ -596,7 +617,8 @@
           </div>
         </div>
       </section>
-    </main>
+      </main>
+    </div>
 
     <footer class="border-t border-[var(--border)] py-4 text-center text-[11px] text-[var(--text-faint)] bg-[var(--bg-elevated)]/60">
       سامانه تولید کروکی نقشه — پنل مدیریتی
@@ -732,13 +754,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from "vue";
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { auth, fmtMoney, fmtDate } from "../stores/auth";
 
 defineEmits(["home"]);
 
 const user = computed(() => auth.state.user);
 const activeTab = ref("requests");
+const sidebarOpen = ref(false);
 const usersLoading = ref(false);
 const busy = ref(false);
 const q = ref("");
@@ -746,6 +769,7 @@ const detail = ref(null);
 const editModal = ref(null);
 const addWalletModal = ref(null);
 const toast = ref(null);
+const roleOpenId = ref(null);
 
 const stats = computed(() => ({
   users: auth.state.stats?.users ?? 0,
@@ -872,8 +896,8 @@ async function reject(r) {
   if (!res.success) showToast(res.error || "خطا در رد شارژ", "error");
 }
 
-async function onRole(u, e) {
-  const res = await auth.setRole(u.id, e.target.value);
+async function setRole(u, role) {
+  const res = await auth.setRole(u.id, role);
   if (!res.success) showToast(res.error || "خطا در تغییر نقش کاربر", "error");
 }
 
@@ -1034,35 +1058,89 @@ onMounted(() => {
   auth.loadUsers().finally(() => {
     usersLoading.value = false;
   });
+  document.addEventListener("click", closeRoleDropdown);
 });
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeRoleDropdown);
+});
+
+function closeRoleDropdown() {
+  roleOpenId.value = null;
+}
 </script>
 
 <style scoped>
-.tabs-container {
+.admin-sidebar {
   position: relative;
+  flex-shrink: 0;
+  width: 240px;
 }
 
-.tabs-wrapper {
-  display: flex;
-  gap: 6px;
-  padding: 5px;
-  border-radius: 14px;
+@media (max-width: 1023px) {
+  .admin-sidebar {
+    position: fixed;
+    top: 64px;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: 260px;
+    transform: translateX(100%);
+    transition: transform 0.35s var(--ease-out);
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+.sidebar-overlay {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: 64px;
+    background: rgba(11, 21, 36, 0.3);
+    z-index: -1;
+  }
+}
+
+.sidebar-nav {
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 12px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  border-left: 1px solid var(--border);
 }
 
-.tabs-scroll {
-  flex-wrap: wrap;
+@media (max-width: 1023px) {
+  .sidebar-nav {
+    height: 100%;
+    border-radius: 0;
+    border-left: none;
+    background: var(--bg);
+  }
 }
 
-.tab-btn {
-  flex: 1;
+.sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
+  justify-content: space-between;
+  padding: 8px 8px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
@@ -1071,28 +1149,27 @@ onMounted(() => {
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
-  transition: all 0.25s var(--ease-out);
-  position: relative;
+  transition: all 0.2s var(--ease-out);
+  text-align: right;
   user-select: none;
 }
 
-.tab-btn:hover:not(.active) {
+.sidebar-item:hover:not(.active) {
   color: var(--text);
   background: var(--surface2);
 }
 
-.tab-btn.active {
+.sidebar-item.active {
   background: var(--accent);
   color: #241a05;
   box-shadow: 0 4px 16px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
 }
 
-.tab-btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
+.sidebar-item:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
-.tab-icon-wrap {
+.sidebar-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1101,18 +1178,21 @@ onMounted(() => {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.15);
   font-size: 12px;
-  transition: all 0.25s var(--ease-out);
+  flex-shrink: 0;
+  transition: all 0.2s var(--ease-out);
 }
 
-.tab-btn.active .tab-icon-wrap {
+.sidebar-item.active .sidebar-icon {
   background: rgba(36, 26, 5, 0.15);
 }
 
-.tab-label {
+.sidebar-label {
+  flex: 1;
   line-height: 1;
+  white-space: nowrap;
 }
 
-.tab-badge {
+.sidebar-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1127,9 +1207,133 @@ onMounted(() => {
   color: white;
 }
 
-.tab-btn.active .tab-badge {
+.sidebar-item.active .sidebar-badge {
   background: #241a05;
   color: white;
+}
+
+/* فیلدهای زیبا */
+.role-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.role-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  transition: all 0.2s var(--ease-out);
+  min-width: 110px;
+}
+
+.role-trigger:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.role-dropdown.open .role-trigger {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.role-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.role-dot.admin {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow-strong);
+}
+
+.role-dot.user {
+  background: var(--info);
+  box-shadow: 0 0 6px var(--info-glow);
+}
+
+.role-text {
+  flex: 1;
+  text-align: right;
+}
+
+.role-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s var(--ease-out);
+}
+
+.role-dropdown.open .role-chevron {
+  transform: rotate(180deg);
+}
+
+.role-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.role-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: right;
+  transition: all 0.15s var(--ease-out);
+}
+
+.role-option:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.role-option.selected {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.role-option.selected .role-dot {
+  box-shadow: 0 0 8px var(--accent-glow-strong);
+}
+
+.drop-enter-active {
+  transition: all 0.2s var(--ease-out);
+}
+.drop-leave-active {
+  transition: all 0.15s ease-in;
+}
+.drop-enter-from {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
+}
+.drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
 }
 
 /* فیلدهای زیبا */
@@ -1167,7 +1371,7 @@ onMounted(() => {
 }
 
 .freekroki-icon {
-  background: linear-gradient(135deg, var(--accent-glow), rgba(224, 123, 57, 0.05));
+  background: linear-gradient(135deg, var(--accent-glow), rgba(250, 108, 4, 0.05));
   color: var(--accent);
 }
 
@@ -1238,5 +1442,21 @@ onMounted(() => {
   background: var(--success-glow);
   color: var(--success);
   border-color: var(--success);
+}
+
+/* انیمیشن بخش‌ها */
+section {
+  animation: fadeSlideIn 0.35s var(--ease-out);
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

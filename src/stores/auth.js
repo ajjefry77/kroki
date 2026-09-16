@@ -89,8 +89,11 @@ async function api(path, { method = "GET", body, auth = true } = {}) {
     data = null;
   }
   if (res.status === 401) {
-    logout();
-    throw new Error("نشست شما منقضی شده است؛ دوباره وارد شوید");
+    if (auth) {
+      logout();
+      throw new Error("نشست شما منقضی شده است؛ دوباره وارد شوید");
+    }
+    throw new Error(data?.error || data?.message || "نام کاربری یا رمز عبور اشتباه است");
   }
   if (!res.ok) {
     throw new Error(data?.error || data?.message || `خطا در ارتباط با سرور (${res.status})`);
@@ -795,9 +798,18 @@ async function loadSubordinates() {
   }
 }
 
-async function requestAgency(city) {
+async function requestAgency(data) {
   try {
-    await api("/agency-requests", { method: "POST", body: { city: String(city || "").trim() } });
+    const body = typeof data === "string"
+      ? { city: String(data || "").trim() }
+      : {
+          firstName: String(data.firstName || "").trim(),
+          lastName: String(data.lastName || "").trim(),
+          phone: String(data.phone || "").trim(),
+          city: String(data.city || "").trim(),
+          full_name: (String(data.firstName || "").trim() + " " + String(data.lastName || "").trim()).trim(),
+        };
+    await api("/agency-requests", { method: "POST", body });
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message || "خطا در ثبت درخواست نمایندگی" };

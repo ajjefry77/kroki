@@ -2,19 +2,21 @@
   <div class="min-h-screen flex flex-col overflow-x-hidden bg-[var(--bg)]">
     <LogPanel v-model="logOpen" />
 
-    <AuthView v-if="page === 'auth'" @back="goHome" @success="onAuthSuccess" />
+    <Transition name="page" mode="out-in">
+      <AuthView v-if="page === 'auth'" key="auth" @back="goHome" @success="onAuthSuccess" />
 
-    <AdminPanel v-else-if="page === 'admin'" @home="goHome" />
+      <AdminPanel v-else-if="page === 'admin'" key="admin" @home="goHome" />
 
-    <UserPanel v-else-if="page === 'userpanel'" @home="goHome" />
+      <UserPanel v-else-if="page === 'userpanel'" key="userpanel" @home="goHome" />
 
-    <template v-else>
+      <AgencyRequestPage v-else-if="page === 'agency-request'" key="agency-request" @home="goHome" />
+
       <LandingPage
-        v-if="step === 'landing'"
+        v-else-if="step === 'landing'"
+        key="landing"
         :authed="auth.isAuthenticated.value"
         :user-name="auth.state.user?.name"
         :is-admin="auth.isAdmin.value"
-        :is-agent="auth.isAgent.value"
         :wallet="auth.walletOf()"
         :free="auth.freeOf()"
         @start="start"
@@ -23,9 +25,10 @@
         @admin="openAdmin"
         @logout="logout"
         @profile="openUserPanel"
+        @agencyRequest="openAgencyRequest"
       />
 
-      <template v-else>
+      <div v-else key="wizard" class="flex-1 flex flex-col min-h-0">
         <WizardHeader
           :steps="steps"
           :current="step"
@@ -99,8 +102,8 @@
             </div>
           </Transition>
         </div>
-      </template>
-    </template>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -118,6 +121,7 @@ const LogPanel = defineAsyncComponent(() => import("./components/LogPanel.vue"))
 const AuthView = defineAsyncComponent(() => import("./components/AuthView.vue"));
 const AdminPanel = defineAsyncComponent(() => import("./components/AdminPanel.vue"));
 const UserPanel = defineAsyncComponent(() => import("./components/UserPanel.vue"));
+const AgencyRequestPage = defineAsyncComponent(() => import("./components/AgencyRequestPage.vue"));
 const DrawStep = defineAsyncComponent(() => import("./components/steps/DrawStep.vue"));
 const InfoStep = defineAsyncComponent(() => import("./components/steps/InfoStep.vue"));
 const PreviewStep = defineAsyncComponent(() => import("./components/steps/PreviewStep.vue"));
@@ -218,6 +222,10 @@ function onAuthSuccess() {
     openUserPanel();
     return;
   }
+  if (ret === "agency-request") {
+    openAgencyRequest();
+    return;
+  }
   if (auth.isAdmin.value) {
     openAdmin();
     return;
@@ -245,6 +253,15 @@ function openUserPanel() {
     return;
   }
   page.value = "userpanel";
+}
+
+function openAgencyRequest() {
+  if (!auth.isAuthenticated.value) {
+    openAuth("agency-request");
+    return;
+  }
+  if (auth.isAdmin.value || auth.isAgent.value) return;
+  page.value = "agency-request";
 }
 
 function logout() {
@@ -281,6 +298,7 @@ let lastHash = "";
 function currentHash() {
   if (page.value === "admin") return "#/admin";
   if (page.value === "userpanel") return "#/userpanel";
+  if (page.value === "agency-request") return "#/agency-request";
   if (page.value === "auth") return "#/auth";
   if (step.value === "landing") return "#/";
   return "#/" + step.value;
@@ -300,6 +318,8 @@ function enforceFromHash() {
     openAdmin();
   } else if (h === "userpanel") {
     openUserPanel();
+  } else if (h === "agency-request") {
+    openAgencyRequest();
   } else if (h === "auth") {
     if (auth.isAuthenticated.value) goHome();
     else page.value = "auth";
@@ -417,3 +437,83 @@ function restart() {
   logger.info("system", "شروع سفارش جدید — بازنشانی وضعیت");
 }
 </script>
+
+<style>
+/* انیمیشن صفحات اصلی */
+.page-enter-active {
+  transition: all 0.35s var(--ease-out);
+}
+.page-leave-active {
+  transition: all 0.25s ease-in;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+  filter: blur(4px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.98);
+  filter: blur(4px);
+}
+
+/* انیمیشن مراحل ویزارد */
+.step-enter-active {
+  transition: all 0.3s var(--ease-out);
+}
+.step-leave-active {
+  transition: all 0.2s ease-in;
+}
+.step-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+.step-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+/* انیمیشن مودال‌ها */
+.modal-enter-active {
+  transition: all 0.3s var(--ease-out);
+}
+.modal-leave-active {
+  transition: all 0.2s ease-in;
+}
+.modal-enter-from {
+  opacity: 0;
+  transform: scale(0.92);
+}
+.modal-leave-to {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+/* انیمیشن عمومی fade */
+.fade-enter-active {
+  transition: opacity 0.3s var(--ease-out);
+}
+.fade-leave-active {
+  transition: opacity 0.2s ease-in;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* انیمیشن slide up */
+.slide-up-enter-active {
+  transition: all 0.35s var(--ease-out);
+}
+.slide-up-leave-active {
+  transition: all 0.25s ease-in;
+}
+.slide-up-enter-from {
+  opacity: 0;
+  transform: translateY(24px);
+}
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-16px);
+}
+</style>

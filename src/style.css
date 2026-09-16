@@ -18,16 +18,16 @@
   --surface3: #eef1f8;
   --border: #e1e7f2;
   --border-strong: #c5cfdf;
+  --accent: #FA6C04;
+  --accent-soft: #E05F03;
+  --accent-dim: #B84D02;
 
-  --accent: #e07b39;
-  --accent-soft: #c8682a;
-  --accent-dim: #93471a;
-  --accent-glow: rgba(224, 123, 57, 0.1);
-  --accent-glow-strong: rgba(224, 123, 57, 0.2);
+  --accent-glow: rgba(250, 108, 4, 0.1);
+  --accent-glow-strong: rgba(250, 108, 4, 0.2);
 
-  --accent-rgb: 224 123 57;
-  --accent-soft-rgb: 200 104 42;
-  --accent-dim-rgb: 147 71 26;
+  --accent-rgb: 250 108 4;
+  --accent-soft-rgb: 224 95 3;
+  --accent-dim-rgb: 184 77 2;
   --text: #1a2236;
   --text-muted: #5a6984;
   --text-faint: #8f9db3;
@@ -83,7 +83,7 @@ html {
 
 body {
   background:
-    radial-gradient(ellipse at 12% 0%, rgba(224, 123, 57, 0.07), transparent 45%),
+    radial-gradient(ellipse at 12% 0%, rgba(250, 108, 4, 0.07), transparent 45%),
     radial-gradient(ellipse at 88% 10%, rgba(29, 58, 110, 0.04), transparent 50%),
     radial-gradient(ellipse at 50% 100%, rgba(47, 111, 208, 0.035), transparent 48%),
     var(--bg);
@@ -279,7 +279,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow), 0 2px 8px rgba(224, 123, 57, 0.06);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 2px 8px rgba(250, 108, 4, 0.06);
   background: var(--bg-elevated);
 }
 

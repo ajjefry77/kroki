@@ -436,7 +436,7 @@ async function flyToLocation(item) {
   props.map.flyTo({ center: [lng, lat], zoom: 16, essential: true });
   clearCoordMarker();
   const mapboxgl = await loadMapbox();
-  searchMarker = new mapboxgl.Marker({ color: "#e07b39" })
+  searchMarker = new mapboxgl.Marker({ color: "#FA6C04" })
     .setLngLat([lng, lat])
     .setPopup(new mapboxgl.Popup().setText(item.title || "مکان انتخاب شده"))
     .addTo(props.map);
