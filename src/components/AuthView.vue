@@ -57,6 +57,11 @@
           <input v-model="fields.phone" type="text" class="input ltr" dir="ltr" placeholder="09xxxxxxxxx" />
         </div>
 
+        <div v-if="mode === 'register'">
+          <label class="block mb-1.5 text-xs font-medium">کد معرف نماینده (اختیاری)</label>
+          <input v-model="fields.agentCode" type="text" class="input ltr" dir="ltr" placeholder="کد نماینده" />
+        </div>
+
         <div>
           <label class="block mb-1.5 text-xs font-medium">رمز عبور *</label>
           <input v-model="fields.password" type="password" class="input" required :minlength="mode === 'register' ? 6 : 1" placeholder="رمز عبور" />
@@ -86,7 +91,7 @@ const emit = defineEmits(["back", "success"]);
 const mode = ref("login");
 const loading = ref(false);
 const error = ref("");
-const fields = reactive({ name: "", username: "", phone: "", password: "" });
+const fields = reactive({ name: "", username: "", phone: "", password: "", agentCode: "" });
 
 async function submit() {
   loading.value = true;

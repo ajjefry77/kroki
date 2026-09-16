@@ -338,6 +338,46 @@
           </div>
         </div>
       </section>
+
+      <!-- زیرمجموعه‌های نمایندگی -->
+      <section v-else-if="activeTab === 'agent'">
+        <div class="card !rounded-2xl p-4 mb-4">
+          <div class="font-bold text-sm mb-2 flex items-center gap-2">
+            <i class="fas fa-user-tie text-[var(--accent)]"></i> کد معرف نمایندگی من
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold tracking-widest text-lg" dir="ltr">{{ myAgent?.code || "—" }}</span>
+          </div>
+          <p class="text-[11px] text-[var(--text-muted)] mt-2">هر کس با این کد ثبت‌نام کند، زیرمجموعه شما محسوب می‌شود.</p>
+        </div>
+
+        <div class="font-bold text-sm mb-3 flex items-center gap-2">
+          <i class="fas fa-sitemap text-[var(--accent)]"></i> زیرمجموعه‌های من
+        </div>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>نام</th>
+                  <th>شماره همراه</th>
+                  <th>تاریخ عضویت</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="subordinates.length === 0">
+                  <td colspan="3" class="text-center text-[var(--text-faint)] py-10">هنوز زیرمجموعه‌ای ندارید</td>
+                </tr>
+                <tr v-for="s in subordinates" :key="s.id">
+                  <td class="text-xs font-semibold">{{ s.full_name || s.name || s.username }}</td>
+                  <td class="text-xs" dir="ltr">{{ s.phone || s.username }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(s.created_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="border-t border-[var(--border)] py-4 text-center text-[11px] text-[var(--text-faint)] bg-[var(--bg-elevated)]/60">
@@ -361,12 +401,18 @@ const transactions = ref([]);
 const pending = computed(() => auth.pendingOf(user.value?.id || "none"));
 
 const activeTab = ref("wallet");
-const tabs = [
-  { id: "wallet", label: "کیف پول", icon: "fa-wallet" },
-  { id: "templates", label: "قالب‌های من", icon: "fa-layers" },
-  { id: "krokis", label: "کروکی‌های من", icon: "fa-drafting-compass" },
-  { id: "referrals", label: "معرفی", icon: "fa-ticket" },
-];
+const tabs = computed(() => {
+  const t = [
+    { id: "wallet", label: "کیف پول", icon: "fa-wallet" },
+    { id: "templates", label: "قالب‌های من", icon: "fa-layers" },
+    { id: "krokis", label: "کروکی‌های من", icon: "fa-drafting-compass" },
+    { id: "referrals", label: "معرفی", icon: "fa-ticket" },
+  ];
+  if (auth.isAgent.value) t.push({ id: "agent", label: "زیرمجموعه‌ها", icon: "fa-sitemap" });
+  return t;
+});
+const myAgent = computed(() => auth.state.myAgent);
+const subordinates = computed(() => auth.state.subordinates);
 
 const bankCard = auth.WALLET_CARD;
 const cardOwner = auth.CARD_OWNER;
@@ -562,6 +608,9 @@ watch(activeTab, (tab) => {
     auth.myKrokis();
   } else if (tab === "referrals") {
     auth.loadMyReferrals();
+  } else if (tab === "agent") {
+    auth.loadMyAgent();
+    auth.loadSubordinates();
   }
 });
 

@@ -244,7 +244,7 @@ const props = defineProps({
 
 const emit = defineEmits(["back", "done"]);
 
-const price = auth.KROKI_PRICE;
+const price = computed(() => auth.priceForCity(props.form.city));
 const bankCard = auth.WALLET_CARD;
 const cardOwner = auth.CARD_OWNER;
 
@@ -263,7 +263,7 @@ const payError = ref("");
 const isAdmin = computed(() => auth.isAdmin.value);
 const payMode = ref(isAdmin.value ? "admin" : "wallet");
 
-const charge = reactive({ amount: price, paymentId: "", card: "" });
+const charge = reactive({ amount: price.value, paymentId: "", card: "" });
 
 const freeKroki = computed(() => auth.freeOf());
 const wallet = computed(() => auth.walletOf());
@@ -276,7 +276,7 @@ const chargeValid = computed(() => Number(charge.amount) >= 1000 && String(charg
 function canPay(mode) {
   if (mode === "admin") return true;
   if (mode === "free") return freeKroki.value > 0;
-  return wallet.value >= price;
+  return wallet.value >= price.value;
 }
 
 function formatPrice(v) {
@@ -310,7 +310,7 @@ async function submitCharge() {
   if (res.success) {
     charge.paymentId = "";
     charge.card = "";
-    charge.amount = price;
+    charge.amount = price.value;
   }
 }
 
@@ -343,6 +343,7 @@ async function pay() {
       surveyor: props.form.surveyor || "",
       plaque: props.form.plaque || "",
       address: props.form.address || "",
+      city: props.form.city || "",
       street_width: props.form.streetWidth || "",
       description: props.form.description || "",
       logo_url: props.form.logo || "",
@@ -390,7 +391,7 @@ async function pay() {
 onMounted(() => {
   if (isAdmin.value) payMode.value = "admin";
   else if (freeKroki.value > 0) payMode.value = "free";
-  logger.info("step", "ورود به صفحه پرداخت", { amount: price, wallet: wallet.value, free: freeKroki.value, admin: isAdmin.value });
+  logger.info("step", "ورود به صفحه پرداخت", { amount: price.value, wallet: wallet.value, free: freeKroki.value, admin: isAdmin.value });
 });
 </script>
 

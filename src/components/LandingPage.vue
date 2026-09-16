@@ -274,6 +274,21 @@
       </div>
     </section>
 
+    <!-- درخواست اخذ نمایندگی -->
+    <section v-if="authed && !isAdmin && !isAgent" class="py-14 border-t border-[var(--border)] bg-[var(--bg-elevated)]/50">
+      <div class="max-w-2xl mx-auto px-5 text-center reveal">
+        <h2 class="text-xl md:text-2xl font-extrabold mb-2">درخواست اخذ نمایندگی</h2>
+        <p class="text-[var(--text-muted)] text-sm mb-6">با ثبت درخواست و تأیید مدیر سیستم، نماینده شوید و کد معرف اختصاصی دریافت کنید.</p>
+        <div v-if="agencyMsg" class="mb-4 text-sm font-medium" :class="agencyMsgOk ? 'text-[var(--success)]' : 'text-[var(--danger)]'">{{ agencyMsg }}</div>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-2">
+          <input v-model="agencyCity" type="text" class="input sm:max-w-xs" placeholder="نام شهر" />
+          <button class="btn btn-primary shrink-0" :disabled="agencyBusy || !agencyCity" @click="submitAgencyRequest">
+            <i class="fas fa-user-tie ml-1"></i> ثبت درخواست
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- CTA پایانی -->
     <section class="py-16 md:py-24 border-t border-[var(--border)] relative overflow-hidden">
       <div class="absolute inset-0 hero-bg pointer-events-none"></div>
@@ -298,17 +313,32 @@
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS, getUserTemplates } from "../utils/templates";
-import { fmtMoney } from "../stores/auth";
+import { fmtMoney, auth } from "../stores/auth";
 
 const props = defineProps({
   authed: { type: Boolean, default: false },
   userName: { type: String, default: "" },
   isAdmin: { type: Boolean, default: false },
+  isAgent: { type: Boolean, default: false },
   wallet: { type: Number, default: 0 },
   free: { type: Number, default: 0 },
 });
 
 defineEmits(["start", "toggleLog", "login", "admin", "logout", "profile"]);
+
+const agencyCity = ref("");
+const agencyBusy = ref(false);
+const agencyMsg = ref("");
+const agencyMsgOk = ref(true);
+async function submitAgencyRequest() {
+  agencyBusy.value = true;
+  agencyMsg.value = "";
+  const res = await auth.requestAgency(agencyCity.value);
+  agencyBusy.value = false;
+  agencyMsgOk.value = res.success;
+  agencyMsg.value = res.success ? "درخواست شما ثبت شد و پس از تأیید مدیر، نماینده خواهید شد." : res.error;
+  if (res.success) agencyCity.value = "";
+}
 
 const features = [
   { icon: "fa-map-marked-alt", title: "ترسیم تعاملی روی نقشه", desc: "خط، پلی‌گان، دایره و نقاط چندگانه را مستقیم روی تصویر ماهواره‌ای ترسیم کنید." },

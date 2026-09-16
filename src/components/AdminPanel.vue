@@ -436,6 +436,166 @@
           </div>
         </div>
       </section>
+
+      <!-- شهرها و قیمت‌ها -->
+      <section v-else-if="activeTab === 'cities'">
+        <div class="card !rounded-2xl p-4 mb-4">
+          <div class="font-bold text-sm mb-3 flex items-center gap-2">
+            <i class="fas fa-city text-[var(--accent)]"></i> افزودن شهر جدید
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input v-model="newCity.city" type="text" class="input" placeholder="نام شهر" />
+            <input v-model.number="newCity.price" type="number" min="0" class="input" dir="ltr" placeholder="مبلغ هر کروکی (تومان)" />
+            <button class="btn btn-primary btn-sm" :disabled="citySaving || !newCity.city" @click="addCity">
+              <i class="fas fa-plus ml-1"></i> افزودن
+            </button>
+          </div>
+        </div>
+
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>شهر</th>
+                  <th>مبلغ هر کروکی</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="cityPrices.length === 0">
+                  <td colspan="3" class="text-center text-[var(--text-faint)] py-10">شهری ثبت نشده است</td>
+                </tr>
+                <tr v-for="c in cityPrices" :key="c.city">
+                  <td class="text-xs font-semibold">{{ c.city }}</td>
+                  <td>
+                    <input
+                      type="number"
+                      class="input !w-32"
+                      dir="ltr"
+                      :value="cityPriceDrafts[c.city] ?? c.price"
+                      @input="cityPriceDrafts[c.city] = $event.target.value"
+                    />
+                  </td>
+                  <td>
+                    <button class="btn btn-secondary btn-xs" :disabled="citySaving" @click="saveCityPrice(c)">
+                      <i class="fas fa-floppy-disk ml-1"></i> ذخیره
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- درخواست‌های نمایندگی -->
+      <section v-else-if="activeTab === 'agencyRequests'">
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>شهر</th>
+                  <th>تاریخ</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="agencyRequests.length === 0">
+                  <td colspan="4" class="text-center text-[var(--text-faint)] py-10">درخواست نمایندگی در انتظار وجود ندارد</td>
+                </tr>
+                <tr v-for="r in agencyRequests" :key="r.id">
+                  <td class="text-xs font-semibold">{{ r.full_name || r.username }}</td>
+                  <td class="text-xs">{{ r.city }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at) }}</td>
+                  <td>
+                    <div class="flex items-center gap-1.5">
+                      <button class="btn btn-primary btn-xs" :disabled="busy" @click="decideAgency(r, true)">
+                        <i class="fas fa-check ml-0.5"></i> تأیید
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="decideAgency(r, false)">
+                        <i class="fas fa-xmark ml-0.5"></i> رد
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- نمایندگان (هرمی) -->
+      <section v-else-if="activeTab === 'agents'">
+        <div class="flex items-center gap-2 mb-4">
+          <input v-model="agentCityFilter" type="text" class="input !max-w-xs" placeholder="فیلتر بر اساس شهر" />
+        </div>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>نماینده</th>
+                  <th>شهر</th>
+                  <th>کد معرف</th>
+                  <th>تعداد زیرمجموعه</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="adminAgents.length === 0">
+                  <td colspan="5" class="text-center text-[var(--text-faint)] py-10">نماینده‌ای ثبت نشده است</td>
+                </tr>
+                <template v-for="a in adminAgents" :key="a.id">
+                  <tr class="cursor-pointer" @click="toggleAgent(a)">
+                    <td class="text-xs font-semibold">{{ a.full_name || a.name || a.username }}</td>
+                    <td class="text-xs">{{ a.city }}</td>
+                    <td class="text-xs font-bold tracking-widest" dir="ltr">{{ a.code }}</td>
+                    <td class="text-xs" dir="ltr">{{ a.subordinate_count ?? "—" }}</td>
+                    <td class="text-xs text-[var(--text-muted)]"><i class="fas" :class="openAgentId === a.id ? 'fa-chevron-up' : 'fa-chevron-down'"></i></td>
+                  </tr>
+                  <tr v-if="openAgentId === a.id">
+                    <td colspan="5" class="!p-0">
+                      <div class="p-4 bg-[var(--bg-elevated)]/50">
+                        <div v-if="!agentDetail || agentDetail.agentId !== a.id" class="text-xs text-[var(--text-faint)]">در حال دریافت...</div>
+                        <template v-else>
+                          <div class="font-bold text-sm mb-3">
+                            جمع تراکنش‌های زیرمجموعه‌ها:
+                            <span class="text-[var(--success)]" dir="ltr">{{ fmtMoney(agentDetail.total) }} تومان</span>
+                          </div>
+                          <div class="overflow-x-auto">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>کاربر</th>
+                                  <th>مبلغ</th>
+                                  <th>تاریخ</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr v-if="agentDetail.items.length === 0">
+                                  <td colspan="3" class="text-center text-[var(--text-faint)] py-6">تراکنشی ثبت نشده است</td>
+                                </tr>
+                                <tr v-for="tx in agentDetail.items" :key="tx.id">
+                                  <td class="text-xs">{{ tx.full_name || tx.username }}</td>
+                                  <td class="text-xs font-semibold" dir="ltr">{{ fmtMoney(tx.amount) }}</td>
+                                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(tx.created_at) }}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="border-t border-[var(--border)] py-4 text-center text-[11px] text-[var(--text-faint)] bg-[var(--bg-elevated)]/60">
@@ -603,6 +763,9 @@ const tabs = computed(() => [
   { id: "transactions", label: "تراکنش‌ها", icon: "fa-clock-rotate-left", badge: null },
   { id: "roles", label: "نقش‌ها", icon: "fa-user-shield", badge: null },
   { id: "referrals", label: "معرفی", icon: "fa-ticket", badge: null },
+  { id: "cities", label: "شهرها", icon: "fa-city", badge: null },
+  { id: "agencyRequests", label: "درخواست نمایندگی", icon: "fa-user-clock", badge: pendingAgencyCount.value || null },
+  { id: "agents", label: "نمایندگان", icon: "fa-sitemap", badge: null },
 ]);
 
 const pendingRequests = computed(() => auth.state.requests.filter((r) => r.status === "pending"));
@@ -630,7 +793,58 @@ const referralSaving = ref(false);
 const referralMsg = ref("");
 const referralMsgOk = ref(true);
 
-const tabLoaded = reactive({ krokis: false, transactions: false, roles: false, referrals: false });
+const cityPrices = computed(() => auth.state.cityPrices);
+const newCity = reactive({ city: "", price: "" });
+const citySaving = ref(false);
+const cityPriceDrafts = reactive({});
+
+const agencyRequests = computed(() => auth.state.agencyRequests.filter((r) => r.status === "pending"));
+const pendingAgencyCount = computed(() => agencyRequests.value.length);
+
+const agentCityFilter = ref("");
+const adminAgents = computed(() => auth.state.adminAgents);
+const openAgentId = ref(null);
+const agentDetail = computed(() => auth.state.agentDetail);
+
+async function saveCityPrice(row) {
+  citySaving.value = true;
+  const res = await auth.setCityPrice(row.city, cityPriceDrafts[row.city] ?? row.price);
+  citySaving.value = false;
+  if (!res.success) showToast(res.error || "خطا در ثبت قیمت", "error");
+}
+
+async function addCity() {
+  if (!newCity.city.trim()) return;
+  citySaving.value = true;
+  const res = await auth.setCityPrice(newCity.city, newCity.price);
+  citySaving.value = false;
+  if (res.success) {
+    newCity.city = "";
+    newCity.price = "";
+  } else {
+    showToast(res.error || "خطا در افزودن شهر", "error");
+  }
+}
+
+async function decideAgency(r, approve) {
+  busy.value = true;
+  const res = await auth.decideAgencyRequest(r.id, approve);
+  busy.value = false;
+  if (!res.success) showToast(res.error || "خطا در ثبت تصمیم", "error");
+}
+
+function toggleAgent(a) {
+  if (openAgentId.value === a.id) {
+    openAgentId.value = null;
+    return;
+  }
+  openAgentId.value = a.id;
+  auth.loadAgentDetail(a.id);
+}
+
+watch(agentCityFilter, (c) => auth.loadAdminAgents(c));
+
+const tabLoaded = reactive({ krokis: false, transactions: false, roles: false, referrals: false, cities: false, agencyRequests: false, agents: false });
 
 function showToast(message, type = "success") {
   toast.value = { message, type };
@@ -797,6 +1011,15 @@ watch(activeTab, (tab) => {
   } else if (tab === "referrals" && !tabLoaded.referrals) {
     tabLoaded.referrals = true;
     auth.loadAllReferrals();
+  } else if (tab === "cities" && !tabLoaded.cities) {
+    tabLoaded.cities = true;
+    auth.loadCityPrices();
+  } else if (tab === "agencyRequests") {
+    tabLoaded.agencyRequests = true;
+    auth.loadAgencyRequests();
+  } else if (tab === "agents" && !tabLoaded.agents) {
+    tabLoaded.agents = true;
+    auth.loadAdminAgents("");
   }
 });
 

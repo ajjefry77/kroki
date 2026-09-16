@@ -59,6 +59,12 @@ const state = reactive({
   adminTransactions: [],
   roles: [],
   loading: false,
+  cityPrices: [],
+  myAgent: null,
+  subordinates: [],
+  agencyRequests: [],
+  adminAgents: [],
+  agentDetail: null,
 });
 
 setUserTemplatesProvider(() => state.templates.map((t) => ({ ...t })));
@@ -155,6 +161,7 @@ loadSession();
 
 const isAuthenticated = computed(() => !!state.token && !!state.user?.id);
 const isAdmin = computed(() => state.user?.role === "admin");
+const isAgent = computed(() => state.user?.role === "agent");
 
 async function login(username, password) {
   const uname = faToEn(username).trim();
@@ -185,13 +192,14 @@ async function register(payload) {
   const phone = faToEn(payload?.phone).trim();
   const username = cleanUsername(payload?.username) || phone;
   const password = String(payload?.password || "");
+  const agentCode = String(payload?.agentCode || "").trim();
   if (name.length < 3) return { success: false, error: "نام و نام خانوادگی را کامل وارد کنید" };
   if (!/^09\d{9}$/.test(phone)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
   if (password.length < 6) return { success: false, error: "رمز عبور حداقل ۶ کاراکتر باشد" };
   try {
     const data = await api("/auth/register", {
       method: "POST",
-      body: { username, phone, full_name: name, national_id: "", password },
+      body: { username, phone, full_name: name, national_id: "", password, agent_code: agentCode || undefined },
       auth: false,
     });
     const { token, user } = data || {};
@@ -227,6 +235,12 @@ function logout() {
   state.adminKrokis = [];
   state.adminTransactions = [];
   state.roles = [];
+  state.cityPrices = [];
+  state.myAgent = null;
+  state.subordinates = [];
+  state.agencyRequests = [];
+  state.adminAgents = [];
+  state.agentDetail = null;
   localStorage.removeItem(LS.token);
   localStorage.removeItem(LS.user);
 }
@@ -731,6 +745,106 @@ async function loadRoles() {
   }
 }
 
+/* ---------------- قیمت کروکی به تفکیک شهر (GET/POST /admin/city-prices) ---------------- */
+
+async function loadCityPrices() {
+  try {
+    const d = await api("/admin/city-prices");
+    state.cityPrices = listOf(d) || [];
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در دریافت قیمت شهرها" };
+  }
+}
+
+async function setCityPrice(city, price) {
+  try {
+    await api("/admin/city-prices", { method: "POST", body: { city: String(city || "").trim(), price: Number(price) || 0 } });
+    await loadCityPrices();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در ثبت قیمت شهر" };
+  }
+}
+
+function priceForCity(city) {
+  const row = state.cityPrices.find((c) => c.city === city);
+  return row ? Number(row.price) || KROKI_PRICE : KROKI_PRICE;
+}
+
+/* ---------------- نمایندگان (هرمی) ---------------- */
+
+async function loadMyAgent() {
+  try {
+    const d = await api("/agent/me");
+    state.myAgent = d || null;
+    return { success: true };
+  } catch (e) {
+    state.myAgent = null;
+    return { success: false, error: e.message || "خطا در دریافت اطلاعات نمایندگی" };
+  }
+}
+
+async function loadSubordinates() {
+  try {
+    const d = await api("/agent/subordinates");
+    state.subordinates = listOf(d) || [];
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در دریافت زیرمجموعه‌ها" };
+  }
+}
+
+async function requestAgency(city) {
+  try {
+    await api("/agency-requests", { method: "POST", body: { city: String(city || "").trim() } });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در ثبت درخواست نمایندگی" };
+  }
+}
+
+async function loadAgencyRequests() {
+  try {
+    const d = await api("/agency-requests");
+    state.agencyRequests = listOf(d) || [];
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در دریافت درخواست‌های نمایندگی" };
+  }
+}
+
+async function decideAgencyRequest(id, approve) {
+  try {
+    await api(`/agency-requests/${id}/${approve ? "approve" : "reject"}`, { method: "POST" });
+    await loadAgencyRequests();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در ثبت تصمیم" };
+  }
+}
+
+async function loadAdminAgents(city) {
+  try {
+    const q = city ? `?city=${encodeURIComponent(city)}` : "";
+    const d = await api("/admin/agents" + q);
+    state.adminAgents = listOf(d) || [];
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در دریافت نمایندگان" };
+  }
+}
+
+async function loadAgentDetail(agentId) {
+  try {
+    const d = await api(`/admin/agents/${agentId}/transactions`);
+    state.agentDetail = { agentId, items: listOf(d?.transactions || d) || [], total: Number(d?.total || 0) };
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در دریافت تراکنش‌های نماینده" };
+  }
+}
+
 /* ---------------- هم‌گام‌سازی اولیه ---------------- */
 
 function syncUser() {
@@ -744,6 +858,7 @@ export const auth = {
   CARD_OWNER,
   isAuthenticated,
   isAdmin,
+  isAgent,
   login,
   register,
   logout,
@@ -790,6 +905,16 @@ export const auth = {
   loadRoles,
   syncUser,
   sessionUserId,
+  loadCityPrices,
+  setCityPrice,
+  priceForCity,
+  loadMyAgent,
+  loadSubordinates,
+  requestAgency,
+  loadAgencyRequests,
+  decideAgencyRequest,
+  loadAdminAgents,
+  loadAgentDetail,
 };
 
 export function fmtMoney(n) {

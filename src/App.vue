@@ -14,6 +14,7 @@
         :authed="auth.isAuthenticated.value"
         :user-name="auth.state.user?.name"
         :is-admin="auth.isAdmin.value"
+        :is-agent="auth.isAgent.value"
         :wallet="auth.walletOf()"
         :free="auth.freeOf()"
         @start="start"
@@ -165,6 +166,7 @@ const krokiForm = reactive({
   clientPhone: "",
   clientNationalId: "",
   address: "",
+  city: "",
   date: getTodayJalali(),
   surveyor: "",
   plaque: "",

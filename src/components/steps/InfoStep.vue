@@ -88,6 +88,13 @@
             <input v-model="form.address" type="text" class="input" placeholder="استان، شهر، خیابان، کوچه، پلاک" />
           </div>
           <div>
+            <label class="block mb-1.5 font-medium text-xs">شهر (برای محاسبه هزینه) *</label>
+            <select v-model="form.city" class="input">
+              <option value="" disabled>انتخاب شهر</option>
+              <option v-for="c in cityOptions" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+          <div>
             <label class="block mb-1.5 font-medium text-xs">عرض معبر</label>
             <input v-model="form.streetWidth" type="text" class="input" placeholder="مثلاً ۱۲ متر" />
           </div>
@@ -228,10 +235,16 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel, getUserTemplates } from "../../utils/templates";
 import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
+import { auth } from "../../stores/auth";
+
+const cityOptions = computed(() => auth.state.cityPrices.map((c) => c.city));
+onMounted(() => {
+  if (!auth.state.cityPrices.length) auth.loadCityPrices();
+});
 
 const props = defineProps({
   pins: { type: Object, required: true },
