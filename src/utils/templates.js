@@ -158,15 +158,29 @@ export function getUserTemplates() {
   }
 }
 
+/** API expects #RRGGBB; expand #RGB shorthand used in built-in templates. */
+export function normalizeHexColor(color, fallback = "#000000") {
+  const raw = String(color ?? "").trim();
+  const m3 = /^#([0-9a-fA-F]{3})$/.exec(raw);
+  if (m3) {
+    const [r, g, b] = m3[1].split("");
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase();
+  const fb = String(fallback).trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(fb)) return fb.toLowerCase();
+  return "#000000";
+}
+
 export function templateToApi(t) {
   return {
     name: String(t?.name || "قالب").trim(),
     frame: t?.frame || "default",
     title_block: t?.titleBlock || "default",
-    header_color: t?.headerColor || "#1e3a5f",
-    polygon_color: t?.polygonColor || "#ff0000",
-    center_color: t?.centerColor || "#0000ff",
-    text_color: t?.textColor || "#000000",
+    header_color: normalizeHexColor(t?.headerColor, "#1e3a5f"),
+    polygon_color: normalizeHexColor(t?.polygonColor, "#ff0000"),
+    center_color: normalizeHexColor(t?.centerColor, "#0000ff"),
+    text_color: normalizeHexColor(t?.textColor, "#000000"),
     vertex_labels: t?.vertexLabels || "numbers",
     grid: Boolean(t?.grid),
     scale_bar: Boolean(t?.scaleBar),
