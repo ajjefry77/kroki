@@ -203,7 +203,7 @@
           </p>
           <div v-for="(shapeTexts, m) in gen.state.edgeTexts" :key="m" class="mb-3 last:mb-0">
             <div class="text-[11px] text-[var(--text-muted)] mb-1.5">
-              ترسیم {{ m + 1 }}
+              {{ gen.state.edgeTexts.length > 1 ? `مجاورت‌ها — ترسیم ${m + 1}` : 'مجاورت‌ها' }}
             </div>
             <div class="flex flex-wrap gap-2">
               <input
@@ -212,7 +212,7 @@
                 v-model="gen.state.edgeTexts[m][i]"
                 type="text"
                 class="input !py-1.5 !text-xs flex-1 min-w-[7rem]"
-                :placeholder="'ضلع ' + (i + 1)"
+                :placeholder="edgePlaceholder(m, i)"
                 @input="rerender"
               />
             </div>
@@ -240,7 +240,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from "vue";
-import { getTemplate } from "../../utils/templates";
+import { getTemplate, vertexLabel } from "../../utils/templates";
 import { logger } from "../../utils/logger";
 
 const props = defineProps({
@@ -258,6 +258,46 @@ const customizeOpen = ref(false);
 const previewDoc = ref("");
 
 const currentTemplate = computed(() => getTemplate(props.templateId));
+
+// ایندکس شمال‌غربی روی نقاط UTM (بیشترین Y، در صورت تساوی کمترین X)
+// معادل نقطه بالا-چپ روی کانوس؛ مبنای نام‌گذاری رئوس A,B,C… یا 1,2,3…
+const nwIndex = computed(() => {
+  const pts = props.gen.state.utmPoints || [];
+  if (!pts.length) return 0;
+  let best = 0;
+  for (let i = 1; i < pts.length; i++) {
+    if (
+      pts[i].y > pts[best].y ||
+      (pts[i].y === pts[best].y && pts[i].x < pts[best].x)
+    ) {
+      best = i;
+    }
+  }
+  return best;
+});
+
+function shapeVertexLabel(globalIdx) {
+  const style = currentTemplate.value?.vertexLabels || "numbers";
+  return String(vertexLabel(style, globalIdx, nwIndex.value));
+}
+
+// placeholder هر ضلع = دو گوشه آن ضلع، مثل A-B یا 1-2
+function edgePlaceholder(m, i) {
+  const metas = props.gen.state.selectedShapesMeta || [];
+  const meta = metas[m];
+  if (!meta) return `ضلع ${i + 1}`;
+  const count = meta.count || 0;
+  if (count < 2) return `ضلع ${i + 1}`;
+  const a = shapeVertexLabel(meta.startIdx + i);
+  let b;
+  if (meta.isClosed) {
+    b = shapeVertexLabel(meta.startIdx + ((i + 1) % count));
+  } else {
+    if (i + 1 >= count) return `ضلع ${i + 1}`;
+    b = shapeVertexLabel(meta.startIdx + i + 1);
+  }
+  return `${a}-${b}`;
+}
 
 const colorFields = [
   { key: "headerColor", label: "سربرگ / قاب" },

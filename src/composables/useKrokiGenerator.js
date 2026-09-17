@@ -883,7 +883,8 @@ export function useKrokiGenerator() {
     if (!pts.length) return;
 
     const headerH = t.titleBlock === "official" ? 46 : 0;
-    const pad = Math.min(36, Math.floor(Math.min(W, H) * 0.07));
+    // حاشیه بیشتر اطراف کروکی تا متن اضلاع/مجاورت و لیبل رئوس بریده نشود
+    const pad = Math.min(90, Math.floor(Math.min(W, H) * 0.15));
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
     const minX = Math.min(...xs),
@@ -945,7 +946,17 @@ export function useKrokiGenerator() {
       );
 
     let globalIdx = 0;
-    const nwIndex = computeNWIndex(cpts);
+    // شمال‌غرب روی مختصات کانوس: کمترین y (بالا) و در صورت تساوی کمترین x (چپ)
+    // معادل بیشترین Y و کمترین X روی UTM
+    let nwIndex = 0;
+    for (let i = 1; i < cpts.length; i++) {
+      if (
+        cpts[i].y < cpts[nwIndex].y ||
+        (cpts[i].y === cpts[nwIndex].y && cpts[i].x < cpts[nwIndex].x)
+      ) {
+        nwIndex = i;
+      }
+    }
 
     for (let m = 0; m < metas.length; m++) {
       const meta = metas[m];
@@ -995,8 +1006,8 @@ export function useKrokiGenerator() {
           ny = -ny;
         }
 
-        const labelX = mx + nx * 20;
-        const labelY = my + ny * 20;
+        const labelX = Math.max(30, Math.min(mx + nx * 22, W - 30));
+        const labelY = Math.max(drawTop + 14, Math.min(my + ny * 22, drawBottom - 14));
 
         let angle = Math.atan2(b.y - a.y, b.x - a.x);
         if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
@@ -1020,15 +1031,16 @@ export function useKrokiGenerator() {
           ctx.font = "500 15px Vazirmatn, Tahoma, sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          const streetX = mx + nx * 56;
-          const streetY = my + ny * 56;
+          const streetX = mx + nx * 58;
+          const streetY = my + ny * 58;
           const sw = ctx.measureText(street).width;
           const halfSw = Math.min(sw / 2, W / 2 - 8);
           const sx = Math.max(halfSw + 8, Math.min(streetX, W - halfSw - 8));
+          const sy = Math.max(drawTop + 12, Math.min(streetY, drawBottom - 12));
           ctx.fillStyle = "rgba(255,255,255,0.9)";
-          ctx.fillRect(sx - sw / 2 - 5, streetY - 12, sw + 10, 24);
+          ctx.fillRect(sx - sw / 2 - 5, sy - 12, sw + 10, 24);
           ctx.fillStyle = t.textColor;
-          ctx.fillText(street, sx, streetY);
+          ctx.fillText(street, sx, sy);
         }
       }
 
@@ -1043,8 +1055,11 @@ export function useKrokiGenerator() {
         const toCx = p.x - cx,
           toCy = p.y - cy;
         const dlen = Math.sqrt(toCx * toCx + toCy * toCy) || 1;
-        const lx = p.x + (toCx / dlen) * 30;
-        const ly = p.y + (toCy / dlen) * 30;
+        const lx = Math.max(14, Math.min(p.x + (toCx / dlen) * 32, W - 14));
+        const ly = Math.max(
+          drawTop + 12,
+          Math.min(p.y + (toCy / dlen) * 32, drawBottom - 12),
+        );
 
         ctx.font = `800 ${t.labelFontSize ?? 20}px Vazirmatn, Tahoma, sans-serif`;
         ctx.fillStyle = t.textColor;
@@ -1219,19 +1234,45 @@ export function useKrokiGenerator() {
       isSabt && state.edgeTexts.some((arr) => arr.some((x) => x))
         ? `<div class="block-title">متن ضلع‌ها / مجاورت</div>
       <table class="utm-table">
-        <thead><tr><th>ترسیم</th><th>ضلع</th><th>متن</th></tr></thead>
+        <thead><tr><th>مجاورت‌ها</th><th>ضلع</th><th>متن</th></tr></thead>
         <tbody>
-          ${state.edgeTexts
-            .map((texts, s) =>
-              texts
-                .map((txt, e) =>
-                  txt
-                    ? `<tr><td>${s + 1}</td><td>${e + 1}</td><td>${escapeHtml(txt)}</td></tr>`
-                    : "",
-                )
-                .join(""),
-            )
-            .join("")}
+          ${(() => {
+            let _nw = 0;
+            for (let i = 1; i < state.utmPoints.length; i++) {
+              if (
+                state.utmPoints[i].y > state.utmPoints[_nw].y ||
+                (state.utmPoints[i].y === state.utmPoints[_nw].y &&
+                  state.utmPoints[i].x < state.utmPoints[_nw].x)
+              ) {
+                _nw = i;
+              }
+            }
+            const _lbl = (gi) =>
+              String(vertexLabel(t.vertexLabels, gi, _nw));
+            return state.edgeTexts
+              .map((texts, s) => {
+                const meta = state.selectedShapesMeta[s];
+                const shapeName =
+                  state.edgeTexts.length > 1 ? `ترسیم ${s + 1}` : "مجاورت‌ها";
+                return texts
+                  .map((txt, e) => {
+                    if (!txt) return "";
+                    let edgeName = `${e + 1}`;
+                    if (meta && meta.count >= 2) {
+                      const a = _lbl(meta.startIdx + e);
+                      const nb = meta.isClosed
+                        ? _lbl(meta.startIdx + ((e + 1) % meta.count))
+                        : e + 1 < meta.count
+                          ? _lbl(meta.startIdx + e + 1)
+                          : null;
+                      if (nb) edgeName = `${a}-${nb}`;
+                    }
+                    return `<tr><td>${shapeName}</td><td>${edgeName}</td><td>${escapeHtml(txt)}</td></tr>`;
+                  })
+                  .join("");
+              })
+              .join("");
+          })()}
         </tbody>
       </table>`
         : "";

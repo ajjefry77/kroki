@@ -33,7 +33,7 @@
         ref="kmlInput"
         type="file"
         class="hidden"
-        accept=".kml,.kmz,.csv,text/csv"
+        accept=".kml,.kmz,.csv,.txt,text/csv,text/plain"
         @change="onKmlChange"
       />
       <button
@@ -275,7 +275,7 @@ async function onKmlChange(e) {
   const file = e.target.files[0];
   if (!file) return;
   e.target.value = "";
-  if (/\.csv$/i.test(file.name)) {
+  if (/\.(csv|txt)$/i.test(file.name)) {
     setCsvLoading(true);
     emit("csvFile", file);
     return;

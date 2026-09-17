@@ -241,7 +241,7 @@
               <i class="fas ml-1" :class="csvLoading ? 'fa-circle-notch fa-spin' : 'fa-file-import'"></i>
               {{ csvLoading ? "در حال خواندن..." : "Import CSV" }}
             </button>
-            <input ref="csvInput" type="file" accept=".csv,text/csv" class="hidden" @change="onCsvChange" />
+            <input ref="csvInput" type="file" accept=".csv,.txt,text/csv,text/plain" class="hidden" @change="onCsvChange" />
           </div>
           <p class="text-[9px] text-[var(--text-faint)] leading-4">
             پس از انتخاب فایل، پنل «انتخاب ستون‌ها» باز می‌شود؛ Lat/Lon یا UTM و در صورت نیاز فیلدهای GPS (HRMS، PDOP و …) را مشخص کنید.
