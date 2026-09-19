@@ -10,11 +10,15 @@ const LEVEL_COLORS = {
   error: "#e2545b",
 };
 
+const SENSITIVE_KEY_RE = /password|passwd|pwd|token|authorization|api[-_ ]?key|national|ssn|card[-_ ]?number|payment[-_ ]?(id|track)|secret/i;
+
 function safeStringify(data) {
   if (data === undefined) return undefined;
   try {
     const seen = new WeakSet();
     return JSON.stringify(data, (k, v) => {
+      // اطلاعات حساس هرگز در لاگ (localStorage) ذخیره نشود
+      if (k && SENSITIVE_KEY_RE.test(k)) return "[redacted]";
       if (typeof v === "bigint") return v.toString();
       if (typeof v === "function") return "[fn]";
       if (v && typeof v === "object") {

@@ -2,6 +2,8 @@ node_modules
 dist
 dist-ssr
 *.local
+# کلیدها و توکن‌های محیط (Mapbox ،map.ir و...) — هرگز کامیت نشود
+.env
 .DS_Store
 .vscode/*
 !.vscode/extensions.json

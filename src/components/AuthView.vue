@@ -44,28 +44,50 @@
 
         <div v-if="mode === 'register'">
           <label class="block mb-1.5 text-xs font-medium">نام و نام خانوادگی</label>
-          <input v-model="fields.name" type="text" class="input" placeholder="نام و نام خانوادگی" />
+          <input v-model="fields.name" type="text" class="input" placeholder="نام و نام خانوادگی" maxlength="100" autocomplete="name" spellcheck="false" />
         </div>
 
         <div>
           <label class="block mb-1.5 text-xs font-medium">نام کاربری *</label>
-          <input v-model="fields.username" type="text" class="input" required placeholder="شماره همراه یا ایمیل" />
+          <input v-model="fields.username" type="text" class="input" required placeholder="شماره همراه یا ایمیل" maxlength="64" autocomplete="username" spellcheck="false" />
         </div>
 
         <div v-if="mode === 'register'">
           <label class="block mb-1.5 text-xs font-medium">شماره همراه</label>
-          <input v-model="fields.phone" type="text" class="input ltr" dir="ltr" placeholder="09xxxxxxxxx" />
+          <input v-model="fields.phone" type="tel" inputmode="numeric" dir="ltr" class="input ltr" placeholder="09xxxxxxxxx" maxlength="11" autocomplete="tel" @input="fields.phone = faToEn(fields.phone).replace(/[^\d]/g, '').slice(0, 11)" />
         </div>
 
         <div v-if="mode === 'register'">
           <label class="block mb-1.5 text-xs font-medium">کد معرف نماینده (اختیاری)</label>
-          <input v-model="fields.agentCode" type="text" class="input ltr" dir="ltr" placeholder="کد نماینده" />
+          <input v-model="fields.agentCode" type="text" class="input ltr" dir="ltr" placeholder="کد نماینده" maxlength="32" autocomplete="off" spellcheck="false" />
         </div>
 
         <div>
           <label class="block mb-1.5 text-xs font-medium">رمز عبور *</label>
-          <input v-model="fields.password" type="password" class="input" required :minlength="mode === 'register' ? 6 : 1" placeholder="رمز عبور" />
+          <input
+            v-model="fields.password"
+            type="password"
+            class="input"
+            required
+            :minlength="mode === 'register' ? 8 : 1"
+            maxlength="72"
+            :autocomplete="mode === 'register' ? 'new-password' : 'current-password'"
+            placeholder="رمز عبور"
+          />
+          <ul v-if="mode === 'register'" class="mt-2 space-y-1 text-[11px]">
+            <li class="flex items-center gap-1.5" :class="pwCheck.length ? 'text-[var(--success)]' : 'text-[var(--text-faint)]'">
+              <i class="fas" :class="pwCheck.length ? 'fa-circle-check' : 'fa-circle'"></i> حداقل ۸ کاراکتر
+            </li>
+            <li class="flex items-center gap-1.5" :class="pwCheck.lower ? 'text-[var(--success)]' : 'text-[var(--text-faint)]'">
+              <i class="fas" :class="pwCheck.lower ? 'fa-circle-check' : 'fa-circle'"></i> حروف کوچک انگلیسی (a-z)
+            </li>
+            <li class="flex items-center gap-1.5" :class="pwCheck.upper ? 'text-[var(--success)]' : 'text-[var(--text-faint)]'">
+              <i class="fas" :class="pwCheck.upper ? 'fa-circle-check' : 'fa-circle'"></i> حروف بزرگ انگلیسی (A-Z)
+            </li>
+          </ul>
         </div>
+
+        <Captcha ref="captchaRef" @submit="submit" />
 
         <button type="submit" class="btn btn-primary w-full !py-3 !text-base" :disabled="loading">
           <i class="fas fa-circle-notch fa-spin ml-1" v-if="loading"></i>
@@ -83,17 +105,37 @@
 </template>
 
 <script setup>
-import { ref, reactive } from "vue";
+import { ref, reactive, computed, watch } from "vue";
 import { auth } from "../stores/auth";
+import { faToEn } from "../utils/validators";
+import Captcha from "./Captcha.vue";
 
 const emit = defineEmits(["back", "success"]);
 
 const mode = ref("login");
 const loading = ref(false);
 const error = ref("");
+const captchaRef = ref(null);
 const fields = reactive({ name: "", username: "", phone: "", password: "", agentCode: "" });
 
+const pwCheck = computed(() => ({
+  length: fields.password.length >= 8,
+  lower: /[a-z]/.test(fields.password),
+  upper: /[A-Z]/.test(fields.password),
+}));
+
+// با عوض شدن حالت، چالش امنیتی تازه می‌شود
+watch(mode, () => {
+  error.value = "";
+  captchaRef.value?.refresh();
+});
+
 async function submit() {
+  if (loading.value) return;
+  if (!captchaRef.value?.validate()) {
+    error.value = "کد امنیتی اشتباه است؛ کد جدید را وارد کنید";
+    return;
+  }
   loading.value = true;
   error.value = "";
   const result =
@@ -107,6 +149,7 @@ async function submit() {
     emit("success");
   } else {
     error.value = result.error;
+    captchaRef.value?.refresh();
   }
 }
 </script>

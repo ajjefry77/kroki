@@ -46,32 +46,36 @@
             <input v-model="form.client" type="text" class="input" placeholder="نام متقاضی" />
           </div>
           <div>
-            <label class="block mb-1.5 font-medium text-xs">شماره همراه متقاضی</label>
+            <label class="block mb-1.5 font-medium text-xs">شماره همراه متقاضی *</label>
             <input
               v-model="form.clientPhone"
               type="tel"
               inputmode="numeric"
               dir="ltr"
               maxlength="11"
+              autocomplete="tel"
               class="input text-center"
               :class="phoneError ? '!border-[var(--danger)]' : ''"
               placeholder="09123456789"
               @input="form.clientPhone = faToEn(form.clientPhone).replace(/[^\d]/g, '').slice(0, 11)"
+              @blur="touched.phone = true"
             />
             <p v-if="phoneError" class="text-[10px] text-[var(--danger)] mt-1">{{ phoneError }}</p>
           </div>
           <div>
-            <label class="block mb-1.5 font-medium text-xs">کد ملی متقاضی</label>
+            <label class="block mb-1.5 font-medium text-xs">کد ملی متقاضی *</label>
             <input
               v-model="form.clientNationalId"
               type="text"
               inputmode="numeric"
               dir="ltr"
               maxlength="10"
+              autocomplete="off"
               class="input text-center"
               :class="nationalError ? '!border-[var(--danger)]' : ''"
               placeholder="0012345678"
               @input="form.clientNationalId = faToEn(form.clientNationalId).replace(/[^\d]/g, '').slice(0, 10)"
+              @blur="touched.national = true"
             />
             <p v-if="nationalError" class="text-[10px] text-[var(--danger)] mt-1">{{ nationalError }}</p>
           </div>
@@ -81,11 +85,12 @@
           </div>
           <div>
             <label class="block mb-1.5 font-medium text-xs">شماره پلاک ثبتی</label>
-            <input v-model="form.plaque" type="text" class="input" placeholder="اصلی / فرعی (اختیاری)" />
+            <input v-model="form.plaque" type="text" class="input" placeholder="اصلی / فرعی (اختیاری)" maxlength="32" />
           </div>
           <div class="lg:col-span-2">
             <label class="block mb-1.5 font-medium text-xs">نشانی ملک</label>
-            <input v-model="form.address" type="text" class="input" placeholder="استان، شهر، خیابان، کوچه، پلاک" />
+            <input v-model="form.address" type="text" class="input" placeholder="پس از ثبت، خودکار از روی موقعیت ملک پیشنهاد می‌شود" maxlength="300" />
+            <p class="text-[10px] text-[var(--text-faint)] mt-1">به‌صورت خودکار از روی موقعیت ملک پیشنهاد و قابل ویرایش است.</p>
           </div>
           <div>
             <label class="block mb-1.5 font-medium text-xs">شهر (برای محاسبه هزینه) *</label>
@@ -235,16 +240,33 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from "vue";
+import { computed, reactive, ref, onMounted } from "vue";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel, getUserTemplates } from "../../utils/templates";
-import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
+import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
+import { eligiblePinsOf, suggestAddressForPositions } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
 import { auth } from "../../stores/auth";
 
 const cityOptions = computed(() => auth.state.cityPrices.map((c) => c.city));
 onMounted(() => {
   if (!auth.state.cityPrices.length) auth.loadCityPrices();
+  void suggestAddress();
 });
+
+// پیشنهاد خودکار نشانی از روی مرکز ترسیم‌ها (فقط اگر کاربر چیزی ننوشته باشد؛
+// معمولاً موقع ثبت ترسیم از قبل پر شده و این فقط تور اطمینان است)
+async function suggestAddress() {
+  try {
+    if (String(props.form.address || "").trim()) return;
+    const positions = eligiblePinsOf(props.pins).flatMap((p) => p.shape?.positions || []);
+    if (!positions.length) return;
+    const display = await suggestAddressForPositions(positions);
+    if (display && !String(props.form.address || "").trim()) {
+      props.form.address = display;
+      logger.info("form", "پیشنهاد خودکار نشانی ملک");
+    }
+  } catch {}
+}
 
 const props = defineProps({
   pins: { type: Object, required: true },
@@ -275,44 +297,46 @@ const selected = computed({
 
 const logoInput = ref(null);
 
-function faToEn(s) {
-  return String(s ?? "").replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
+// فقط فرمت‌های تصویری شطرنجی مجاز است (SVG مسدود: سطح حمله XXE/اسکریپت در چاپ)
+const LOGO_MIME_ALLOW = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+function isSafeImageDataUrl(s) {
+  return typeof s === "string" && /^data:image\/(png|jpeg|gif|webp);base64,/.test(s);
 }
 
-function isValidNational(code) {
-  if (!/^\d{10}$/.test(code)) return false;
-  if (/^(\d)\1{9}$/.test(code)) return false;
-  const check = +code[9];
-  let sum = 0;
-  for (let i = 0; i < 9; i++) sum += +code[i] * (10 - i);
-  const r = sum % 11;
-  return (r < 2 && check === r) || (r >= 2 && check === 11 - r);
-}
+const touched = reactive({ phone: false, national: false });
 
 const phoneError = computed(() => {
   const v = faToEn(props.form.clientPhone).trim();
-  if (!v) return "";
-  return /^09\d{9}$/.test(v) ? "" : "شماره همراه باید ۱۱ رقم و با 09 شروع شود.";
+  if (!v) return touched.phone ? "شماره همراه متقاضی الزامی است." : "";
+  return isValidIranianMobile(v) ? "" : "شماره همراه باید ۱۱ رقم و با 09 شروع شود.";
 });
 
 const nationalError = computed(() => {
   const v = faToEn(props.form.clientNationalId).trim();
-  if (!v) return "";
+  if (!v) return touched.national ? "کد ملی متقاضی الزامی است." : "";
   if (!/^\d{10}$/.test(v)) return "کد ملی باید ۱۰ رقم باشد.";
-  return isValidNational(v) ? "" : "کد ملی معتبر نیست.";
+  return isValidNationalCode(v) ? "" : "کد ملی معتبر نیست.";
 });
 
 function onLogoChange(e) {
   const file = e.target.files[0];
   e.target.value = "";
   if (!file) return;
-  if (!file.type.startsWith("image/")) return;
+  if (!LOGO_MIME_ALLOW.includes(file.type)) {
+    alert("فقط تصویر PNG ،JPG ،GIF یا WebP مجاز است.");
+    return;
+  }
   if (file.size > 2 * 1024 * 1024) {
     alert("حجم تصویر لوگو حداکثر ۲ مگابایت باشد.");
     return;
   }
   const reader = new FileReader();
   reader.onload = () => {
+    if (!isSafeImageDataUrl(reader.result)) {
+      logger.error("form", "قالب فایل لوگو نامعتبر است");
+      return;
+    }
     props.form.logo = reader.result;
     logger.info("form", "بارگذاری لوگو", { size: Math.round(file.size / 1024) + "KB" });
   };
@@ -337,6 +361,8 @@ const valid = computed(() => {
     f.title.trim() &&
       f.client.trim() &&
       f.date.trim() &&
+      faToEn(f.clientPhone).trim() &&
+      faToEn(f.clientNationalId).trim() &&
       !phoneError.value &&
       !nationalError.value &&
       eligiblePinsOf(props.pins).length,

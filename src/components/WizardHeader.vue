@@ -51,10 +51,7 @@
 
     <!-- نشان اعتبار + پروفایل + گزارش -->
     <div class="hidden md:flex items-center gap-2 text-[11px] text-[var(--text-muted)] px-2 flex-shrink-0">
-      <span class="flex items-center gap-1.5">
-        <i class="fas fa-shield-halved text-[var(--success)]"></i>
-        <span>پرداخت امن</span>
-      </span>
+      
       <button
         class="relative flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text)] transition"
         title="گزارش سیستم"

@@ -50,21 +50,6 @@
         </p>
       </div>
 
-      <!-- نشانی ملک -->
-      <div v-if="gen.state.ready" class="card !rounded-2xl !py-3">
-        <label class="text-xs font-semibold flex items-center gap-2 mb-2">
-          <i class="fas fa-location-dot text-[var(--accent)]"></i>
-          نشانی ملک (قابل ویرایش — در پیش‌نویس و PDF درج می‌شود)
-        </label>
-        <input
-          v-model="gen.last.form.address"
-          type="text"
-          class="input !text-xs"
-          placeholder="نشانی کامل ملک را وارد یا ویرایش کنید"
-          @input="rerenderSoon"
-        />
-      </div>
-
       <!-- حالت تولید -->
       <div v-if="gen.state.generating" class="card !rounded-2xl py-16 flex flex-col items-center gap-3 text-[var(--text-muted)]">
         <i class="fas fa-sync-alt fa-spin text-2xl text-[var(--accent)]"></i>

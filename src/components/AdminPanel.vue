@@ -678,7 +678,7 @@
               </div>
               <div>
                 <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">رمز عبور جدید</label>
-                <input v-model="editModal.password" type="password" class="input" placeholder="خالی = بدون تغییر" />
+                <input v-model="editModal.password" type="password" class="input" placeholder="خالی = بدون تغییر" maxlength="72" autocomplete="new-password" />
               </div>
               <div v-if="editModal.error" class="text-xs text-[var(--danger)] bg-[var(--danger-glow)] px-3 py-2 rounded-lg">
                 {{ editModal.error }}
@@ -756,6 +756,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { auth, fmtMoney, fmtDate } from "../stores/auth";
+import { validatePassword } from "../utils/validators";
 
 defineEmits(["home"]);
 
@@ -937,6 +938,14 @@ function showEditUser(u) {
 async function saveEditUser() {
   const m = editModal.value;
   m.error = "";
+  // رمز جدید هم باید سیاست امنیتی را پاس کند (خالی = بدون تغییر)
+  if (String(m.password || "").trim()) {
+    const pwErr = validatePassword(m.password);
+    if (pwErr) {
+      m.error = pwErr;
+      return;
+    }
+  }
   m.saving = true;
   const res = await auth.editUser(m.user.id, { name: m.name, password: m.password });
   m.saving = false;

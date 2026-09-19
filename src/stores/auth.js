@@ -19,6 +19,7 @@ import {
   AdminApi,
   AgencyApi,
 } from "../api";
+import { faToEn, validatePassword } from "../utils/validators";
 
 /*
  * استور احراز هویت و داده کاربر.
@@ -73,10 +74,6 @@ const state = reactive({
 });
 
 setUserTemplatesProvider(() => state.templates.map((t) => ({ ...t })));
-
-function faToEn(s) {
-  return String(s || "").replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
-}
 
 function normalizeUser(u) {
   return {
@@ -199,7 +196,8 @@ async function register(payload) {
   const agentCode = String(payload?.agentCode || "").trim();
   if (name.length < 3) return { success: false, error: "نام و نام خانوادگی را کامل وارد کنید" };
   if (!/^09\d{9}$/.test(phone)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
-  if (password.length < 6) return { success: false, error: "رمز عبور حداقل ۶ کاراکتر باشد" };
+  const pwErr = validatePassword(password);
+  if (pwErr) return { success: false, error: pwErr };
   try {
     const data = await AuthApi.register({
       username,

@@ -234,6 +234,7 @@ import { getTemplate } from "../../utils/templates";
 import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
 import { auth, fmtMoney } from "../../stores/auth";
+import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
 
 const props = defineProps({
   gen: { type: Object, required: true },
@@ -322,8 +323,27 @@ function geometryPoints() {
 
 async function pay() {
   if (payError.value) payError.value = "";
-  if (!props.form.client) {
+  if (!props.form.client?.trim()) {
     payError.value = "ابتدا نام متقاضی را در مرحله اطلاعات وارد کنید.";
+    return;
+  }
+  // دفاع دومرحله‌ای: موبایل و کد ملی حتی با دست‌کاری فرم هم کنترل می‌شوند
+  const phone = faToEn(props.form.clientPhone).trim();
+  if (!phone) {
+    payError.value = "شماره همراه متقاضی الزامی است؛ لطفاً به مرحله اطلاعات برگردید.";
+    return;
+  }
+  if (!isValidIranianMobile(phone)) {
+    payError.value = "شماره همراه متقاضی معتبر نیست (۱۱ رقم با 09).";
+    return;
+  }
+  const nationalId = faToEn(props.form.clientNationalId).trim();
+  if (!nationalId) {
+    payError.value = "کد ملی متقاضی الزامی است؛ لطفاً به مرحله اطلاعات برگردید.";
+    return;
+  }
+  if (!isValidNationalCode(nationalId)) {
+    payError.value = "کد ملی متقاضی معتبر نیست.";
     return;
   }
   const pts = geometryPoints();

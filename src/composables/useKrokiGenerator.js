@@ -9,20 +9,18 @@ import { logger } from "../utils/logger";
 
 export { getTodayJalali };
 
+// آدرس‌یابی معکوس برای پیشنهاد خودکار نشانی ملک:
+// اول map.ir (داده محلی دقیق‌تر)، اگر جواب نداد mapbox (جایگزین مطمئن)
 const MAP_IR_KEY = import.meta.env.VITE_MAP_IR_KEY || "";
-async function reverseLookup(lat, lon) {
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || "";
+
+async function reverseLookupMapIr(lat, lon) {
   const url = `https://map.ir/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
-  let data;
-  try {
-    const res = await axios.get(url, {
-      headers: { Accept: "application/json", "x-api-key": MAP_IR_KEY },
-      timeout: 15000,
-    });
-    data = res.data;
-  } catch (e) {
-    const status = e?.response?.status;
-    throw new Error("خطا در سرویس آدرس (" + (status || "شبکه") + ")");
-  }
+  const res = await axios.get(url, {
+    headers: { Accept: "application/json", "x-api-key": MAP_IR_KEY },
+    timeout: 15000,
+  });
+  const data = res.data;
   const a = data.address || data || {};
   return {
     display:
@@ -37,6 +35,56 @@ async function reverseLookup(lat, lon) {
       " ",
     road: a.primary || a.road || data.primary || data.road || a.last || " ",
   };
+}
+
+async function reverseLookupMapbox(lat, lon) {
+  const url =
+    "https://api.mapbox.com/geocoding/v5/mapbox.places/" +
+    encodeURIComponent(lon + "," + lat) +
+    ".json";
+  const res = await axios.get(url, {
+    params: { access_token: MAPBOX_TOKEN, language: "fa", limit: 1 },
+    timeout: 15000,
+  });
+  const f = res.data?.features?.[0];
+  if (!f) throw new Error("نتیجه‌ای یافت نشد");
+  const ctx = {};
+  for (const c of f.context || []) ctx[String(c.id).split(".")[0]] = c.text;
+  return {
+    display: f.place_name || "",
+    road:
+      f.place_type?.[0] === "address" ? f.text || "" : ctx.address || "",
+  };
+}
+
+export async function reverseLookup(lat, lon) {
+  if (MAP_IR_KEY) {
+    try {
+      const r = await reverseLookupMapIr(lat, lon);
+      if (r.display && String(r.display).trim()) return r;
+    } catch {}
+  }
+  return reverseLookupMapbox(lat, lon);
+}
+
+/*
+ * پیشنهاد تک‌خطی نشانی از روی میانگین موقعیت‌ها.
+ * در ثبت ترسیم (موازی با برداشت تصویر) و ورود به اطلاعات استفاده می‌شود
+ * تا فیلد نشانی از قبل پر باشد و نیازی به رفت‌وبرگشت نباشد.
+ */
+export async function suggestAddressForPositions(allPositions) {
+  try {
+    const pts = (allPositions || []).filter(
+      (p) => isFinite(Number(p.lat)) && isFinite(Number(p.lon ?? p.lng)),
+    );
+    if (!pts.length) return "";
+    const lat = pts.reduce((s, p) => s + Number(p.lat), 0) / pts.length;
+    const lon = pts.reduce((s, p) => s + Number(p.lon ?? p.lng), 0) / pts.length;
+    const r = await reverseLookup(lat, lon).catch(() => null);
+    return String(r?.display || "").trim();
+  } catch {
+    return "";
+  }
 }
 
 function flattenPins(list) {
@@ -192,6 +240,17 @@ function escapeHtml(s = " ") {
         "'": "&#39;",
       })[c],
   );
+}
+
+/*
+ * فقط src امن برای <img> چاپ: دیتای تصویری مجاز، http(s) و blob داخلی.
+ * بقیه (مثل javascript: یا data:text/html) حذف می‌شود.
+ */
+function safeImgSrc(s) {
+  if (typeof s !== "string" || !s) return "";
+  if (/^data:image\/(png|jpeg|gif|webp);base64,/i.test(s)) return s;
+  if (/^(https?:|blob:)/i.test(s)) return s;
+  return "";
 }
 
 function truncateText(ctx, text, maxWidth) {
@@ -469,6 +528,7 @@ export function useKrokiGenerator() {
         zone: state.utmZone,
       };
 
+      // مرکز هر ترسیم + نشانی پیشنهادی از map.ir (اگر کاربر دستی وارد نکرده باشد)
       const centroidResults = [];
       const centroidTasks = [];
       for (const meta of metas) {
@@ -1233,7 +1293,7 @@ export function useKrokiGenerator() {
     const headBlock = `
     <div class="head" style="border-bottom-color:${t.headerColor}">
       <div class="head-logo-title">
-        ${last.form.logo ? `<img class="head-logo" src="${last.form.logo}" alt="" />` : ""}
+        ${safeImgSrc(last.form.logo) ? `<img class="head-logo" src="${safeImgSrc(last.form.logo)}" alt="" />` : ""}
         <div class="head-title">${escapeHtml(last.form.title) || "کروکی وضعیت موجود"}</div>
       </div>
       <div class="head-sub">قالب: ${escapeHtml(t.name)} — تاریخ برداشت: ${escapeHtml(last.form.date)}</div>
@@ -1243,7 +1303,7 @@ export function useKrokiGenerator() {
       ["متقاضی", escapeHtml(last.form.client)],
       ["کد ملی متقاضی", escapeHtml(last.form.clientNationalId) || "—"],
       ["شماره همراه متقاضی", escapeHtml(last.form.clientPhone) || "—"],
-      ["نشانی ملک", escapeHtml(last.form.address)],
+      ["نشانی ملک", escapeHtml(last.form.address) || "—"],
       ["سیستم مختصات", `WGS84 / UTM — Zone: ${state.utmZone ?? "—"}`],
       ["مساحت کل", `${state.areaM2.toFixed(2)} متر مربع`],
       ["سازمان / مرجع", escapeHtml(t.org)],
@@ -1251,13 +1311,17 @@ export function useKrokiGenerator() {
       ["عرض معبر", `${escapeHtml(last.form.streetWidth) || "—"} متر`],
       ["شماره پلاک ثبتی", escapeHtml(last.form.plaque) || "—"],
     ];
+    // جدول دوستونه: اگر تعداد ردیف‌ها فرد شد، ردیف آخر تمام‌عرض می‌شود تا جدول نشکند
     const infoTable2col = `<table class="info-table"><tbody>${Array.from(
-      { length: 5 },
-      (_, r) =>
-        `<tr>${infoRows
-          .slice(r * 2, r * 2 + 2)
+      { length: Math.ceil(infoRows.length / 2) },
+      (_, r) => {
+        const pair = infoRows.slice(r * 2, r * 2 + 2);
+        if (pair.length === 1)
+          return `<tr><td>${pair[0][0]}</td><td colspan="3">${pair[0][1]}</td></tr>`;
+        return `<tr>${pair
           .map(([l, v]) => `<td>${l}</td><td>${v}</td>`)
-          .join("")}</tr>`,
+          .join("")}</tr>`;
+      },
     ).join("")}</tbody></table>`;
     const infoTableStacked = `<table class="info-table info-stacked"><tbody>${infoRows
       .map(([l, v]) => `<tr><td class="cell-lb">${l}</td><td>${v}</td></tr>`)

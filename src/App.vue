@@ -196,6 +196,12 @@ function go(id) {
     return;
   }
   if (id !== "landing") ensureGen().catch(() => {});
+  // نشانی خودکار (پیشنهاد map.ir در پیش‌نمایش) را به فرم اصلی برمی‌گردانیم
+  // تا در payload پرداخت/ثبت به سرور هم ارسال شود
+  if (id === "payment" && !krokiForm.address) {
+    const auto = gen.value?.last?.form?.address || "";
+    if (auto) krokiForm.address = auto;
+  }
   const idx = steps.findIndex((s) => s.id === id);
   if (idx !== -1) {
     reachedIndex.value = Math.max(reachedIndex.value, idx);
@@ -393,6 +399,11 @@ async function onDrawSubmit() {
   const g = await ensureGen();
   const geom = g.buildGeometry(pins);
   if (!geom) return;
+  // نشانی خودکار را موازی با برداشت تصویر می‌گیریم تا موقع ورود به
+  // قسمت اطلاعات، فیلد نشانی از قبل پر باشد
+  const addrPromise = import("./composables/useKrokiGenerator")
+    .then((m) => m.suggestAddressForPositions(geom.allPositions))
+    .catch(() => "");
   try {
     g.state.mapImage = await g.captureMapImage(map.value, pins, geom.allPositions);
     logger.info("draw", "ثبت ترسیم‌ها و برداشت تصویر نقشه", {
@@ -402,6 +413,10 @@ async function onDrawSubmit() {
   } catch (e) {
     logger.error("draw", "خطا در برداشت تصویر نقشه", e.message);
   }
+  try {
+    const auto = await addrPromise;
+    if (auto && !String(krokiForm.address || "").trim()) krokiForm.address = auto;
+  } catch {}
   go("info");
 }
 
@@ -409,7 +424,11 @@ async function onInfoSubmit() {
   const g = await ensureGen();
   g.setTemplate(templateId.value);
   const ok = await g.computeGeometry(pins, krokiForm);
-  if (ok) go("preview");
+  if (!ok) return;
+  // نشانی خودکار map.ir را به فرم اصلی برمی‌گردانیم تا در فیلد اطلاعات
+  // دیده شود و در ثبت/پرداخت به سرور ارسال شود
+  if (!krokiForm.address && g.last?.form?.address) krokiForm.address = g.last.form.address;
+  go("preview");
 }
 
 function onPaymentDone(result) {

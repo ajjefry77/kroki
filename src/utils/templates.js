@@ -193,6 +193,7 @@ export function templateFromApi(row) {
   if (!row) return null;
   const frame = row.frame || "default";
   const coordinateTable = row.coordinate_table === "none" ? "none" : "html";
+  // رنگ‌ها نرمال می‌شوند تا مقدار آلوده ذخیره‌شده در سرور نتواند CSS تزریق کند
   return {
     id: row.id,
     name: row.name,
@@ -201,10 +202,10 @@ export function templateFromApi(row) {
     description: "قالب شخصی ذخیره‌شده در سامانه",
     frame,
     titleBlock: row.title_block || "default",
-    headerColor: row.header_color || "#1e3a5f",
-    polygonColor: row.polygon_color || "#ff0000",
-    centerColor: row.center_color || "#0000ff",
-    textColor: row.text_color || "#000000",
+    headerColor: normalizeHexColor(row.header_color, "#1e3a5f"),
+    polygonColor: normalizeHexColor(row.polygon_color, "#ff0000"),
+    centerColor: normalizeHexColor(row.center_color, "#0000ff"),
+    textColor: normalizeHexColor(row.text_color, "#000000"),
     vertexLabels: row.vertex_labels || "numbers",
     grid: Boolean(row.grid),
     scaleBar: Boolean(row.scale_bar),
