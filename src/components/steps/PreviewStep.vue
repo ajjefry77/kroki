@@ -45,7 +45,7 @@
           </div>
         </div>
         <p class="text-[10px] text-[var(--text-faint)] mt-2 leading-5">
-          در حالت عمودی، کروکی در یک سطر کامل قرار می‌گیرد و تصویر نقشه در یک قاب جداگانه زیر آن چاپ می‌شود.
+          در حالت عمودی، کروکی بزرگ در بالا و تصویر نقشه با جدول‌های مختصات و مجاورت به‌صورت فشرده زیر آن چاپ می‌شود (تک‌صفحه).
           در حالت افقی، کروکی بزرگ در وسط صفحه و سایر اطلاعات در دو طرف آن چیده می‌شوند.
         </p>
       </div>
@@ -61,7 +61,7 @@
           type="text"
           class="input !text-xs"
           placeholder="نشانی کامل ملک را وارد یا ویرایش کنید"
-          @input="rerender"
+          @input="rerenderSoon"
         />
       </div>
 
@@ -101,6 +101,7 @@
               :class="gen.state.orientation === 'landscape' ? 'is-landscape' : 'is-portrait preview-blur-more'"
               tabindex="-1"
               title="پیش‌نمایش خروجی نهایی"
+              @load="fitPreview"
             ></iframe>
             <div v-else class="preview-fallback">
               <canvas
@@ -156,8 +157,8 @@
                 <input type="range" min="2" max="9" step="1" :value="styleVal('vertexRadius', 4)" class="w-full" @input="setStyle('vertexRadius', +$event.target.value)" />
               </div>
               <div>
-                <label class="block mb-1 text-[11px] font-medium">اندازه فونت برچسب رئوس: {{ styleVal('labelFontSize', 20) }}</label>
-                <input type="range" min="12" max="36" step="1" :value="styleVal('labelFontSize', 20)" class="w-full" @input="setStyle('labelFontSize', +$event.target.value)" />
+                <label class="block mb-1 text-[11px] font-medium">اندازه فونت برچسب رئوس: {{ styleVal('labelFontSize', 16) }}</label>
+                <input type="range" min="12" max="36" step="1" :value="styleVal('labelFontSize', 16)" class="w-full" @input="setStyle('labelFontSize', +$event.target.value)" />
               </div>
             </div>
 
@@ -192,11 +193,11 @@
           </div>
         </div>
 
-        <!-- متن ضلع‌ها / اطلاعات مجاورت — فقط در قالب ثبتی قابل ورود است -->
+        <!-- مجاورت‌ها — فقط در قالب ثبتی قابل ورود است -->
         <div v-if="currentTemplate?.id === 'sabt' && gen.state.edgeTexts.length" class="card !rounded-2xl">
           <div class="font-semibold text-sm mb-3 flex items-center gap-2">
             <i class="fas fa-font text-[var(--accent)]"></i>
-            متن ضلع‌ها / اطلاعات مجاورت (نام کوچه، معبر، ملک مجاور)
+            مجاورت‌ها (نام کوچه، معبر، ملک مجاور)
           </div>
           <p class="text-[10px] text-[var(--text-faint)] mb-3 -mt-2">
             این بخش مخصوص قالب «ثبتی» است و فقط در همین حالت قابل ورود می‌باشد.
@@ -213,7 +214,7 @@
                 type="text"
                 class="input !py-1.5 !text-xs flex-1 min-w-[7rem]"
                 :placeholder="edgePlaceholder(m, i)"
-                @input="rerender"
+                @input="rerenderSoon"
               />
             </div>
           </div>
@@ -239,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { getTemplate, vertexLabel } from "../../utils/templates";
 import { logger } from "../../utils/logger";
 
@@ -325,6 +326,30 @@ function rerender() {
   updatePreview();
 }
 
+// بازسازی با تأخیر برای ورودی‌های متنی تا هنگام تایپ، صفحه نپرد و فوکوس حفظ شود؛
+// فقط پیش‌نمایش بازسازی می‌شود، نه کل صفحه
+let previewTimer = null;
+function rerenderSoon(ms = 500) {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => updatePreview(), ms);
+}
+
+// ارتفاع iframe پیش‌نمایش را با ارتفاع واقعی محتوا هماهنگ می‌کند تا
+// برش نخورد و دقیقاً هم‌شکل خروجی چاپ باشد.
+// نکته: ارتفاع قبلی دست نمی‌خورد تا هنگام تایپ، صفحه بالا/پایین نپرد.
+function fitPreview(e) {
+  try {
+    const f = e?.target;
+    const doc = f?.contentDocument;
+    if (!f || !doc || !doc.body) return;
+    const h = doc.body.scrollHeight || 0;
+    if (h > 10) {
+      f.style.aspectRatio = "auto";
+      f.style.height = Math.ceil(h + 4) + "px";
+    }
+  } catch {}
+}
+
 function sizeCanvas() {
   const pts = props.gen.state.utmPoints;
   if (!pts.length) return;
@@ -380,6 +405,10 @@ onMounted(async () => {
   logger.info("step", "مشاهده پیش‌نمایش کروکی", { template: props.templateId });
 });
 
+onUnmounted(() => {
+  clearTimeout(previewTimer);
+});
+
 watch(
   () => props.templateId,
   () => {
@@ -405,7 +434,7 @@ watch(
 watch(
   () => props.gen.state.edgeTexts,
   () => {
-    updatePreview();
+    rerenderSoon();
   },
   { deep: true },
 );
@@ -441,6 +470,10 @@ watch(
 }
 .preview-sheet-frame.is-portrait {
   aspect-ratio: 210 / 297;
+  /* عرض برابر چاپ (A4) تا پیش‌نمایش دقیقاً هم‌شکل خروجی شود */
+  max-width: 794px;
+  margin-inline: auto;
+  display: block;
 }
 .preview-sheet-frame.is-landscape {
   aspect-ratio: 297 / 210;

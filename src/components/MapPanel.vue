@@ -573,11 +573,10 @@ function initMap() {
 
 async function initMapAsync() {
   mapboxgl = await loadMap();
-  // نکته: عمداً mapboxgl.accessToken ست نمی‌شود. استایل نقشه کاستوم است
-  // (تایل گوگل) و نیازی به توکن Mapbox ندارد؛ ست نکردن توکن + غیرفعال بودن
-  // تله‌متری در loadMapbox.js باعث می‌شود هیچ درخواستی به
-  // events.mapbox.com ارسال نشود (رفع خطای ERR_CERT_COMMON_NAME_INVALID).
-  // جستجوی آدرس توکن خودش را مستقیم در fetch به api.mapbox.com می‌فرستد.
+  mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
+  // توکن برای glyphs (فونت لیبل‌های ترسیم) و سرویس‌های mapbox لازم است.
+  // تله‌متری (events.mapbox.com) به‌صورت جداگانه در loadMapbox.js غیرفعال شده،
+  // پس ست کردن توکن دیگر خطای ERR_CERT_COMMON_NAME_INVALID تولید نمی‌کند.
 
   if (!mapboxgl.supported()) {
     initError.value = "مرورگر شما از WebGL پشتیبانی نمی‌کند. لطفاً از مرورگر دیگری استفاده کنید یا تنظیمات گرافیکی سیستم را بررسی کنید.";
@@ -589,8 +588,9 @@ async function initMapAsync() {
       container: mapContainerRef.value,
       style: {
         version: 8,
-        // عمداً glyphs از نوع mapbox:// حذف شد تا هیچ درخواستی به دامنه
-        // mapbox ارسال نشود (استایل فعلی هیچ لایه‌ی متنی/symbol ندارد).
+        // لیبل‌های ترسیم (لایه‌های symbol با text-field در useDrawing.js)
+        // به glyphs نیاز دارند؛ بدون این خط، addLayer خطای اعتبارسنجی می‌دهد.
+        glyphs: "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
         sources: {
           satellite: {
             type: "raster",
