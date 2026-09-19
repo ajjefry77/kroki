@@ -69,18 +69,28 @@ const state = reactive({
 
 setUserTemplatesProvider(() => state.templates.map((t) => ({ ...t })));
 
-async function api(path, { method = "GET", body, auth = true } = {}) {
+const API_TIMEOUT_MS = 25000;
+
+async function api(path, { method = "GET", body, auth = true, timeout = API_TIMEOUT_MS } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (auth && state.token) headers.Authorization = `Bearer ${state.token}`;
   let res;
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
   try {
     res = await fetch(API_BASE + path, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl?.signal,
     });
   } catch (e) {
+    if (e?.name === "AbortError") {
+      throw new Error("سرور پاسخ نداد؛ اتصال اینترنت را بررسی کنید و دوباره تلاش کنید");
+    }
     throw new Error("خطا در ارتباط با سرور؛ اتصال خود را بررسی کنید");
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   let data = null;
   try {
@@ -431,26 +441,61 @@ async function deleteUserTemplate(id) {
   }
 }
 
+function builtinTemplateMapKey() {
+  return "kroki_tpl_map_" + (state.user?.id ?? "guest");
+}
+
+function readBuiltinTemplateMap() {
+  try {
+    return JSON.parse(localStorage.getItem(builtinTemplateMapKey()) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeBuiltinTemplateMap(map) {
+  try {
+    localStorage.setItem(builtinTemplateMapKey(), JSON.stringify(map || {}));
+  } catch {}
+}
+
 async function resolveTemplateId(tplId) {
   const id = String(tplId ?? "");
-  if (/^\d+$/.test(id)) return Number(id);
+  if (/^\d+$/.test(id)) return { id: Number(id) };
   const fp = getTemplate(id);
-  if (!fp) return null;
+  if (!fp) return { id: null };
   const sourceKey = "builtin:" + id;
   const existing = state.templates.find((t) => t._source === sourceKey);
-  if (existing && /^\d+$/.test(String(existing.id))) return Number(existing.id);
-  try {
-    const created = await api("/templates", {
-      method: "POST",
-      body: templateToApi({ ...fp, name: (fp.name || "قالب") + " — سامانه" }),
-    });
-    if (!created?.template?.id) return null;
-    const mapped = { ...templateFromApi(created.template), _backend: true, _source: sourceKey };
-    state.templates.unshift(mapped);
-    return Number(mapped.id);
-  } catch {
-    return null;
+  if (existing && /^\d+$/.test(String(existing.id))) return { id: Number(existing.id) };
+  // نگاشت ذخیره‌شده از نشست‌های قبلی تا برای هر پرداخت یک قالب تکراری ساخته نشود
+  // و در صورت قطعی لحظه‌ای، بدون POST اضافه ادامه دهیم
+  const cached = readBuiltinTemplateMap()[sourceKey];
+  if (cached && /^\d+$/.test(String(cached))) return { id: Number(cached) };
+  // یک بار تلاش مجدد در برابر قطعی‌های لحظه‌ای شبکه (مثل ERR_TIMED_OUT)
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const created = await api("/templates", {
+        method: "POST",
+        body: templateToApi({ ...fp, name: (fp.name || "قالب") + " — سامانه" }),
+      });
+      if (!created?.template?.id) {
+        lastErr = new Error("پاسخ سرور نامعتبر است");
+        continue;
+      }
+      const mapped = { ...templateFromApi(created.template), _backend: true, _source: sourceKey };
+      state.templates.unshift(mapped);
+      const map = readBuiltinTemplateMap();
+      map[sourceKey] = mapped.id;
+      writeBuiltinTemplateMap(map);
+      return { id: Number(mapped.id) };
+    } catch (e) {
+      lastErr = e;
+      // خطای احراز هویت را دوباره تلاش نکن
+      if (/نشست|وارد/.test(e?.message || "")) break;
+    }
   }
+  return { id: null, error: lastErr?.message || "خطا در ارتباط با سرور" };
 }
 
 function sessionUserId() {
@@ -460,7 +505,15 @@ function sessionUserId() {
 /* ---------------- کروکی‌ها (GET/POST /krokis و ...) ---------------- */
 
 async function createKroki(payload, tplId) {
-  const tid = tplId !== undefined ? await resolveTemplateId(tplId) : payload?.template_id;
+  let tid = payload?.template_id;
+  if (tplId !== undefined) {
+    const resolved = await resolveTemplateId(tplId);
+    if (!resolved.id) {
+      // خطای واقعی سرور/شبکه را نشان بده، نه «قالب یافت نشد» گمراه‌کننده
+      return { success: false, error: resolved.error || "قالب کروکی یافت نشد" };
+    }
+    tid = resolved.id;
+  }
   if (!tid) return { success: false, error: "قالب کروکی یافت نشد" };
   try {
     const body = { ...payload, template_id: tid };

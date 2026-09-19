@@ -573,7 +573,11 @@ function initMap() {
 
 async function initMapAsync() {
   mapboxgl = await loadMap();
-  mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
+  // نکته: عمداً mapboxgl.accessToken ست نمی‌شود. استایل نقشه کاستوم است
+  // (تایل گوگل) و نیازی به توکن Mapbox ندارد؛ ست نکردن توکن + غیرفعال بودن
+  // تله‌متری در loadMapbox.js باعث می‌شود هیچ درخواستی به
+  // events.mapbox.com ارسال نشود (رفع خطای ERR_CERT_COMMON_NAME_INVALID).
+  // جستجوی آدرس توکن خودش را مستقیم در fetch به api.mapbox.com می‌فرستد.
 
   if (!mapboxgl.supported()) {
     initError.value = "مرورگر شما از WebGL پشتیبانی نمی‌کند. لطفاً از مرورگر دیگری استفاده کنید یا تنظیمات گرافیکی سیستم را بررسی کنید.";
@@ -585,7 +589,8 @@ async function initMapAsync() {
       container: mapContainerRef.value,
       style: {
         version: 8,
-        glyphs: "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
+        // عمداً glyphs از نوع mapbox:// حذف شد تا هیچ درخواستی به دامنه
+        // mapbox ارسال نشود (استایل فعلی هیچ لایه‌ی متنی/symbol ندارد).
         sources: {
           satellite: {
             type: "raster",
