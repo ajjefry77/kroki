@@ -24,6 +24,9 @@ import { logger } from "../utils/logger";
 export const DRAFT_COLOR = "#ff0000";
 export const DONE_COLOR = "#00a651";
 
+// فونت لیبل‌های متنی روی نقشه (طول اضلاع، نام رئوس، فاصله)
+export const MAP_TEXT_FONT = ["Droid Sans", "Arial Unicode MS Bold"];
+
 export function useDrawing(map, pins) {
   const loading = ref(false);
   const drawMode = ref("");
@@ -493,7 +496,7 @@ export function useDrawing(map, pins) {
         "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#b45309",
@@ -512,7 +515,7 @@ export function useDrawing(map, pins) {
         "text-anchor": "bottom",
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#1e3a8a",
@@ -542,7 +545,7 @@ export function useDrawing(map, pins) {
         "text-anchor": "top",
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#1d4ed8",
@@ -586,7 +589,7 @@ export function useDrawing(map, pins) {
         "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#b45309",
@@ -616,7 +619,7 @@ export function useDrawing(map, pins) {
         "text-anchor": "top",
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#1d4ed8",
@@ -677,7 +680,7 @@ export function useDrawing(map, pins) {
         "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#b45309",
@@ -696,7 +699,7 @@ export function useDrawing(map, pins) {
         "text-anchor": "bottom",
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#1e3a8a",
@@ -1252,7 +1255,7 @@ export function useDrawing(map, pins) {
         "text-anchor": "top",
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        "text-font": ["Droid Sans", "Arial Unicode MS Bold"],
+        "text-font": MAP_TEXT_FONT,
       },
       paint: {
         "text-color": "#1e293b",

@@ -216,6 +216,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from "vue";
 import { getTemplate } from "../../utils/templates";
+import { canvasSizeForPoints } from "../../utils/canvas";
 import { makeExportFilename } from "../../utils/jalali";
 import { logger } from "../../utils/logger";
 
@@ -235,15 +236,10 @@ const canvasH = ref(700);
 const currentTemplate = getTemplate(props.templateId);
 
 function sizeCanvas() {
-  const pts = props.gen.state.utmPoints;
-  if (!pts.length) return;
-  const xs = pts.map((p) => p.x);
-  const ys = pts.map((p) => p.y);
-  const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 1);
-  const spanY = Math.max(Math.max(...ys) - Math.min(...ys), 1);
-  const { w, h } = props.gen.computeCanvasSize(spanX, spanY);
-  canvasW.value = w;
-  canvasH.value = h;
+  const size = canvasSizeForPoints(props.gen.state.utmPoints);
+  if (!size) return;
+  canvasW.value = size.w;
+  canvasH.value = size.h;
 }
 
 onMounted(() => {

@@ -242,6 +242,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { getTemplate, vertexLabel } from "../../utils/templates";
+import { canvasSizeForPoints, findNorthWestIndex } from "../../utils/canvas";
 import { logger } from "../../utils/logger";
 
 const props = defineProps({
@@ -260,22 +261,8 @@ const previewDoc = ref("");
 
 const currentTemplate = computed(() => getTemplate(props.templateId));
 
-// ایندکس شمال‌غربی روی نقاط UTM (بیشترین Y، در صورت تساوی کمترین X)
-// معادل نقطه بالا-چپ روی کانوس؛ مبنای نام‌گذاری رئوس A,B,C… یا 1,2,3…
-const nwIndex = computed(() => {
-  const pts = props.gen.state.utmPoints || [];
-  if (!pts.length) return 0;
-  let best = 0;
-  for (let i = 1; i < pts.length; i++) {
-    if (
-      pts[i].y > pts[best].y ||
-      (pts[i].y === pts[best].y && pts[i].x < pts[best].x)
-    ) {
-      best = i;
-    }
-  }
-  return best;
-});
+// ایندکس شمال‌غربی روی نقاط UTM؛ مبنای نام‌گذاری رئوس A,B,C… یا 1,2,3…
+const nwIndex = computed(() => findNorthWestIndex(props.gen.state.utmPoints || []));
 
 function shapeVertexLabel(globalIdx) {
   const style = currentTemplate.value?.vertexLabels || "numbers";
@@ -351,15 +338,10 @@ function fitPreview(e) {
 }
 
 function sizeCanvas() {
-  const pts = props.gen.state.utmPoints;
-  if (!pts.length) return;
-  const xs = pts.map((p) => p.x);
-  const ys = pts.map((p) => p.y);
-  const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 1);
-  const spanY = Math.max(Math.max(...ys) - Math.min(...ys), 1);
-  const { w, h } = props.gen.computeCanvasSize(spanX, spanY);
-  canvasW.value = w;
-  canvasH.value = h;
+  const size = canvasSizeForPoints(props.gen.state.utmPoints);
+  if (!size) return;
+  canvasW.value = size.w;
+  canvasH.value = size.h;
 }
 
 function renderSketchNow() {

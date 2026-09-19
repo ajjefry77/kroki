@@ -1,6 +1,8 @@
 import { reactive, ref, nextTick } from "vue";
+import axios from "axios";
 import proj4 from "proj4";
 import { getTemplate, vertexLabel } from "../utils/templates";
+import { computeCanvasSize, findNorthWestIndex } from "../utils/canvas";
 import { loadMapbox } from "../utils/loadMapbox";
 import { getTodayJalali, makeExportFilename } from "../utils/jalali";
 import { logger } from "../utils/logger";
@@ -10,11 +12,17 @@ export { getTodayJalali };
 const MAP_IR_KEY = import.meta.env.VITE_MAP_IR_KEY || "";
 async function reverseLookup(lat, lon) {
   const url = `https://map.ir/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
-  const res = await fetch(url, {
-    headers: { Accept: "application/json", "x-api-key": MAP_IR_KEY },
-  });
-  if (!res.ok) throw new Error("خطا در سرویس آدرس (" + res.status + ")");
-  const data = await res.json();
+  let data;
+  try {
+    const res = await axios.get(url, {
+      headers: { Accept: "application/json", "x-api-key": MAP_IR_KEY },
+      timeout: 15000,
+    });
+    data = res.data;
+  } catch (e) {
+    const status = e?.response?.status;
+    throw new Error("خطا در سرویس آدرس (" + (status || "شبکه") + ")");
+  }
   const a = data.address || data || {};
   return {
     display:
@@ -134,21 +142,6 @@ function computeShapeCentroid(pos, zone) {
   const y = origin.y + cy / (3 * twiceArea);
   const [lon, lat] = proj4(projStr, "EPSG:4326", [x, y]);
   return { x, y, lon, lat, zone };
-}
-
-function computeCanvasSize(spanX, spanY) {
-  const ratio = spanX / spanY;
-  const MAX = 1400,
-    MIN = 400;
-  let cw = MAX,
-    ch = Math.round(MAX / ratio);
-  if (spanX < spanY) {
-    ch = MAX;
-    cw = Math.round(MAX * ratio);
-  }
-  cw = Math.max(MIN, Math.min(cw, MAX));
-  ch = Math.max(MIN, Math.min(ch, MAX));
-  return { w: cw, h: ch };
 }
 
 function niceScaleLength(span) {
@@ -759,18 +752,25 @@ export function useKrokiGenerator() {
     ctx.fillStyle = "#fff";
     ctx.font = `600 ${fHead}px Vazirmatn, Tahoma, sans-serif`;
     ctx.textBaseline = "middle";
+    // سطر عنوان سه ستون مساوی دارد تا متقاضی/مقیاس/تاریخ روی هم نیفتند
+    const colW = bw / 3;
+    const colPad = Math.round(10 * k);
     ctx.textAlign = "right";
     ctx.fillText(
-      truncateText(ctx, "متقاضی: " + (form.client || "—"), half - Math.round(20 * k)),
-      mid - padX,
+      truncateText(ctx, "متقاضی: " + (form.client || "—"), colW - colPad * 2),
+      bx + bw - colPad,
       by + headH2 / 2,
     );
     ctx.textAlign = "center";
-    ctx.fillText("مقیاس: " + extra.scaleText, mid, by + headH2 / 2);
+    ctx.fillText(
+      truncateText(ctx, "مقیاس: " + extra.scaleText, colW - colPad * 2),
+      bx + colW * 1.5,
+      by + headH2 / 2,
+    );
     ctx.textAlign = "left";
     ctx.fillText(
-      truncateText(ctx, "تاریخ: " + (form.date || "—"), half - Math.round(20 * k)),
-      mid + padX,
+      truncateText(ctx, "تاریخ: " + (form.date || "—"), colW - colPad * 2),
+      bx + colPad,
       by + headH2 / 2,
     );
 
@@ -1280,16 +1280,7 @@ export function useKrokiGenerator() {
         <thead><tr><th>ترسیم</th><th>ضلع</th><th>مجاورت</th></tr></thead>
         <tbody>
           ${(() => {
-            let _nw = 0;
-            for (let i = 1; i < state.utmPoints.length; i++) {
-              if (
-                state.utmPoints[i].y > state.utmPoints[_nw].y ||
-                (state.utmPoints[i].y === state.utmPoints[_nw].y &&
-                  state.utmPoints[i].x < state.utmPoints[_nw].x)
-              ) {
-                _nw = i;
-              }
-            }
+            const _nw = findNorthWestIndex(state.utmPoints);
             const _lbl = (gi) =>
               String(vertexLabel(t.vertexLabels, gi, _nw));
             return state.edgeTexts

@@ -6,30 +6,35 @@ import {
   isBackendTemplateId,
   setUserTemplatesProvider,
 } from "../utils/templates";
+import {
+  listOf,
+  setAuthToken,
+  setUnauthorizedHandler,
+  AuthApi,
+  WalletApi,
+  TemplatesApi,
+  KrokisApi,
+  ReferralsApi,
+  UsersApi,
+  AdminApi,
+  AgencyApi,
+} from "../api";
 
 /*
- * احراز هویت از طریق بک‌اند کروکی (همین ریپو)
- *  - POST /auth/register, POST /auth/login, GET /auth/me, PATCH /auth/me
- *  - کیف پول: GET /wallet, GET /wallet/transactions
- *  - قالب‌ها: GET/POST /templates, GET/PATCH/DELETE /templates/:id
- *  - کروکی‌ها: GET/POST /krokis, GET /krokis/track/:code, GET/PATCH/DELETE /krokis/:id,
- *    POST /krokis/:id/pay, POST /krokis/:id/issue
- *  - شارژ: POST /charges, GET /charges/my، GET /charges (ادمین)، POST /charges/:id/approve|reject
- *  - معرفی: POST /referrals/redeem, GET /referrals/my، GET/POST /referrals (ادمین)، PATCH/DELETE /referrals/:id
- *  - کاربران (ادمین): GET /users, GET/PATCH /users/:id, POST /users/:id/credit
- *  - ادمین: GET /admin/stats, GET /admin/krokis, GET /admin/transactions, GET /admin/roles
+ * استور احراز هویت و داده کاربر.
+ * درخواست‌های HTTP در src/api تفکیک شده‌اند (auth/wallet/templates/krokis/...)؛
+ * اینجا فقط وضعیت، نگاشت داده‌ها و منطق فرانت نگه داشته می‌شود.
+ * ورودی/خروجی همه متدها مثل قبل { success, ... } است تا کامپوننت‌ها دست نخورند.
  */
-
-const LS = {
-  token: "kroki_token",
-  user: "kroki_user",
-};
 
 export const KROKI_PRICE = 50000;
 export const WALLET_CARD = "5047-0611-3665-6671";
 export const CARD_OWNER = "جلیل باقرزاده";
 
-const API_BASE = (import.meta.env.VITE_SERVER || "").replace(/\/+$/, "") + "/api";
+const LS = {
+  token: "kroki_token",
+  user: "kroki_user",
+};
 
 function read(key, fallback) {
   try {
@@ -69,54 +74,6 @@ const state = reactive({
 
 setUserTemplatesProvider(() => state.templates.map((t) => ({ ...t })));
 
-const API_TIMEOUT_MS = 25000;
-
-async function api(path, { method = "GET", body, auth = true, timeout = API_TIMEOUT_MS } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  if (auth && state.token) headers.Authorization = `Bearer ${state.token}`;
-  let res;
-  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
-  try {
-    res = await fetch(API_BASE + path, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      signal: ctrl?.signal,
-    });
-  } catch (e) {
-    if (e?.name === "AbortError") {
-      throw new Error("سرور پاسخ نداد؛ اتصال اینترنت را بررسی کنید و دوباره تلاش کنید");
-    }
-    throw new Error("خطا در ارتباط با سرور؛ اتصال خود را بررسی کنید");
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    data = null;
-  }
-  if (res.status === 401) {
-    if (auth) {
-      logout();
-      throw new Error("نشست شما منقضی شده است؛ دوباره وارد شوید");
-    }
-    throw new Error(data?.error || data?.message || "نام کاربری یا رمز عبور اشتباه است");
-  }
-  if (!res.ok) {
-    throw new Error(data?.error || data?.message || `خطا در ارتباط با سرور (${res.status})`);
-  }
-  return data;
-}
-
-function listOf(data) {
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.data)) return data.data;
-  return [];
-}
-
 function faToEn(s) {
   return String(s || "").replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
 }
@@ -135,10 +92,49 @@ function normalizeUser(u) {
   };
 }
 
+function applyAuth(token, userData) {
+  state.token = token;
+  localStorage.setItem(LS.token, token);
+  setAuthToken(token);
+  const u = normalizeUser(userData);
+  state.user = u;
+  localStorage.setItem(LS.user, JSON.stringify(state.user));
+  state.users = [];
+}
+
+function logout() {
+  state.token = null;
+  state.user = null;
+  state.users = [];
+  state.templates = [];
+  state.requests = [];
+  state.transactions = [];
+  state.myKrokis = [];
+  state.referrals = [];
+  state.myReferrals = [];
+  state.stats = null;
+  state.adminKrokis = [];
+  state.adminTransactions = [];
+  state.roles = [];
+  state.cityPrices = [];
+  state.myAgent = null;
+  state.subordinates = [];
+  state.agencyRequests = [];
+  state.adminAgents = [];
+  state.agentDetail = null;
+  setAuthToken(null);
+  localStorage.removeItem(LS.token);
+  localStorage.removeItem(LS.user);
+}
+
+// توکن ذخیره‌شده را به کلاینت axios می‌دهیم؛ 401 هم به logout وصل است
+setAuthToken(state.token);
+setUnauthorizedHandler(() => logout());
+
 async function loadWallet() {
   if (!state.user?.id) return;
   try {
-    const d = await api("/wallet");
+    const d = await WalletApi.get();
     const w = Number(d?.wallet_balance ?? 0);
     const f = Number(d?.free_kroki_count ?? 0);
     if (state.user) {
@@ -152,7 +148,7 @@ async function loadWallet() {
 async function refreshMe() {
   if (!state.token) return;
   try {
-    const d = await api("/auth/me");
+    const d = await AuthApi.me();
     const u = normalizeUser(d?.user || d);
     if (u.id) {
       state.user = { ...(state.user || {}), ...u };
@@ -180,11 +176,7 @@ async function login(username, password) {
   const uname = faToEn(username).trim();
   if (!uname || !password) return { success: false, error: "نام کاربری و رمز عبور را وارد کنید" };
   try {
-    const data = await api("/auth/login", {
-      method: "POST",
-      body: { username: uname, password },
-      auth: false,
-    });
+    const data = await AuthApi.login({ username: uname, password });
     const { token, user } = data || {};
     if (!token || !user) return { success: false, error: "پاسخ سرور نامعتبر است" };
     applyAuth(token, user);
@@ -196,8 +188,7 @@ async function login(username, password) {
 }
 
 function cleanUsername(s) {
-  return faToEn(s)
-    .trim();
+  return faToEn(s).trim();
 }
 
 async function register(payload) {
@@ -210,10 +201,13 @@ async function register(payload) {
   if (!/^09\d{9}$/.test(phone)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
   if (password.length < 6) return { success: false, error: "رمز عبور حداقل ۶ کاراکتر باشد" };
   try {
-    const data = await api("/auth/register", {
-      method: "POST",
-      body: { username, phone, full_name: name, national_id: "", password, agent_code: agentCode || undefined },
-      auth: false,
+    const data = await AuthApi.register({
+      username,
+      phone,
+      full_name: name,
+      national_id: "",
+      password,
+      agent_code: agentCode || undefined,
     });
     const { token, user } = data || {};
     if (!token || !user) return { success: false, error: "پاسخ سرور نامعتبر است" };
@@ -225,39 +219,6 @@ async function register(payload) {
   }
 }
 
-function applyAuth(token, userData) {
-  state.token = token;
-  localStorage.setItem(LS.token, token);
-  const u = normalizeUser(userData);
-  state.user = u;
-  localStorage.setItem(LS.user, JSON.stringify(state.user));
-  state.users = [];
-}
-
-function logout() {
-  state.token = null;
-  state.user = null;
-  state.users = [];
-  state.templates = [];
-  state.requests = [];
-  state.transactions = [];
-  state.myKrokis = [];
-  state.referrals = [];
-  state.myReferrals = [];
-  state.stats = null;
-  state.adminKrokis = [];
-  state.adminTransactions = [];
-  state.roles = [];
-  state.cityPrices = [];
-  state.myAgent = null;
-  state.subordinates = [];
-  state.agencyRequests = [];
-  state.adminAgents = [];
-  state.agentDetail = null;
-  localStorage.removeItem(LS.token);
-  localStorage.removeItem(LS.user);
-}
-
 function walletOf() {
   return state.user ? Number(state.user.wallet) || 0 : 0;
 }
@@ -265,7 +226,7 @@ function freeOf() {
   return state.user ? Number(state.user.freeKroki) || 0 : 0;
 }
 
-/* ---------------- تراکنش‌ها (GET /wallet/transactions) ---------------- */
+/* ---------------- تراکنش‌ها ---------------- */
 
 function mapTx(t) {
   return {
@@ -283,7 +244,7 @@ function mapTx(t) {
 
 async function loadTransactions() {
   try {
-    const d = await api("/wallet/transactions");
+    const d = await WalletApi.transactions();
     state.transactions = (listOf(d) || []).map(mapTx);
     return { success: true };
   } catch (e) {
@@ -295,7 +256,7 @@ function txList() {
   return state.transactions;
 }
 
-/* ---------------- شارژ کیف پول (POST /charges و ...) ---------------- */
+/* ---------------- شارژ کیف پول ---------------- */
 
 function mapCharge(r) {
   return {
@@ -324,9 +285,11 @@ async function requestCharge({ amount, card, paymentId, note } = {}) {
   if (!/^\d{16}$/.test(cards)) return { success: false, error: "شماره کارت باید ۱۶ رقم باشد" };
   if (pid.length < 2) return { success: false, error: "شناسه پرداخت را وارد کنید" };
   try {
-    await api("/charges", {
-      method: "POST",
-      body: { amount: amt, card_number: cards, payment_tracking_id: pid, note: String(note || "").trim() },
+    await WalletApi.createCharge({
+      amount: amt,
+      card_number: cards,
+      payment_tracking_id: pid,
+      note: String(note || "").trim(),
     });
     await loadMyCharges();
     return { success: true };
@@ -337,7 +300,7 @@ async function requestCharge({ amount, card, paymentId, note } = {}) {
 
 async function loadMyCharges() {
   try {
-    const d = await api("/charges/my");
+    const d = await WalletApi.myCharges();
     state.requests = (listOf(d) || []).map(mapCharge);
     return { success: true };
   } catch (e) {
@@ -347,8 +310,7 @@ async function loadMyCharges() {
 
 async function loadAllCharges(status) {
   try {
-    const q = status ? `?status=${status}` : "";
-    const d = await api("/charges" + q);
+    const d = await WalletApi.charges(status);
     state.requests = (listOf(d) || []).map(mapCharge);
     return { success: true };
   } catch (e) {
@@ -365,7 +327,7 @@ function requestsOf(userId) {
 
 async function approveRequest(id) {
   try {
-    await api(`/charges/${id}/approve`, { method: "POST", body: {} });
+    await WalletApi.approveCharge(id);
     const me = state.requests.find((r) => r.id === id);
     if (me) {
       me.status = "approved";
@@ -382,7 +344,7 @@ async function approveRequest(id) {
 
 async function rejectRequest(id) {
   try {
-    await api(`/charges/${id}/reject`, { method: "POST", body: {} });
+    await WalletApi.rejectCharge(id);
     const me = state.requests.find((r) => r.id === id);
     if (me) {
       me.status = "rejected";
@@ -396,11 +358,11 @@ async function rejectRequest(id) {
   }
 }
 
-/* ---------------- قالب‌ها (GET/POST /templates و ...) ---------------- */
+/* ---------------- قالب‌ها ---------------- */
 
 async function loadTemplates() {
   try {
-    const d = await api("/templates");
+    const d = await TemplatesApi.list();
     state.templates = (listOf(d) || []).map((r) => ({ ...templateFromApi(r), _backend: true }));
     return { success: true };
   } catch (e) {
@@ -418,9 +380,9 @@ async function saveUserTemplate(t, _userId) {
   const payload = { ...t, ...body };
   try {
     if (isBackendTemplateId(t.id)) {
-      await api(`/templates/${t.id}`, { method: "PATCH", body });
+      await TemplatesApi.update(t.id, body);
     } else {
-      const created = await api("/templates", { method: "POST", body });
+      const created = await TemplatesApi.create(body);
       payload.id = created?.template?.id;
     }
     await loadTemplates();
@@ -433,7 +395,7 @@ async function saveUserTemplate(t, _userId) {
 async function deleteUserTemplate(id) {
   if (!isBackendTemplateId(id)) return { success: true };
   try {
-    await api(`/templates/${id}`, { method: "DELETE" });
+    await TemplatesApi.remove(id);
     await loadTemplates();
     return { success: true };
   } catch (e) {
@@ -475,10 +437,9 @@ async function resolveTemplateId(tplId) {
   let lastErr = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const created = await api("/templates", {
-        method: "POST",
-        body: templateToApi({ ...fp, name: (fp.name || "قالب") + " — سامانه" }),
-      });
+      const created = await TemplatesApi.create(
+        templateToApi({ ...fp, name: (fp.name || "قالب") + " — سامانه" }),
+      );
       if (!created?.template?.id) {
         lastErr = new Error("پاسخ سرور نامعتبر است");
         continue;
@@ -502,7 +463,7 @@ function sessionUserId() {
   return state.user?.id || null;
 }
 
-/* ---------------- کروکی‌ها (GET/POST /krokis و ...) ---------------- */
+/* ---------------- کروکی‌ها ---------------- */
 
 async function createKroki(payload, tplId) {
   let tid = payload?.template_id;
@@ -518,7 +479,7 @@ async function createKroki(payload, tplId) {
   try {
     const body = { ...payload, template_id: tid };
     delete body.template_id_orig;
-    const d = await api("/krokis", { method: "POST", body });
+    const d = await KrokisApi.create(body);
     return { success: true, kroki: d?.kroki };
   } catch (e) {
     return { success: false, error: e.message || "خطا در ثبت کروکی" };
@@ -527,7 +488,7 @@ async function createKroki(payload, tplId) {
 
 async function updateKroki(id, payload) {
   try {
-    const d = await api(`/krokis/${id}`, { method: "PATCH", body: payload });
+    const d = await KrokisApi.update(id, payload);
     return { success: true, kroki: d?.kroki };
   } catch (e) {
     return { success: false, error: e.message || "خطا در به‌روزرسانی کروکی" };
@@ -536,7 +497,7 @@ async function updateKroki(id, payload) {
 
 async function myKrokis() {
   try {
-    const d = await api("/krokis");
+    const d = await KrokisApi.list();
     state.myKrokis = listOf(d) || [];
     return { success: true, data: state.myKrokis };
   } catch (e) {
@@ -546,7 +507,7 @@ async function myKrokis() {
 
 async function getKroki(id) {
   try {
-    const d = await api(`/krokis/${id}`);
+    const d = await KrokisApi.get(id);
     return { success: true, kroki: d?.kroki };
   } catch (e) {
     return { success: false, error: e.message || "خطا در دریافت کروکی" };
@@ -555,7 +516,7 @@ async function getKroki(id) {
 
 async function trackKroki(code) {
   try {
-    const d = await api(`/krokis/track/${encodeURIComponent(code)}`);
+    const d = await KrokisApi.track(code);
     return { success: true, kroki: d?.kroki };
   } catch (e) {
     return { success: false, error: e.message || "کروکی یافت نشد" };
@@ -564,7 +525,7 @@ async function trackKroki(code) {
 
 async function payKroki(id, mode) {
   try {
-    const d = await api(`/krokis/${id}/pay`, { method: "POST", body: { mode } });
+    const d = await KrokisApi.pay(id, mode);
     await loadWallet();
     return { success: true, kroki: d?.kroki };
   } catch (e) {
@@ -574,10 +535,7 @@ async function payKroki(id, mode) {
 
 async function issueKroki(id, pdfUrl) {
   try {
-    const d = await api(`/krokis/${id}/issue`, {
-      method: "POST",
-      body: pdfUrl ? { pdf_url: pdfUrl } : {},
-    });
+    const d = await KrokisApi.issue(id, pdfUrl);
     return { success: true, kroki: d?.kroki };
   } catch (e) {
     return { success: false, error: e.message || "خطا در صدور کروکی" };
@@ -586,7 +544,7 @@ async function issueKroki(id, pdfUrl) {
 
 async function deleteKroki(id) {
   try {
-    await api(`/krokis/${id}`, { method: "DELETE" });
+    await KrokisApi.remove(id);
     state.myKrokis = state.myKrokis.filter((k) => String(k.id) !== String(id));
     return { success: true };
   } catch (e) {
@@ -594,12 +552,12 @@ async function deleteKroki(id) {
   }
 }
 
-/* ---------------- معرفی (POST /referrals/redeem و ...) ---------------- */
+/* ---------------- معرفی ---------------- */
 
 async function redeemReferral(code) {
   if (!String(code || "").trim()) return { success: false, error: "کد معرف را وارد کنید" };
   try {
-    const d = await api("/referrals/redeem", { method: "POST", body: { code: String(code).trim() } });
+    const d = await ReferralsApi.redeem(String(code).trim());
     await loadWallet();
     await loadMyReferrals();
     return { success: true, granted: d?.granted, freeKroki: d?.free_kroki_count };
@@ -610,7 +568,7 @@ async function redeemReferral(code) {
 
 async function loadMyReferrals() {
   try {
-    const d = await api("/referrals/my");
+    const d = await ReferralsApi.my();
     state.myReferrals = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -620,7 +578,7 @@ async function loadMyReferrals() {
 
 async function loadAllReferrals() {
   try {
-    const d = await api("/referrals");
+    const d = await ReferralsApi.list();
     state.referrals = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -636,7 +594,7 @@ async function createReferral({ code, free_kroki_amount, max_uses, expires_at } 
       max_uses: Number(max_uses) || 1,
       expires_at: expires_at || "",
     };
-    await api("/referrals", { method: "POST", body });
+    await ReferralsApi.create(body);
     await loadAllReferrals();
     return { success: true };
   } catch (e) {
@@ -646,7 +604,7 @@ async function createReferral({ code, free_kroki_amount, max_uses, expires_at } 
 
 async function updateReferral(id, patch) {
   try {
-    const d = await api(`/referrals/${id}`, { method: "PATCH", body: patch });
+    const d = await ReferralsApi.update(id, patch);
     await loadAllReferrals();
     return { success: true, referral: d?.referral };
   } catch (e) {
@@ -656,7 +614,7 @@ async function updateReferral(id, patch) {
 
 async function deleteReferral(id) {
   try {
-    await api(`/referrals/${id}`, { method: "DELETE" });
+    await ReferralsApi.remove(id);
     await loadAllReferrals();
     return { success: true };
   } catch (e) {
@@ -664,11 +622,11 @@ async function deleteReferral(id) {
   }
 }
 
-/* ---------------- کاربران (ادمین: GET /users و ...) ---------------- */
+/* ---------------- کاربران (ادمین) ---------------- */
 
 async function loadUsers() {
   try {
-    const d = await api("/users");
+    const d = await UsersApi.list();
     state.users = (listOf(d) || []).map(normalizeUser);
     for (const u of state.users) {
       if (String(u.id) === String(state.user?.id)) {
@@ -685,7 +643,7 @@ async function loadUsers() {
 async function setRole(userId, role) {
   const want = role === "admin" ? "admin" : "user";
   try {
-    await api(`/users/${userId}`, { method: "PATCH", body: { role: want } });
+    await UsersApi.update(userId, { role: want });
     const u = state.users.find((x) => String(x.id) === String(userId));
     if (u) u.role = want;
     if (String(state.user?.id) === String(userId)) {
@@ -702,7 +660,7 @@ async function setRole(userId, role) {
 async function setFreeKroki(userId, n) {
   const value = Math.max(0, Math.floor(Number(n) || 0));
   try {
-    await api(`/users/${userId}`, { method: "PATCH", body: { free_kroki_count: value } });
+    await UsersApi.update(userId, { free_kroki_count: value });
     const u = state.users.find((x) => String(x.id) === String(userId));
     if (u) u.freeKroki = value;
     if (String(state.user?.id) === String(userId)) await loadWallet();
@@ -716,7 +674,7 @@ async function creditUser(userId, amount) {
   const amt = Number(amount);
   if (!amt || amt <= 0) return { success: false, error: "مبلغ معتبر نیست" };
   try {
-    await api(`/users/${userId}/credit`, { method: "POST", body: { amount: amt } });
+    await UsersApi.credit(userId, amt);
     await loadUsers();
     if (String(state.user?.id) === String(userId)) await loadWallet();
     return { success: true };
@@ -729,7 +687,7 @@ async function toggleActive(userId) {
   const u = state.users.find((x) => String(x.id) === String(userId));
   const active = u ? !u.active : false;
   try {
-    await api(`/users/${userId}`, { method: "PATCH", body: { active } });
+    await UsersApi.update(userId, { active });
     if (u) u.active = active;
     return { success: true };
   } catch (e) {
@@ -744,7 +702,7 @@ async function editUser(userId, { name, password } = {}) {
   if (String(password || "").trim()) body.password = String(password).trim();
   if (!Object.keys(body).length) return { success: true };
   try {
-    const d = await api(`/users/${userId}`, { method: "PATCH", body });
+    const d = await UsersApi.update(userId, body);
     const updated = normalizeUser(d?.user);
     const u = state.users.find((x) => String(x.id) === String(userId));
     if (u) Object.assign(u, updated);
@@ -758,11 +716,11 @@ async function editUser(userId, { name, password } = {}) {
   }
 }
 
-/* ---------------- پنل ادمین (GET /admin/stats و ...) ---------------- */
+/* ---------------- پنل ادمین ---------------- */
 
 async function loadStats() {
   try {
-    const d = await api("/admin/stats");
+    const d = await AdminApi.stats();
     state.stats = d;
     return { success: true };
   } catch (e) {
@@ -772,8 +730,7 @@ async function loadStats() {
 
 async function loadAdminKrokis(status) {
   try {
-    const q = status ? `?status=${status}` : "";
-    const d = await api("/admin/krokis" + q);
+    const d = await AdminApi.krokis(status);
     state.adminKrokis = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -783,7 +740,7 @@ async function loadAdminKrokis(status) {
 
 async function loadAdminTransactions() {
   try {
-    const d = await api("/admin/transactions");
+    const d = await AdminApi.transactions();
     state.adminTransactions = (listOf(d) || []).map(mapTx);
     return { success: true };
   } catch (e) {
@@ -793,7 +750,7 @@ async function loadAdminTransactions() {
 
 async function loadRoles() {
   try {
-    const d = await api("/admin/roles");
+    const d = await AdminApi.roles();
     state.roles = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -801,11 +758,11 @@ async function loadRoles() {
   }
 }
 
-/* ---------------- قیمت کروکی به تفکیک شهر (GET/POST /admin/city-prices) ---------------- */
+/* ---------------- قیمت کروکی به تفکیک شهر ---------------- */
 
 async function loadCityPrices() {
   try {
-    const d = await api("/admin/city-prices");
+    const d = await AdminApi.cityPrices();
     state.cityPrices = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -815,7 +772,7 @@ async function loadCityPrices() {
 
 async function setCityPrice(city, price) {
   try {
-    await api("/admin/city-prices", { method: "POST", body: { city: String(city || "").trim(), price: Number(price) || 0 } });
+    await AdminApi.setCityPrice(String(city || "").trim(), Number(price) || 0);
     await loadCityPrices();
     return { success: true };
   } catch (e) {
@@ -832,7 +789,7 @@ function priceForCity(city) {
 
 async function loadMyAgent() {
   try {
-    const d = await api("/agent/me");
+    const d = await AgencyApi.me();
     state.myAgent = d || null;
     return { success: true };
   } catch (e) {
@@ -843,7 +800,7 @@ async function loadMyAgent() {
 
 async function loadSubordinates() {
   try {
-    const d = await api("/agent/subordinates");
+    const d = await AgencyApi.subordinates();
     state.subordinates = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -853,16 +810,17 @@ async function loadSubordinates() {
 
 async function requestAgency(data) {
   try {
-    const body = typeof data === "string"
-      ? { city: String(data || "").trim() }
-      : {
-          firstName: String(data.firstName || "").trim(),
-          lastName: String(data.lastName || "").trim(),
-          phone: String(data.phone || "").trim(),
-          city: String(data.city || "").trim(),
-          full_name: (String(data.firstName || "").trim() + " " + String(data.lastName || "").trim()).trim(),
-        };
-    await api("/agency-requests", { method: "POST", body });
+    const body =
+      typeof data === "string"
+        ? { city: String(data || "").trim() }
+        : {
+            firstName: String(data.firstName || "").trim(),
+            lastName: String(data.lastName || "").trim(),
+            phone: String(data.phone || "").trim(),
+            city: String(data.city || "").trim(),
+            full_name: (String(data.firstName || "").trim() + " " + String(data.lastName || "").trim()).trim(),
+          };
+    await AgencyApi.request(body);
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message || "خطا در ثبت درخواست نمایندگی" };
@@ -871,7 +829,7 @@ async function requestAgency(data) {
 
 async function loadAgencyRequests() {
   try {
-    const d = await api("/agency-requests");
+    const d = await AgencyApi.requests();
     state.agencyRequests = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -881,7 +839,7 @@ async function loadAgencyRequests() {
 
 async function decideAgencyRequest(id, approve) {
   try {
-    await api(`/agency-requests/${id}/${approve ? "approve" : "reject"}`, { method: "POST" });
+    await AgencyApi.decide(id, approve);
     await loadAgencyRequests();
     return { success: true };
   } catch (e) {
@@ -891,8 +849,7 @@ async function decideAgencyRequest(id, approve) {
 
 async function loadAdminAgents(city) {
   try {
-    const q = city ? `?city=${encodeURIComponent(city)}` : "";
-    const d = await api("/admin/agents" + q);
+    const d = await AgencyApi.adminAgents(city);
     state.adminAgents = listOf(d) || [];
     return { success: true };
   } catch (e) {
@@ -902,7 +859,7 @@ async function loadAdminAgents(city) {
 
 async function loadAgentDetail(agentId) {
   try {
-    const d = await api(`/admin/agents/${agentId}/transactions`);
+    const d = await AgencyApi.agentTransactions(agentId);
     state.agentDetail = { agentId, items: listOf(d?.transactions || d) || [], total: Number(d?.total || 0) };
     return { success: true };
   } catch (e) {

@@ -276,6 +276,7 @@
 
 <script setup>
 import { ref, reactive, watch, onUnmounted } from "vue";
+import axios from "axios";
 import { loadMapbox } from "../utils/loadMapbox";
 import proj4 from "proj4";
 
@@ -341,27 +342,27 @@ const IR_BBOX = "44.0,25.0,63.3,39.8";
 
 const formatCoordinate = (coord) => (coord != null ? Number(coord).toFixed(6) : "نامشخص");
 
-function waitMapReady() {
-  return new Promise((resolve) => {
-    if (props.map?.loaded?.()) return resolve(true);
-    props.map?.once?.("load", () => resolve(true));
-    setTimeout(() => resolve(!!props.map), 3000);
-  });
-}
-
 async function geocode(q, params) {
-  const p = new URLSearchParams({
-    access_token: token(),
-    language: "fa",
-    country: "ir",
-    bbox: IR_BBOX,
-    ...params,
-  });
-  const res = await fetch(
-    "https://api.mapbox.com/geocoding/v5/mapbox.places/" + encodeURIComponent(q) + ".json?" + p,
-  );
-  if (!res.ok) throw new Error("خطای سرویس جستجو (" + res.status + ")");
-  return res.json();
+  try {
+    const res = await axios.get(
+      "https://api.mapbox.com/geocoding/v5/mapbox.places/" + encodeURIComponent(q) + ".json",
+      {
+        params: {
+          access_token: token(),
+          language: "fa",
+          country: "ir",
+          bbox: IR_BBOX,
+          ...params,
+        },
+        timeout: 15000,
+      },
+    );
+    return res.data;
+  } catch (e) {
+    const status = e?.response?.status;
+    if (status) throw new Error("خطای سرویس جستجو (" + status + ")");
+    throw new Error("خطا در ارتباط با سرور؛ اتصال خود را بررسی کنید");
+  }
 }
 
 async function performSearch() {
@@ -430,17 +431,22 @@ function attachMarkerContextDelete(marker) {
   });
 }
 
+async function showMarker(lng, lat, color, popupText) {
+  const mapboxgl = await loadMapbox();
+  const marker = new mapboxgl.Marker({ color }).setLngLat([lng, lat]);
+  if (popupText) marker.setPopup(new mapboxgl.Popup().setText(popupText));
+  marker.addTo(props.map);
+  attachMarkerContextDelete(marker);
+  return marker;
+}
+
 async function flyToLocation(item) {
   if (!props.map || !item.geom) return;
   const [lng, lat] = item.geom.coordinates;
   props.map.flyTo({ center: [lng, lat], zoom: 16, essential: true });
   clearCoordMarker();
-  const mapboxgl = await loadMapbox();
-  searchMarker = new mapboxgl.Marker({ color: "#FA6C04" })
-    .setLngLat([lng, lat])
-    .setPopup(new mapboxgl.Popup().setText(item.title || "مکان انتخاب شده"))
-    .addTo(props.map);
-  attachMarkerContextDelete(searchMarker);
+  clearSearchMarker();
+  searchMarker = await showMarker(lng, lat, "#FA6C04", item.title || "مکان انتخاب شده");
 };
 
 const closePanel = () => {
@@ -463,11 +469,8 @@ const clearResults = () => {
 async function placeCoordMarker(lon, lat) {
   if (!props.map) return;
   clearSearchMarker();
-  const mapboxgl = await loadMapbox();
-  coordMarker = new mapboxgl.Marker({ color: "#ea580c" })
-    .setLngLat([lon, lat])
-    .addTo(props.map);
-  attachMarkerContextDelete(coordMarker);
+  clearCoordMarker();
+  coordMarker = await showMarker(lon, lat, "#ea580c");
   props.map.flyTo({ center: [lon, lat], zoom: Math.max(props.map.getZoom(), 15), essential: true });
 }
 
