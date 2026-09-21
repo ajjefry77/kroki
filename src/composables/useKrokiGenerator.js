@@ -618,48 +618,105 @@ export function useKrokiGenerator() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  // ─────────────── DXF Export ───────────────
+  // ─────────────── DXF Export (R12 / AC1009 — سازگار با همه اتوکدها) ───────────────
+  // مشکل قبلی: فایل AC1027 با LWPOLYLINE بدون مارکرهای 100 (AcDbEntity/AcDbPolyline)
+  // توسط اتوکد نادیده گرفته می‌شد و فایل خالی به نظر می‌رسید.
+  // راه‌حل: خروجی R12 فقط با LINE و TEXT روی لایه 0 که همه اتوکدها بازش می‌کنند.
   function exportDxf() {
     const metas = state.selectedShapesMeta;
     const pts = state.utmPoints;
     if (!pts.length || !metas.length) return;
 
-    let entities = "";
-    for (let m = 0; m < metas.length; m++) {
-      const meta = metas[m];
+    // جمع‌آوری شکل‌های معتبر
+    const shapes = [];
+    for (const meta of metas) {
       const slice = pts.slice(meta.startIdx, meta.startIdx + meta.count);
-      if (slice.length < 2) continue;
+      const clean = (slice || []).filter(
+        (p) => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)),
+      );
+      if (clean.length < 2) continue;
+      shapes.push({ isClosed: !!meta.isClosed, pts: clean });
+    }
+    if (!shapes.length) return;
 
-      if (meta.isClosed && slice.length >= 3) {
-        entities += `  0\nLWPOLYLINE\n  8\n0\n 90\n${slice.length}\n 70\n1\n`;
-        for (const p of slice)
-          entities += ` 10\n${p.x.toFixed(4)}\n 20\n${p.y.toFixed(4)}\n`;
-      } else {
-        for (let i = 0; i < slice.length - 1; i++) {
-          const a = slice[i],
-            b = slice[i + 1];
-          entities += `  0\nLINE\n  8\n0\n 10\n${a.x.toFixed(4)}\n 20\n${a.y.toFixed(4)}\n 30\n0.0\n 11\n${b.x.toFixed(4)}\n 21\n${b.y.toFixed(4)}\n 31\n0.0\n`;
-        }
+    // ارتفاع متن پویا نسبت به ابعاد زمین (متن ثابت 2.5 متری یا خیلی ریز بود یا خیلی درشت)
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
+    for (const s of shapes) {
+      for (const p of s.pts) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
       }
+    }
+    const span = Math.max(maxX - minX, maxY - minY, 1);
+    const textH = Math.min(Math.max(span * 0.025, 0.5), 20);
+    const offset = textH * 0.8;
+    const f3 = (n) => Number(n).toFixed(3);
 
-      for (let i = 0; i < slice.length; i++) {
-        const next = (i + 1) % slice.length;
-        if (!meta.isClosed && next === 0 && i === slice.length - 1) break;
-        const a = slice[i],
-          b = slice[next];
-        const dx = b.x - a.x,
-          dy = b.y - a.y;
+    const L = [];
+    const w = (code, val) => {
+      L.push(String(code), String(val));
+    };
+
+    w(0, "SECTION");
+    w(2, "HEADER");
+    w(9, "$ACADVER");
+    w(1, "AC1009");
+    w(0, "ENDSEC");
+    w(0, "SECTION");
+    w(2, "ENTITIES");
+
+    for (const s of shapes) {
+      const n = s.pts.length;
+      const edgeCount = s.isClosed ? n : n - 1;
+      // ۱) خطوط محیط (هر یال یک LINE مستقل — مطمئن‌ترین موجودیت DXF)
+      for (let i = 0; i < edgeCount; i++) {
+        const a = s.pts[i];
+        const b = s.pts[(i + 1) % n];
+        w(0, "LINE");
+        w(8, "0");
+        w(10, f3(a.x));
+        w(20, f3(a.y));
+        w(30, "0.0");
+        w(11, f3(b.x));
+        w(21, f3(b.y));
+        w(31, "0.0");
+      }
+      // ۲) لیبل طول هر ضلع
+      for (let i = 0; i < edgeCount; i++) {
+        const a = s.pts[i];
+        const b = s.pts[(i + 1) % n];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
         const len = Math.sqrt(dx * dx + dy * dy);
-        const mx = (a.x + b.x) / 2,
-          my = (a.y + b.y) / 2;
-        const nlen = Math.sqrt(dx * dx + dy * dy) || 1;
-        const nx = -dy / nlen,
-          ny = dx / nlen;
-        entities += `  0\nTEXT\n  8\n0\n 10\n${(mx + nx * 2).toFixed(4)}\n 20\n${(my + ny * 2).toFixed(4)}\n 30\n0.0\n 40\n2.5\n 1\n${len.toFixed(2)}\n`;
+        if (!Number.isFinite(len) || len < 1e-9) continue;
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        const nlen = len || 1;
+        const nx = -dy / nlen;
+        const ny = dx / nlen;
+        let rot = (Math.atan2(dy, dx) * 180) / Math.PI;
+        if (rot > 90) rot -= 180;
+        if (rot < -90) rot += 180;
+        w(0, "TEXT");
+        w(8, "0");
+        w(10, f3(mx + nx * offset));
+        w(20, f3(my + ny * offset));
+        w(30, "0.0");
+        w(40, f3(textH));
+        w(1, len.toFixed(2));
+        w(50, rot.toFixed(2));
+        w(7, "STANDARD");
       }
     }
 
-    const dxf = `  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1027\n  9\n$INSUNITS\n 70\n6\n  0\nENDSEC\n  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n1\n  0\nLAYER\n  2\n0\n 70\n0\n 62\n7\n  6\nCONTINUOUS\n  0\nENDTAB\n  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n${entities}  0\nENDSEC\n  0\nEOF\n`;
+    w(0, "ENDSEC");
+    w(0, "EOF");
+    const dxf = L.join("\r\n") + "\r\n";
     const blob = new Blob([dxf], { type: "application/dxf;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

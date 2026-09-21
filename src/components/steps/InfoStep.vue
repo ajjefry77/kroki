@@ -46,7 +46,7 @@
             <input v-model="form.client" type="text" class="input" placeholder="نام متقاضی" />
           </div>
           <div>
-            <label class="block mb-1.5 font-medium text-xs">شماره همراه متقاضی *</label>
+            <label class="block mb-1.5 font-medium text-xs">شماره همراه متقاضی</label>
             <input
               v-model="form.clientPhone"
               type="tel"
@@ -63,7 +63,7 @@
             <p v-if="phoneError" class="text-[10px] text-[var(--danger)] mt-1">{{ phoneError }}</p>
           </div>
           <div>
-            <label class="block mb-1.5 font-medium text-xs">کد ملی متقاضی *</label>
+            <label class="block mb-1.5 font-medium text-xs">کد ملی متقاضی</label>
             <input
               v-model="form.clientNationalId"
               type="text"
@@ -308,13 +308,13 @@ const touched = reactive({ phone: false, national: false });
 
 const phoneError = computed(() => {
   const v = faToEn(props.form.clientPhone).trim();
-  if (!v) return touched.phone ? "شماره همراه متقاضی الزامی است." : "";
+  if (!v) return "";
   return isValidIranianMobile(v) ? "" : "شماره همراه باید ۱۱ رقم و با 09 شروع شود.";
 });
 
 const nationalError = computed(() => {
   const v = faToEn(props.form.clientNationalId).trim();
-  if (!v) return touched.national ? "کد ملی متقاضی الزامی است." : "";
+  if (!v) return "";
   if (!/^\d{10}$/.test(v)) return "کد ملی باید ۱۰ رقم باشد.";
   return isValidNationalCode(v) ? "" : "کد ملی معتبر نیست.";
 });
@@ -361,8 +361,6 @@ const valid = computed(() => {
     f.title.trim() &&
       f.client.trim() &&
       f.date.trim() &&
-      faToEn(f.clientPhone).trim() &&
-      faToEn(f.clientNationalId).trim() &&
       !phoneError.value &&
       !nationalError.value &&
       eligiblePinsOf(props.pins).length,

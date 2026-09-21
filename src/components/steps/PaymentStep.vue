@@ -327,22 +327,14 @@ async function pay() {
     payError.value = "ابتدا نام متقاضی را در مرحله اطلاعات وارد کنید.";
     return;
   }
-  // دفاع دومرحله‌ای: موبایل و کد ملی حتی با دست‌کاری فرم هم کنترل می‌شوند
+  // موبایل و کد ملی اختیاری‌اند؛ فقط در صورت ورود، اعتبارشان کنترل می‌شود
   const phone = faToEn(props.form.clientPhone).trim();
-  if (!phone) {
-    payError.value = "شماره همراه متقاضی الزامی است؛ لطفاً به مرحله اطلاعات برگردید.";
-    return;
-  }
-  if (!isValidIranianMobile(phone)) {
+  if (phone && !isValidIranianMobile(phone)) {
     payError.value = "شماره همراه متقاضی معتبر نیست (۱۱ رقم با 09).";
     return;
   }
   const nationalId = faToEn(props.form.clientNationalId).trim();
-  if (!nationalId) {
-    payError.value = "کد ملی متقاضی الزامی است؛ لطفاً به مرحله اطلاعات برگردید.";
-    return;
-  }
-  if (!isValidNationalCode(nationalId)) {
+  if (nationalId && !isValidNationalCode(nationalId)) {
     payError.value = "کد ملی متقاضی معتبر نیست.";
     return;
   }

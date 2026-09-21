@@ -55,41 +55,47 @@ function esc(s = "") {
   })[c]);
 }
 
-// ساخت متن DXF (R12, POLYLINE) با مختصات UTM در یک زون
+// ساخت متن DXF سازگار با اتوکد (R12 / AC1009 با LINE و TEXT روی لایه 0)
+// نکته: نسخه قبلی با POLYLINE روی لایه تعریف‌نشده KROKI در بعضی اتوکدها خالی باز می‌شد.
 export function buildDxf({ metas, allPositions }, zone = 39) {
-  const out = [];
+  const L = [];
   const w = (code, val) => {
-    out.push(code, String(val));
+    L.push(String(code), String(val));
   };
-  const entities = [];
 
-  let shapeNo = 0;
-  for (const meta of metas) {
-    shapeNo += 1;
-    const slice = allPositions.slice(meta.startIdx, meta.startIdx + meta.count);
+  const shapes = [];
+  for (const meta of metas || []) {
+    const slice = (allPositions || []).slice(meta.startIdx, meta.startIdx + meta.count);
     if (slice.length < 2) continue;
-    const pts = slice.map((p) => {
-      const { x, y } = toUTMInZone(Number(p.lon), Number(p.lat), zone);
-      return { x, y };
-    });
-
-    entities.push("0", "POLYLINE");
-    entities.push("8", "KROKI");
-    entities.push("66", "1");
-    entities.push("70", String(meta.isClosed ? 1 : 0));
-    entities.push("10", "0.0");
-    entities.push("20", "0.0");
-    entities.push("30", "0.0");
-    for (const p of pts) {
-      entities.push("0", "VERTEX");
-      entities.push("8", "KROKI");
-      entities.push("10", p.x.toFixed(3));
-      entities.push("20", p.y.toFixed(3));
-      entities.push("30", "0.0");
-    }
-    entities.push("0", "SEQEND");
-    entities.push("8", "KROKI");
+    const pts = slice
+      .map((p) => {
+        const { x, y } = toUTMInZone(Number(p.lon ?? p.lng), Number(p.lat), zone);
+        return { x, y };
+      })
+      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    if (pts.length < 2) continue;
+    shapes.push({ isClosed: !!meta.isClosed, pts });
   }
+
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  for (const s of shapes)
+    for (const p of s.pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+  const span = Math.max(
+    Number.isFinite(maxX - minX) ? maxX - minX : 1,
+    Number.isFinite(maxY - minY) ? maxY - minY : 1,
+    1,
+  );
+  const textH = Math.min(Math.max(span * 0.025, 0.5), 20);
+  const offset = textH * 0.8;
+  const f3 = (n) => Number(n).toFixed(3);
 
   w(0, "SECTION");
   w(2, "HEADER");
@@ -99,10 +105,49 @@ export function buildDxf({ metas, allPositions }, zone = 39) {
 
   w(0, "SECTION");
   w(2, "ENTITIES");
-  out.push(...entities);
+  for (const s of shapes) {
+    const n = s.pts.length;
+    const edgeCount = s.isClosed ? n : n - 1;
+    for (let i = 0; i < edgeCount; i++) {
+      const a = s.pts[i];
+      const b = s.pts[(i + 1) % n];
+      w(0, "LINE");
+      w(8, "0");
+      w(10, f3(a.x));
+      w(20, f3(a.y));
+      w(30, "0.0");
+      w(11, f3(b.x));
+      w(21, f3(b.y));
+      w(31, "0.0");
+    }
+    for (let i = 0; i < edgeCount; i++) {
+      const a = s.pts[i];
+      const b = s.pts[(i + 1) % n];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (!Number.isFinite(len) || len < 1e-9) continue;
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const nx = -dy / (len || 1);
+      const ny = dx / (len || 1);
+      let rot = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (rot > 90) rot -= 180;
+      if (rot < -90) rot += 180;
+      w(0, "TEXT");
+      w(8, "0");
+      w(10, f3(mx + nx * offset));
+      w(20, f3(my + ny * offset));
+      w(30, "0.0");
+      w(40, f3(textH));
+      w(1, len.toFixed(2));
+      w(50, rot.toFixed(2));
+      w(7, "STANDARD");
+    }
+  }
   w(0, "ENDSEC");
   w(0, "EOF");
-  return out.join("\r\n");
+  return L.join("\r\n") + "\r\n";
 }
 
 export function downloadText(text, filename, mime = "text/plain") {

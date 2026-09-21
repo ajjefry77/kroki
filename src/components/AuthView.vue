@@ -36,10 +36,13 @@
 
       <form @submit.prevent="submit" class="space-y-4">
         <Transition name="fade-slide">
-          <div v-if="error" class="flex items-center gap-2 border border-[var(--danger)]/25 bg-[var(--danger-glow)] px-4 py-3 rounded-xl text-sm text-[var(--danger)]">
-            <i class="fas fa-triangle-exclamation"></i>
-            <span>{{ error }}</span>
-          </div>
+          <AuthAlert
+            v-if="alert.message"
+            :type="alert.type"
+            :title="alert.type === 'success' ? 'عملیات موفق' : 'خطا'"
+            :message="alert.message"
+            @close="alert.message = ''"
+          />
         </Transition>
 
         <div v-if="mode === 'register'">
@@ -109,12 +112,13 @@ import { ref, reactive, computed, watch } from "vue";
 import { auth } from "../stores/auth";
 import { faToEn } from "../utils/validators";
 import Captcha from "./Captcha.vue";
+import AuthAlert from "./AuthAlert.vue";
 
 const emit = defineEmits(["back", "success"]);
 
 const mode = ref("login");
 const loading = ref(false);
-const error = ref("");
+const alert = reactive({ type: "error", message: "" });
 const captchaRef = ref(null);
 const fields = reactive({ name: "", username: "", phone: "", password: "", agentCode: "" });
 
@@ -126,29 +130,44 @@ const pwCheck = computed(() => ({
 
 // با عوض شدن حالت، چالش امنیتی تازه می‌شود
 watch(mode, () => {
-  error.value = "";
+  alert.type = "error";
+  alert.message = "";
   captchaRef.value?.refresh();
 });
+
+function showError(msg) {
+  alert.type = "error";
+  alert.message = msg;
+}
+
+function showSuccess(msg) {
+  alert.type = "success";
+  alert.message = msg;
+}
 
 async function submit() {
   if (loading.value) return;
   if (!captchaRef.value?.validate()) {
-    error.value = "کد امنیتی اشتباه است؛ کد جدید را وارد کنید";
+    showError("کد امنیتی اشتباه است؛ کد جدید را وارد کنید");
     return;
   }
   loading.value = true;
-  error.value = "";
+  alert.message = "";
   const result =
     mode.value === "login"
       ? await auth.login(fields.username, fields.password)
       : await auth.register(fields);
   loading.value = false;
   if (result.success) {
-    fields.username = "";
-    fields.password = "";
-    emit("success");
+    showSuccess(mode.value === "login" ? "ورود با موفقیت انجام شد؛ در حال انتقال..." : "ثبت‌نام با موفقیت انجام شد؛ در حال انتقال...");
+    const done = () => {
+      fields.username = "";
+      fields.password = "";
+      emit("success");
+    };
+    setTimeout(done, 900);
   } else {
-    error.value = result.error;
+    showError(result.error);
     captchaRef.value?.refresh();
   }
 }
