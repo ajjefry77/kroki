@@ -26,10 +26,11 @@
               <div class="text-[11px] text-[var(--text-muted)] whitespace-nowrap transition-all duration-500" :class="scrolled ? 'opacity-0 h-0' : 'opacity-100'">تولید حرفه‌ای کروکی نقشه ملک</div>
             </div>
           </div>
-          <nav class="hidden md:flex items-center gap-6 text-sm text-[var(--text-muted)] justify-self-center">
+          <nav class="hidden md:flex items-center gap-5 text-sm text-[var(--text-muted)] justify-self-center">
             <a href="#features" class="nav-link">امکانات</a>
-            <a href="#how" class="nav-link">مراحل کار</a>
             <a href="#templates" class="nav-link">قالب‌ها</a>
+            <button class="nav-link text-sm" @click="$emit('experts')">کارشناسان</button>
+            <a href="#how" class="nav-link">مراحل کار</a>
             <button v-if="authed && !isAdmin" class="nav-link font-semibold text-sm" @click="$emit('agencyRequest')">
               <i class="fas fa-user-tie ml-1"></i> درخواست نمایندگی
             </button>
@@ -384,7 +385,7 @@ const props = defineProps({
   free: { type: Number, default: 0 },
 });
 
-defineEmits(["start", "toggleLog", "login", "admin", "logout", "profile", "agencyRequest"]);
+defineEmits(["start", "toggleLog", "login", "admin", "logout", "profile", "agencyRequest", "experts"]);
 
 const features = [
   { icon: "fa-map-marked-alt", title: "ترسیم تعاملی روی نقشه", desc: "خط، پلی‌گان، دایره و نقاط چندگانه را مستقیم روی تصویر ماهواره‌ای ترسیم کنید." },

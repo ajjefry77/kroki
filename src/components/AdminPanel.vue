@@ -548,6 +548,134 @@
         </div>
       </section>
 
+      <!-- درخواست‌های همکاری (کارشناسان) -->
+      <section v-else-if="activeTab === 'expertRequests'">
+        <div class="card !rounded-2xl overflow-hidden mb-6">
+          <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50 font-bold text-sm flex items-center gap-2">
+            <i class="fas fa-handshake text-[var(--accent)]"></i> درخواست‌های در انتظار بررسی
+            <span class="text-[11px] text-[var(--text-muted)] font-semibold">({{ expertRequests.length }})</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کارشناس</th>
+                  <th>کد ملی</th>
+                  <th>تماس</th>
+                  <th>عنوان‌ها / تخصص‌ها</th>
+                  <th>مدارک</th>
+                  <th>تاریخ</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="expertRequests.length === 0">
+                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">درخواست همکاری در انتظار وجود ندارد</td>
+                </tr>
+                <tr v-for="r in expertRequests" :key="r.id">
+                  <td class="text-xs font-semibold">{{ r.fullName || r.name }}</td>
+                  <td class="text-xs" dir="ltr">{{ r.nationalId }}</td>
+                  <td class="text-xs" dir="ltr">{{ r.phone }}</td>
+                  <td class="text-xs">
+                    <div class="flex flex-wrap gap-1 max-w-[220px]">
+                      <span v-for="t in (r.titles || [])" :key="t" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-glow)] text-[var(--accent-soft)]">{{ t }}</span>
+                      <span v-for="s in (r.specialties || [])" :key="s" class="px-2 py-0.5 rounded-full text-[10px] bg-[var(--surface3)] text-[var(--text-muted)]">{{ s }}</span>
+                    </div>
+                  </td>
+                  <td class="text-xs">
+                    <div v-if="(r.documents || []).length === 0" class="text-[var(--text-faint)]">—</div>
+                    <div v-else class="flex flex-col gap-0.5 max-w-[200px]">
+                      <span v-for="(d, i) in r.documents" :key="i" class="truncate text-[10px] text-[var(--text-muted)]" dir="ltr" :title="d.name">
+                        <i class="fas fa-paperclip ml-1"></i>{{ d.name || ('مدرک ' + (i + 1)) }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at || r.at) }}</td>
+                  <td>
+                    <div class="flex items-center gap-1.5">
+                      <button class="btn btn-primary btn-xs" :disabled="busy" @click="decideExpert(r, true)">
+                        <i class="fas fa-check ml-0.5"></i> تأیید
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="decideExpert(r, false)">
+                        <i class="fas fa-xmark ml-0.5"></i> رد
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3 class="font-bold text-sm mt-8 mb-3">تاریخچه تصمیم‌ها</h3>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کارشناس</th>
+                  <th>عنوان‌ها</th>
+                  <th>تاریخ</th>
+                  <th>وضعیت</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="decidedExpertRequests.length === 0">
+                  <td colspan="4" class="text-center text-[var(--text-faint)] py-8">هنوز تصمیمی ثبت نشده است</td>
+                </tr>
+                <tr v-for="r in decidedExpertRequests" :key="r.id">
+                  <td class="text-xs font-semibold">{{ r.fullName || r.name }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ (r.titles || []).join('، ') }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at || r.at) }}</td>
+                  <td>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="r.status === 'approved' ? 'bg-[var(--success-glow)] text-[var(--success)]' : 'bg-[var(--danger-glow)] text-[var(--danger)]'">
+                      {{ r.status === "approved" ? "تأیید شد" : "رد شد" }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- کارشناسان تأییدشده -->
+      <section v-else-if="activeTab === 'experts'">
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50 font-bold text-sm flex items-center gap-2">
+            <i class="fas fa-user-tie text-[var(--accent)]"></i> کارشناسان تأییدشده (لیست عمومی)
+            <span class="text-[11px] text-[var(--text-muted)] font-semibold">({{ approvedExperts.length }})</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>نام</th>
+                  <th>تماس</th>
+                  <th>عنوان‌ها / تخصص‌ها</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="approvedExperts.length === 0">
+                  <td colspan="4" class="text-center text-[var(--text-faint)] py-10">هنوز کارشناسی تأیید نشده است</td>
+                </tr>
+                <tr v-for="e in approvedExperts" :key="e.id">
+                  <td class="text-xs font-semibold">{{ e.fullName || e.name }}</td>
+                  <td class="text-xs" dir="ltr">{{ e.phone }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ [...(e.titles || []), ...(e.specialties || [])].join('، ') || '—' }}</td>
+                  <td>
+                    <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="removeExpertRow(e)">
+                      <i class="fas fa-trash text-xs ml-0.5"></i> حذف از لیست
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- نمایندگان (هرمی) -->
       <section v-else-if="activeTab === 'agents'">
         <div class="flex items-center gap-2 mb-4">
@@ -790,6 +918,8 @@ const tabs = computed(() => [
   { id: "referrals", label: "معرفی", icon: "fa-ticket", badge: null },
   { id: "cities", label: "شهرها", icon: "fa-city", badge: null },
   { id: "agencyRequests", label: "درخواست نمایندگی", icon: "fa-user-clock", badge: pendingAgencyCount.value || null },
+  { id: "expertRequests", label: "درخواست‌های همکاری", icon: "fa-handshake", badge: pendingExpertCount.value || null },
+  { id: "experts", label: "کارشناسان", icon: "fa-user-tie", badge: null },
   { id: "agents", label: "نمایندگان", icon: "fa-sitemap", badge: null },
 ]);
 
@@ -826,6 +956,12 @@ const cityPriceDrafts = reactive({});
 const agencyRequests = computed(() => auth.state.agencyRequests.filter((r) => r.status === "pending"));
 const pendingAgencyCount = computed(() => agencyRequests.value.length);
 
+// درخواست‌های همکاری کارشناسان
+const expertRequests = computed(() => (auth.state.expertRequests || []).filter((r) => r.status === "pending"));
+const decidedExpertRequests = computed(() => (auth.state.expertRequests || []).filter((r) => r.status !== "pending").slice(0, 40));
+const pendingExpertCount = computed(() => expertRequests.value.length);
+const approvedExperts = computed(() => auth.state.experts || []);
+
 const agentCityFilter = ref("");
 const adminAgents = computed(() => auth.state.adminAgents);
 const openAgentId = ref(null);
@@ -858,6 +994,25 @@ async function decideAgency(r, approve) {
   if (!res.success) showToast(res.error || "خطا در ثبت تصمیم", "error");
 }
 
+async function decideExpert(r, approve) {
+  busy.value = true;
+  const res = await auth.decideExpertRequest(r.id, approve);
+  busy.value = false;
+  if (res.success) {
+    showToast(approve ? "کارشناس تأیید شد و به لیست کارشناسان اضافه شد." : "درخواست همکاری رد شد.");
+  } else {
+    showToast(res.error || "خطا در ثبت تصمیم", "error");
+  }
+}
+
+async function removeExpertRow(r) {
+  busy.value = true;
+  const res = await auth.removeExpert(r.id);
+  busy.value = false;
+  if (res.success) showToast("کارشناس از لیست عمومی حذف شد.");
+  else showToast(res.error || "خطا در حذف کارشناس", "error");
+}
+
 function toggleAgent(a) {
   if (openAgentId.value === a.id) {
     openAgentId.value = null;
@@ -869,7 +1024,7 @@ function toggleAgent(a) {
 
 watch(agentCityFilter, (c) => auth.loadAdminAgents(c));
 
-const tabLoaded = reactive({ krokis: false, transactions: false, roles: false, referrals: false, cities: false, agencyRequests: false, agents: false });
+const tabLoaded = reactive({ krokis: false, transactions: false, roles: false, referrals: false, cities: false, agencyRequests: false, agents: false, expertRequests: false, experts: false });
 
 function showToast(message, type = "success") {
   toast.value = { message, type };
@@ -1050,6 +1205,12 @@ watch(activeTab, (tab) => {
   } else if (tab === "agencyRequests") {
     tabLoaded.agencyRequests = true;
     auth.loadAgencyRequests();
+  } else if (tab === "expertRequests") {
+    tabLoaded.expertRequests = true;
+    auth.loadExpertRequests();
+  } else if (tab === "experts") {
+    tabLoaded.experts = true;
+    auth.loadExperts();
   } else if (tab === "agents" && !tabLoaded.agents) {
     tabLoaded.agents = true;
     auth.loadAdminAgents("");

@@ -11,6 +11,10 @@
 
       <AgencyRequestPage v-else-if="page === 'agency-request'" key="agency-request" @home="goHome" />
 
+      <ExpertRequestPage v-else-if="page === 'expert-request'" key="expert-request" @home="goHome" />
+
+      <ExpertListPage v-else-if="page === 'experts'" key="experts" @home="goHome" @request="openExpertRequest" />
+
       <LandingPage
         v-else-if="step === 'landing'"
         key="landing"
@@ -26,6 +30,7 @@
         @logout="logout"
         @profile="openUserPanel"
         @agencyRequest="openAgencyRequest"
+        @experts="openExperts"
       />
 
       <div v-else key="wizard" class="flex-1 flex flex-col min-h-0">
@@ -122,6 +127,8 @@ const AuthView = defineAsyncComponent(() => import("./components/AuthView.vue"))
 const AdminPanel = defineAsyncComponent(() => import("./components/AdminPanel.vue"));
 const UserPanel = defineAsyncComponent(() => import("./components/UserPanel.vue"));
 const AgencyRequestPage = defineAsyncComponent(() => import("./components/AgencyRequestPage.vue"));
+const ExpertRequestPage = defineAsyncComponent(() => import("./components/ExpertRequestPage.vue"));
+const ExpertListPage = defineAsyncComponent(() => import("./components/ExpertListPage.vue"));
 const DrawStep = defineAsyncComponent(() => import("./components/steps/DrawStep.vue"));
 const InfoStep = defineAsyncComponent(() => import("./components/steps/InfoStep.vue"));
 const PreviewStep = defineAsyncComponent(() => import("./components/steps/PreviewStep.vue"));
@@ -232,6 +239,10 @@ function onAuthSuccess() {
     openAgencyRequest();
     return;
   }
+  if (ret === "expert-request") {
+    openExpertRequest();
+    return;
+  }
   if (auth.isAdmin.value) {
     openAdmin();
     return;
@@ -270,6 +281,19 @@ function openAgencyRequest() {
   page.value = "agency-request";
 }
 
+function openExpertRequest() {
+  if (!auth.isAuthenticated.value) {
+    openAuth("expert-request");
+    return;
+  }
+  if (auth.isAdmin.value) return;
+  page.value = "expert-request";
+}
+
+function openExperts() {
+  page.value = "experts";
+}
+
 function logout() {
   auth.logout();
   logger.info("auth", "خروج از حساب کاربری");
@@ -305,6 +329,8 @@ function currentHash() {
   if (page.value === "admin") return "#/admin";
   if (page.value === "userpanel") return "#/userpanel";
   if (page.value === "agency-request") return "#/agency-request";
+  if (page.value === "expert-request") return "#/expert-request";
+  if (page.value === "experts") return "#/experts";
   if (page.value === "auth") return "#/auth";
   if (step.value === "landing") return "#/";
   return "#/" + step.value;
@@ -326,6 +352,10 @@ function enforceFromHash() {
     openUserPanel();
   } else if (h === "agency-request") {
     openAgencyRequest();
+  } else if (h === "expert-request") {
+    openExpertRequest();
+  } else if (h === "experts") {
+    openExperts();
   } else if (h === "auth") {
     if (auth.isAuthenticated.value) goHome();
     else page.value = "auth";
