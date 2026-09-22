@@ -101,13 +101,6 @@
                 <p class="text-[10px] text-[var(--text-faint)] mt-1">به‌صورت خودکار از روی موقعیت ملک پیشنهاد و قابل ویرایش است.</p>
               </div>
               <div>
-                <label class="block mb-1.5 font-medium text-xs">شهر (برای محاسبه دقیق هزینه — اختیاری)</label>
-                <select v-model="form.city" class="input">
-                  <option value="">— نرخ پایه (بدون انتخاب شهر)</option>
-                  <option v-for="c in cityOptions" :key="c" :value="c">{{ c }}</option>
-                </select>
-              </div>
-              <div>
                 <label class="block mb-1.5 font-medium text-xs">کارشناس / نقشه‌بردار</label>
                 <input v-model="form.surveyor" type="text" class="input" placeholder="نام کارشناس (اختیاری)" />
               </div>
@@ -263,7 +256,7 @@
                 <dd class="font-bold">{{ areaPreview }}</dd>
               </div>
               <div class="flex items-center justify-between gap-2">
-                <dt class="text-[var(--text-muted)]">هزینه ({{ form.city || "—" }})</dt>
+                <dt class="text-[var(--text-muted)]">هزینه</dt>
                 <dd class="font-extrabold text-[var(--accent-soft)]" dir="ltr">{{ fmtMoney(price) }} <span class="text-[10px] font-medium text-[var(--text-muted)]">تومان</span></dd>
               </div>
             </dl>
@@ -305,11 +298,9 @@ import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel, getUserTemplates } from 
 import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
 import { eligiblePinsOf, suggestAddressForPositions } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
-import { auth, fmtMoney } from "../../stores/auth";
+import { fmtMoney, KROKI_PRICE } from "../../stores/auth";
 
-const cityOptions = computed(() => auth.state.cityPrices.map((c) => c.city));
 onMounted(() => {
-  if (!auth.state.cityPrices.length) auth.loadCityPrices();
   document.addEventListener("click", closeDrop);
   document.addEventListener("keydown", onEscapeDrop);
   void suggestAddress();
@@ -432,7 +423,7 @@ const polyVerts = [
   [60, 80],
 ];
 
-const price = computed(() => auth.priceForCity(props.form.city));
+const price = computed(() => KROKI_PRICE);
 
 const missingList = computed(() => {
   const f = props.form;

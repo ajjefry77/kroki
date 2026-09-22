@@ -65,7 +65,7 @@
             </div>
             <div>
               <label class="block mb-1 text-xs font-medium">سربرگ</label>
-              <input v-model="t.org" type="text" class="input" placeholder="نام سازمان / دفتر" />
+              <input v-model="t.org" type="text" class="input" placeholder="نام نهاد / دفتر" />
             </div>
             <div class="sm:col-span-2">
               <label class="block mb-1 text-xs font-medium">توضیح کوتاه</label>

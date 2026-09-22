@@ -10,7 +10,6 @@ import {
   measureDistance,
   formatDistance,
   formatArea,
-  formatVertexLabel,
   getDrawTypeName,
   toUTM,
   toUTMInZone,
@@ -367,18 +366,8 @@ export function useDrawing(map, pins) {
     if (!ts.polygonLabelSourceId) return;
     const labelSrc = map.getSource(ts.polygonLabelSourceId);
     if (!labelSrc) return;
+    // لیبل مختصات UTM رئوس عمداً نمایش داده نمی‌شود؛ فقط طول اضلاع و مرکز
     const features = [];
-    pts.forEach((p) => {
-      const lng = p.lng || p.lon;
-      features.push({
-        type: "Feature",
-        geometry: { type: "Point", coordinates: [lng, p.lat] },
-        properties: {
-          kind: "vertex",
-          label: formatVertexLabel(lng, p.lat, coordinateSystem.value),
-        },
-      });
-    });
     for (let i = 1; i < pts.length; i++) {
       features.push(edgeFeature(pts[i - 1], pts[i]));
     }
@@ -507,7 +496,7 @@ export function useDrawing(map, pins) {
     addTempLayer(ts.sourceId + "-vertex-label", {
       type: "symbol",
       source: labelSrcId,
-      filter: ["==", ["get", "kind"], "vertex"],
+      filter: ["==", ["get", "kind"], "__disabled_vertex__"],
       layout: {
         "text-field": ["get", "label"],
         "text-size": 9,
@@ -691,7 +680,7 @@ export function useDrawing(map, pins) {
     addTempLayer(ts.sourceId + "-vertex-label", {
       type: "symbol",
       source: labelSrcId,
-      filter: ["==", ["get", "kind"], "vertex"],
+      filter: ["==", ["get", "kind"], "__disabled_vertex__"],
       layout: {
         "text-field": ["get", "label"],
         "text-size": 9,

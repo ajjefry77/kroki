@@ -178,14 +178,14 @@
           </div>
         </div>
 
-        <!-- مجاورت‌ها — فقط در قالب ثبتی قابل ورود است -->
-        <div v-if="currentTemplate?.id === 'sabt' && gen.state.edgeTexts.length" class="card !rounded-2xl">
+        <!-- مجاورت‌ها — برای تمام قالب‌ها -->
+        <div v-if="gen.state.edgeTexts.length" class="card !rounded-2xl">
           <div class="font-semibold text-sm mb-3 flex items-center gap-2">
             <i class="fas fa-font text-[var(--accent)]"></i>
             مجاورت‌ها (نام کوچه، معبر، ملک مجاور)
           </div>
           <p class="text-[10px] text-[var(--text-faint)] mb-3 -mt-2">
-            این بخش مخصوص قالب «ثبتی» است و فقط در همین حالت قابل ورود می‌باشد.
+            متن هر ضلع روی کروکی و در جدول مجاورت‌های خروجی چاپ می‌شود.
           </p>
           <div v-for="(shapeTexts, m) in gen.state.edgeTexts" :key="m" class="mb-3 last:mb-0">
             <div class="text-[11px] text-[var(--text-muted)] mb-1.5">

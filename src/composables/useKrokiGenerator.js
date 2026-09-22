@@ -1082,9 +1082,6 @@ export function useKrokiGenerator() {
         W,
       );
 
-    let globalIdx = 0;
-    // شمال‌غرب روی مختصات کانوس: کمترین y (بالا) و در صورت تساوی کمترین x (چپ)
-    // معادل بیشترین Y و کمترین X روی UTM
     let nwIndex = 0;
     for (let i = 1; i < cpts.length; i++) {
       if (
@@ -1117,6 +1114,24 @@ export function useKrokiGenerator() {
       ctx.strokeStyle = t.polygonColor;
       ctx.stroke();
 
+      // مرکز همین ترسیم (نه میانگین کل ترسیم‌ها) تا جهت داخل/بیرون و
+      // جای لیبل گوشه‌ها برای هر شکل مستقل و مرتب باشد
+      let scx = 0,
+        scy = 0;
+      if (isClosed) {
+        const cpc = canvasPolygonCentroid(slice);
+        if (cpc) {
+          scx = cpc.x;
+          scy = cpc.y;
+        } else {
+          scx = slice.reduce((s, p) => s + p.x, 0) / slice.length;
+          scy = slice.reduce((s, p) => s + p.y, 0) / slice.length;
+        }
+      } else {
+        scx = slice.reduce((s, p) => s + p.x, 0) / slice.length;
+        scy = slice.reduce((s, p) => s + p.y, 0) / slice.length;
+      }
+
       const edgeCount = isClosed ? slice.length : slice.length - 1;
       for (let i = 0; i < edgeCount; i++) {
         const a = slice[i];
@@ -1136,8 +1151,8 @@ export function useKrokiGenerator() {
         nx /= nlen;
         ny /= nlen;
 
-        const toCx = mx - cx,
-          toCy = my - cy;
+        const toCx = mx - scx,
+          toCy = my - scy;
         if (nx * toCx + ny * toCy < 0) {
           nx = -nx;
           ny = -ny;
@@ -1200,31 +1215,46 @@ export function useKrokiGenerator() {
       }
 
       const startIdx = meta.startIdx;
+      const vRadius = (t.vertexRadius ?? 4) * FS;
       slice.forEach((p, i) => {
-        globalIdx += 1;
+        // نقطه گوشه: دایره توپر با حاشیه سفید تا روی خطوط مرتب دیده شود
         ctx.beginPath();
-        ctx.arc(p.x, p.y, (t.vertexRadius ?? 4) * FS, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, vRadius, 0, Math.PI * 2);
         ctx.fillStyle = t.polygonColor;
         ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = Math.max(1.5, Math.round(2 * FS));
+        ctx.stroke();
 
-        const toCx = p.x - cx,
-          toCy = p.y - cy;
+        // جهت لیبل: از مرکز همین ترسیم به سمت گوشه (نه مرکز کل نقشه)
+        const toCx = p.x - scx,
+          toCy = p.y - scy;
         const dlen = Math.sqrt(toCx * toCx + toCy * toCy) || 1;
-        const lx = Math.max(14, Math.min(p.x + (toCx / dlen) * offVx, W - 14));
-        const ly = Math.max(
-          drawTop + 12,
-          Math.min(p.y + (toCy / dlen) * offVx, drawBottom - 12),
+        const label = String(vertexLabel(t.vertexLabels, startIdx + i, nwIndex));
+        ctx.font = `800 ${fVertex}px Vazirmatn, Tahoma, sans-serif`;
+        const tw = ctx.measureText(label).width;
+        const padX = Math.round(5 * FS);
+        const padY = Math.round(7 * FS);
+        const boxW = tw + padX * 2;
+        const boxH = fVertex + padY;
+        let lx = p.x + (toCx / dlen) * offVx;
+        let ly = p.y + (toCy / dlen) * offVx;
+        // کل جعبه لیبل داخل ناحیه ترسیم نگه داشته می‌شود تا برش نخورد
+        lx = Math.max(pad + boxW / 2, Math.min(lx, W - pad - boxW / 2));
+        ly = Math.max(
+          drawTop + boxH / 2 + 2,
+          Math.min(ly, drawBottom - boxH / 2 - 2),
         );
 
-        ctx.font = `800 ${fVertex}px Vazirmatn, Tahoma, sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.strokeStyle = t.polygonColor;
+        ctx.lineWidth = Math.max(1, FS);
+        ctx.fillRect(lx - boxW / 2, ly - boxH / 2, boxW, boxH);
+        ctx.strokeRect(lx - boxW / 2, ly - boxH / 2, boxW, boxH);
         ctx.fillStyle = t.textColor;
-        ctx.strokeStyle = "rgba(255,255,255,0.9)";
-        ctx.lineWidth = Math.max(2, Math.round(3 * FS));
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const label = vertexLabel(t.vertexLabels, startIdx + i, nwIndex);
-        ctx.strokeText(String(label), lx, ly);
-        ctx.fillText(String(label), lx, ly);
+        ctx.fillText(label, lx, ly + 1);
       });
     }
 
@@ -1344,7 +1374,6 @@ export function useKrokiGenerator() {
       : "";
 
     const hasUtm = t.coordinateTable !== "none";
-    const isSabt = state.templateId === "sabt";
     const landscape = state.orientation === "landscape";
 
     const headBlock = `
@@ -1363,7 +1392,7 @@ export function useKrokiGenerator() {
       ["نشانی ملک", escapeHtml(last.form.address) || "—"],
       ["سیستم مختصات", `WGS84 / UTM — Zone: ${state.utmZone ?? "—"}`],
       ["مساحت کل", `${state.areaM2.toFixed(2)} متر مربع`],
-      ["سازمان / مرجع", escapeHtml(t.org)],
+      ["نهاد", escapeHtml(t.org)],
       ["کارشناس", escapeHtml(last.form.surveyor)],
       ["عرض معبر", `${escapeHtml(last.form.streetWidth) || "—"} متر`],
       ["شماره پلاک ثبتی", escapeHtml(last.form.plaque) || "—"],
@@ -1395,7 +1424,7 @@ export function useKrokiGenerator() {
       : "";
 
     const edgeTable =
-      isSabt && state.edgeTexts.some((arr) => arr.some((x) => x))
+      state.edgeTexts.some((arr) => arr.some((x) => x))
         ? `<div class="block-title">مجاورت‌ها</div>
       <table class="utm-table">
         <thead><tr><th>ترسیم</th><th>ضلع</th><th>مجاورت</th></tr></thead>

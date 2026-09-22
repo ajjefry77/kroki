@@ -472,6 +472,7 @@ function restart() {
   krokiForm.clientPhone = "";
   krokiForm.clientNationalId = "";
   krokiForm.address = "";
+  krokiForm.city = "";
   krokiForm.surveyor = "";
   krokiForm.plaque = "";
   krokiForm.streetWidth = "";

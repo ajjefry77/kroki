@@ -233,7 +233,7 @@ import { ref, reactive, computed, onMounted } from "vue";
 import { getTemplate } from "../../utils/templates";
 import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
-import { auth, fmtMoney } from "../../stores/auth";
+import { auth, fmtMoney, KROKI_PRICE } from "../../stores/auth";
 import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
 
 const props = defineProps({
@@ -245,7 +245,7 @@ const props = defineProps({
 
 const emit = defineEmits(["back", "done"]);
 
-const price = computed(() => auth.priceForCity(props.form.city));
+const price = computed(() => KROKI_PRICE);
 const bankCard = auth.WALLET_CARD;
 const cardOwner = auth.CARD_OWNER;
 
@@ -355,7 +355,7 @@ async function pay() {
       surveyor: props.form.surveyor || "",
       plaque: props.form.plaque || "",
       address: props.form.address || "",
-      city: props.form.city || "",
+      city: "",
       street_width: props.form.streetWidth || "",
       description: props.form.description || "",
       logo_url: props.form.logo || "",
