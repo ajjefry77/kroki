@@ -101,9 +101,9 @@
                 <p class="text-[10px] text-[var(--text-faint)] mt-1">به‌صورت خودکار از روی موقعیت ملک پیشنهاد و قابل ویرایش است.</p>
               </div>
               <div>
-                <label class="block mb-1.5 font-medium text-xs">شهر (برای محاسبه هزینه) *</label>
+                <label class="block mb-1.5 font-medium text-xs">شهر (برای محاسبه دقیق هزینه — اختیاری)</label>
                 <select v-model="form.city" class="input">
-                  <option value="" disabled>انتخاب شهر</option>
+                  <option value="">— نرخ پایه (بدون انتخاب شهر)</option>
                   <option v-for="c in cityOptions" :key="c" :value="c">{{ c }}</option>
                 </select>
               </div>
@@ -440,7 +440,6 @@ const missingList = computed(() => {
   if (!f.title.trim()) miss.push("عنوان نقشه");
   if (!f.client.trim()) miss.push("نام متقاضی");
   if (!f.date.trim()) miss.push("تاریخ برداشت");
-  if (!f.city) miss.push("انتخاب شهر");
   if (!eligiblePinsOf(props.pins).length) miss.push("ثبت حداقل یک ترسیم");
   return miss.length ? miss : [""];
 });
@@ -451,7 +450,6 @@ const valid = computed(() => {
     f.title.trim() &&
       f.client.trim() &&
       f.date.trim() &&
-      f.city &&
       !phoneError.value &&
       !nationalError.value &&
       eligiblePinsOf(props.pins).length,
