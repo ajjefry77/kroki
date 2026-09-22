@@ -68,7 +68,7 @@
         <p class="text-xs text-[var(--text-muted)] leading-6 mb-5">
           {{ experts.length === 0 ? "اگر کارشناس هستید، درخواست همکاری ثبت کنید تا پس از تأیید مدیر در این لیست نمایش داده شوید." : "عبارت جستجو یا فیلتر عنوان را تغییر دهید." }}
         </p>
-        <button v-if="experts.length === 0" class="btn btn-primary" @click="$emit('request')">
+        <button class="btn btn-primary" @click="$emit('request')">
           <i class="fas fa-handshake ml-1"></i> ثبت درخواست همکاری
         </button>
       </div>

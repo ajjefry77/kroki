@@ -51,6 +51,12 @@
           </div>
 
           <div class="card !rounded-2xl p-6 md:p-8">
+            <div v-if="!auth.isAuthenticated.value" class="mb-5 rounded-xl px-4 py-3 text-sm font-medium bg-[var(--warning-glow,rgba(250,180,4,0.12))] border border-[var(--warning)]/30 flex items-center justify-between gap-3 flex-wrap">
+              <span><i class="fas fa-circle-info ml-1"></i>برای ارسال درخواست باید وارد شوید؛ می‌توانید فرم را ببینید و بعد وارد شوید.</span>
+              <button type="button" class="btn btn-secondary btn-sm" @click="goLogin">
+                <i class="fas fa-right-to-bracket ml-1"></i> ورود / ثبت‌نام
+              </button>
+            </div>
             <div class="space-y-5">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -167,12 +173,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import { auth } from "../stores/auth";
 import { EXPERT_TITLES, expertTitleMeta } from "../utils/experts";
 import { faToEn, isValidIranianMobile, isValidNationalCode } from "../utils/validators";
 
-defineEmits(["home"]);
+const emit = defineEmits(["home", "login"]);
+
+const DRAFT_KEY = "kroki_expert_draft";
 
 const titles = EXPERT_TITLES;
 const titleMeta = expertTitleMeta;
@@ -197,6 +205,38 @@ const submitted = ref(false);
 
 const nationalOk = computed(() => isValidNationalCode(form.nationalId));
 const phoneOk = computed(() => isValidIranianMobile(form.phone));
+
+function saveDraft() {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      firstName: form.firstName,
+      lastName: form.lastName,
+      nationalId: form.nationalId,
+      phone: form.phone,
+      titles: form.titles,
+      specialties: form.specialties,
+    }));
+  } catch {}
+}
+
+function goLogin() {
+  saveDraft();
+  emit("login");
+}
+
+onMounted(() => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d.firstName) form.firstName = d.firstName;
+    if (d.lastName) form.lastName = d.lastName;
+    if (d.nationalId) form.nationalId = d.nationalId;
+    if (d.phone) form.phone = d.phone;
+    if (Array.isArray(d.titles)) form.titles = d.titles.filter((t) => EXPERT_TITLES.includes(t));
+    if (Array.isArray(d.specialties)) form.specialties = d.specialties.slice(0, 10);
+  } catch {}
+});
 
 const valid = computed(() => {
   return (
@@ -248,8 +288,20 @@ function onFiles(e) {
 }
 
 async function submit() {
-  busy.value = true;
   msg.value = "";
+  if (!auth.isAuthenticated.value) {
+    msgOk.value = false;
+    msg.value = "برای ارسال درخواست ابتدا وارد حساب کاربری شوید";
+    saveDraft();
+    emit("login");
+    return;
+  }
+  if (auth.isAdmin.value) {
+    msgOk.value = false;
+    msg.value = "حساب ادمین امکان ثبت درخواست همکاری ندارد";
+    return;
+  }
+  busy.value = true;
   const res = await auth.requestExpert({
     firstName: faToEn(form.firstName).trim(),
     lastName: faToEn(form.lastName).trim(),
@@ -262,6 +314,7 @@ async function submit() {
   busy.value = false;
   msgOk.value = res.success;
   if (res.success) {
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
     submitted.value = true;
   } else {
     msg.value = res.error || "خطا در ثبت درخواست";

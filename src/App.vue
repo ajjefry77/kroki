@@ -11,7 +11,7 @@
 
       <AgencyRequestPage v-else-if="page === 'agency-request'" key="agency-request" @home="goHome" />
 
-      <ExpertRequestPage v-else-if="page === 'expert-request'" key="expert-request" @home="goHome" />
+      <ExpertRequestPage v-else-if="page === 'expert-request'" key="expert-request" @home="goHome" @login="openAuth('expert-request')" />
 
       <ExpertListPage v-else-if="page === 'experts'" key="experts" @home="goHome" @request="openExpertRequest" />
 
@@ -282,11 +282,8 @@ function openAgencyRequest() {
 }
 
 function openExpertRequest() {
-  if (!auth.isAuthenticated.value) {
-    openAuth("expert-request");
-    return;
-  }
-  if (auth.isAdmin.value) return;
+  // دکمه «درخواست همکاری» باید همیشه فرم را باز کند (حتی برای مهمان).
+  // کنترل ورود/نقش موقع ارسال در ExpertRequestPage انجام می‌شود تا دکمه هیچ‌وقت بی‌اثر به‌نظر نرسد.
   page.value = "expert-request";
 }
 
