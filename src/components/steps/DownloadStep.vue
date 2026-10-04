@@ -244,8 +244,13 @@ function sizeCanvas() {
 
 onMounted(() => {
   sizeCanvas();
-  nextTick(() => {
-    props.gen.renderSketch(hiddenCanvasRef.value);
+  nextTick(async () => {
+    try {
+      await document.fonts?.ready;
+    } catch (e) {}
+    try {
+      props.gen.renderSketch(hiddenCanvasRef.value);
+    } catch (e) {}
   });
   logger.info("step", "صفحه دانلود — تکمیل سفارش", {
     code: props.trackingCode,
@@ -253,6 +258,9 @@ onMounted(() => {
 });
 
 function downloadSketch() {
+  try {
+    props.gen.renderSketch(hiddenCanvasRef.value);
+  } catch (e) {}
   const name = makeExportFilename("mapiq", props.formIndex);
   props.gen.downloadCanvasImage(hiddenCanvasRef.value, name + ".png");
   logger.info("download", "دانلود کروکی PNG");

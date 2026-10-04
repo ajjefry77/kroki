@@ -15,7 +15,7 @@
         @click="closePanel"
       >
         <div
-          class="fixed top-0 right-0 w-[340px] h-full bg-[var(--surface)] shadow-2xl z-50 overflow-y-auto border-l border-[var(--border)]"
+          class="fixed top-0 right-0 w-[min(340px,92vw)] h-full bg-[var(--surface)] shadow-2xl z-50 overflow-y-auto border-l border-[var(--border)]"
           dir="rtl"
           @click.stop
         >

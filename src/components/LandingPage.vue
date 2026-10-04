@@ -15,10 +15,10 @@
         "
       >
         <div
-          class="mx-auto grid grid-cols-[1fr_auto_1fr] items-center transition-all duration-500"
-          :class="scrolled ? 'max-w-3xl px-4 h-[60px]' : 'max-w-7xl px-5 h-16'"
+          class="mx-auto flex items-center justify-between gap-2 transition-all duration-500"
+          :class="scrolled ? 'max-w-3xl px-3 sm:px-4 h-[60px]' : 'max-w-7xl px-3 sm:px-5 h-16'"
         >
-          <div class="flex items-center gap-3 justify-self-start min-w-0">
+          <div class="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
             <span class="logo-3d relative shrink-0">
               <img
                 src="/favicon.png"
@@ -30,10 +30,10 @@
             </span>
             <div
               class="min-w-0 transition-all duration-500 overflow-hidden"
-              :class="scrolled ? 'hidden sm:block' : 'block'"
+              :class="scrolled ? 'hidden xs:block sm:block' : 'block'"
             >
               <div
-                class="font-extrabold text-lg leading-tight whitespace-nowrap"
+                class="font-extrabold text-base sm:text-lg leading-tight whitespace-nowrap"
               >
                 سامانه کروکی
               </div>
@@ -46,7 +46,7 @@
             </div>
           </div>
           <nav
-            class="hidden md:flex items-center gap-5 text-sm text-[var(--text-muted)] justify-self-center"
+            class="hidden md:flex items-center gap-5 text-sm text-[var(--text-muted)] flex-1 justify-center min-w-0"
           >
             <a href="#features" class="nav-link">امکانات</a>
             <a href="#templates" class="nav-link">قالب‌ها</a>
@@ -62,11 +62,10 @@
               <i class="fas fa-user-tie ml-1"></i> درخواست نمایندگی
             </button>
           </nav>
-          <div class="flex items-center gap-2 justify-self-end">
+          <div class="flex items-center gap-2 shrink-0">
             <button
               v-if="!authed"
-              class="btn btn-ghost h-9 !rounded-full transition-all duration-500"
-              :class="scrolled ? '!px-4 !text-[13px]' : ''"
+              class="btn btn-ghost h-9 !rounded-full transition-all duration-500 !px-3 sm:!px-5 text-[13px] sm:text-sm whitespace-nowrap"
               @click="$emit('login')"
             >
               <i class="fas fa-right-to-bracket ml-1"></i>
@@ -74,7 +73,7 @@
               ><span class="sm:hidden">ورود</span>
             </button>
 
-            <div v-if="authed" class="relative order-last">
+            <div v-if="authed" class="relative">
               <button
                 class="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition"
                 title="حساب کاربری"
@@ -86,7 +85,7 @@
               <Transition name="drop">
                 <div
                   v-if="menuOpen"
-                  class="absolute left-0 mt-2 w-64 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden profile-menu"
+                  class="absolute left-0 mt-2 w-[min(16rem,78vw)] rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden profile-menu"
                 >
                   <div
                     class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50"
@@ -738,6 +737,9 @@
         class="max-w-7xl mx-auto px-5 text-center text-sm md:text-base font-semibold text-[var(--text-muted)]"
       >
         کلیه حقوق مادی و معنوی متعلق به شرکت ساج گستر کاسپین می‌باشد
+        <div class="mt-4 flex justify-center">
+          <a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7999093&Code=IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7999093&Code=IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz' alt='' style='cursor:pointer' code='IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz'></a>
+        </div>
       </div>
     </footer>
   </div>

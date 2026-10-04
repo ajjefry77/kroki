@@ -418,6 +418,9 @@ export function useKrokiGenerator() {
       const container = map.getContainer();
       const origWidth = container.style.width;
       const origHeight = container.style.height;
+      const origOverflow = document.body.style.overflow;
+      const isMobileView =
+        typeof window !== "undefined" && window.innerWidth && window.innerWidth < 768;
       const aspectUtm = toUTM(allPositions);
       const aspectSpanX = Math.max(
         Math.max(...aspectUtm.map((p) => p.x)) -
@@ -429,28 +432,46 @@ export function useKrokiGenerator() {
           Math.min(...aspectUtm.map((p) => p.y)),
         1,
       );
-      const { w: cw, h: ch } = computeCanvasSize(aspectSpanX, aspectSpanY);
+      let { w: cw, h: ch } = computeCanvasSize(aspectSpanX, aspectSpanY);
+      // روی موبایل کانتینر ۱۴۰۰px صفحه را می‌ترکاند و تایل‌ها لود نمی‌شوند؛
+      // سقف ابعاد برداشت را پایین می‌آوریم تا تصویر سیوشده دقیق و سالم باشد
+      if (isMobileView) {
+        cw = Math.min(cw, 900);
+        ch = Math.min(ch, 900);
+      }
+      const pad = isMobileView ? 40 : 120;
+      // جلوگیری از پرش اسکرول صفحه هنگام بزرگ‌شدن موقت کانتینر
+      try { document.body.style.overflow = "hidden"; } catch (e) {}
       container.style.width = cw + "px";
       container.style.height = ch + "px";
       map.resize();
-      await new Promise((resolve) => {
-        map.fitBounds(bounds, { padding: 120, maxZoom: 20, duration: 0 });
-        map.once("idle", resolve);
-        setTimeout(resolve, 1500);
-      });
-      map.triggerRepaint();
-      await new Promise((r) =>
-        requestAnimationFrame(() => requestAnimationFrame(r)),
-      );
-      await new Promise((r) => setTimeout(r, 200));
-      const dataUrl = map.getCanvas().toDataURL("image/png");
-      container.style.width = origWidth;
-      container.style.height = origHeight;
-      map.resize();
-      for (const [layerId, visibility] of layerStates) {
+      let dataUrl = "";
+      try {
+        await new Promise((resolve) => {
+          map.fitBounds(bounds, { padding: pad, maxZoom: 19, duration: 0 });
+          map.once("idle", resolve);
+          setTimeout(resolve, isMobileView ? 2500 : 1500);
+        });
+        map.triggerRepaint();
+        await new Promise((r) =>
+          requestAnimationFrame(() => requestAnimationFrame(r)),
+        );
+        await new Promise((r) => setTimeout(r, isMobileView ? 400 : 200));
         try {
-          map.setLayoutProperty(layerId, "visibility", visibility);
-        } catch (e) {}
+          dataUrl = map.getCanvas().toDataURL("image/png");
+        } catch (e) {
+          dataUrl = "";
+        }
+      } finally {
+        container.style.width = origWidth;
+        container.style.height = origHeight;
+        try { document.body.style.overflow = origOverflow; } catch (e) {}
+        map.resize();
+        for (const [layerId, visibility] of layerStates) {
+          try {
+            map.setLayoutProperty(layerId, "visibility", visibility);
+          } catch (e) {}
+        }
       }
       return dataUrl;
     } catch (e) {
@@ -1349,15 +1370,60 @@ export function useKrokiGenerator() {
 
   function downloadImage(dataUrl, filename) {
     if (!dataUrl) return;
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = filename;
-    a.click();
+    try {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) {}
+    // فالبک موبایل (iOS سافاری download را نادیده می‌گیرد): باز کردن در تب جدید
+    const isMobileView =
+      typeof window !== "undefined" && window.innerWidth && window.innerWidth < 768;
+    if (isMobileView) {
+      setTimeout(() => {
+        try {
+          const check = document.createElement("a");
+          // اگر دانلود انجام نشده باشد، کاربر با لمس طولانی می‌تواند ذخیره کند
+          if (!check.download && /iPhone|iPad|iPod/i.test(navigator.userAgent || "")) {
+            window.open(dataUrl, "_blank");
+          }
+        } catch (e) {}
+      }, 300);
+    }
+  }
+
+  function downloadDataUrlFallback(dataUrl, filename) {
+    // تلاش دوم برای موبایل: باز کردن تصویر در تب جدید تا کاربر ذخیره کند
+    try {
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.write(
+          `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${filename}</title></head><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${dataUrl}" style="max-width:100%;height:auto"/></body></html>`,
+        );
+        w.document.close();
+        return true;
+      }
+    } catch (e) {}
+    try {
+      window.open(dataUrl, "_blank");
+      return true;
+    } catch (e) {}
+    return false;
   }
 
   function downloadCanvasImage(canvas, filename) {
     if (!canvas) return;
-    downloadImage(canvas.toDataURL("image/png"), filename);
+    let url = "";
+    try {
+      // صبر برای فونت وزیرمتن تا متن کروکی روی موبایل ناخوانا/جابه‌جا سیو نشود
+      url = canvas.toDataURL("image/png");
+    } catch (e) {
+      url = "";
+    }
+    if (!url) return;
+    downloadImage(url, filename);
   }
 
   function buildPrintHtml() {
@@ -1788,6 +1854,28 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
 .sheet.portrait .bottom-section table th,
 .sheet.portrait .bottom-section table td { padding: 1px 3px; }
 .sheet.portrait .bottom-section .block-title { font-size: 10px; margin: 0 0 2px; }
+
+/* پیش‌نمایش داخل iframe باریک موبایل: جلوگیری از سرریز و به‌هم‌ریختگی */
+.sheet img { max-width: 100%; height: auto; }
+.utm-table { table-layout: fixed; }
+.utm-table td, .utm-table th { word-break: break-all; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .sheet { padding: 3mm; }
+  .head { flex-wrap: wrap; gap: 4px; }
+  .head-title { font-size: 13px; }
+  .sheet.portrait .bottom-section { flex-direction: column; }
+  .sheet.portrait .bottom-right,
+  .sheet.portrait .bottom-mid,
+  .sheet.portrait .bottom-left { flex: 1 1 auto; width: 100%; max-width: 100%; }
+  .sheet.portrait .bottom-right .map-fig img { max-height: 180px; }
+  .sheet.landscape .map-area { flex-direction: column; }
+  .sheet.landscape .side-panel { order: 2; flex: 1 1 auto; max-width: 100%; }
+  .sheet.landscape .sketch-side { order: 1; min-height: 220px; }
+  .sheet.landscape .sketch-fig { position: relative; min-height: 220px; }
+  .sheet.landscape .sketch-fig img { max-height: 260px; }
+  table { font-size: 8.5px; }
+  .sign-row { flex-direction: column; }
+}
 
 @page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 0; }
 @media print {

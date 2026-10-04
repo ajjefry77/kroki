@@ -1,16 +1,16 @@
 <template>
-  <header class="wizard-header h-14 flex items-center px-4 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-40">
-    <div class="flex items-center gap-3 flex-shrink-0">
-      <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-9 h-9 rounded-lg object-contain shadow-md shadow-[var(--accent-glow-strong)]" />
+  <header class="wizard-header h-14 flex items-center gap-2 px-3 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-40">
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-md shadow-[var(--accent-glow-strong)]" />
       <div class="hidden sm:block">
-        <div class="font-extrabold text-sm leading-tight">سامانه کروکی</div>
-        <div class="text-[10px] text-[var(--text-muted)]">تولید کروکی نقشه</div>
+        <div class="font-extrabold text-sm leading-tight whitespace-nowrap">سامانه کروکی</div>
+        <div class="text-[10px] text-[var(--text-muted)] whitespace-nowrap">تولید کروکی نقشه</div>
       </div>
     </div>
 
     <!-- استپر -->
-    <nav class="flex-1 flex items-center justify-center overflow-x-auto px-2 min-w-0">
-      <div class="flex items-center min-w-0 h-12">
+    <nav class="flex-1 flex items-center justify-center sm:justify-center overflow-x-auto min-w-0" aria-label="مراحل">
+      <div class="flex items-center min-w-max h-12 px-1">
         <template v-for="(s, i) in steps" :key="s.id">
           <button
             class="flex items-center gap-2 group shrink-0"
@@ -19,7 +19,7 @@
             :title="canClick(i) ? 'رفتن به مرحله ' + s.label : ''"
           >
             <span
-              class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300"
+              class="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-[11px] md:text-xs font-bold border-2 transition-all duration-300 shrink-0"
               :class="dotClass(i, s.id)"
             >
               <i v-if="s.id === current" class="fas fa-chevron-left text-[10px]"></i>
@@ -41,24 +41,22 @@
           </button>
           <div
             v-if="i < steps.length - 1"
-            class="h-0.5 rounded transition-all duration-300 shrink-0"
+            class="h-0.5 rounded transition-all duration-300 shrink-0 w-4 sm:w-6 lg:w-9"
             :class="isDone(i) ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'"
-            :style="{ width: i < steps.length - 1 ? 'min(38px, 4vw)' : '0' }"
           ></div>
         </template>
       </div>
     </nav>
 
-    <!-- نشان اعتبار + پروفایل + گزارش -->
-    <div class="hidden md:flex items-center gap-2 text-[11px] text-[var(--text-muted)] px-2 flex-shrink-0">
-      
+    <!-- نشان اعتبار + پروفایل + گزارش : همیشه visible، در موبایل فقط آیکون -->
+    <div class="flex items-center gap-1.5 md:gap-2 text-[11px] text-[var(--text-muted)] flex-shrink-0">
       <button
-        class="relative flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text)] transition"
+        class="relative flex items-center justify-center gap-1.5 w-9 h-9 md:w-auto md:px-2.5 md:h-8 rounded-lg border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text)] transition"
         title="گزارش سیستم"
         @click="$emit('toggleLog')"
       >
         <i class="fas fa-bug text-[var(--accent)]"></i>
-        <span>گزارش</span>
+        <span class="hidden md:inline">گزارش</span>
         <span
           v-if="logCount"
           class="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[var(--danger)] text-white text-[9px] font-bold flex items-center justify-center"
@@ -77,7 +75,7 @@
         <Transition name="drop">
           <div
             v-if="menuOpen"
-            class="absolute left-0 mt-2 w-56 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden z-50"
+            class="absolute left-0 mt-2 w-[min(14rem,70vw)] rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden z-50"
           >
             <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50">
               <div class="flex items-center gap-3">

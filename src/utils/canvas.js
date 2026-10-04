@@ -6,7 +6,10 @@
 /** ابعاد بوم بر اساس گستره افقی/عمودی (متر)؛ حداکثر 1400، حداقل 400 */
 export function computeCanvasSize(spanX, spanY) {
   const ratio = spanX / spanY;
-  const MAX = 1400,
+  // روی موبایل بوم کوچک‌تر تا حافظه GPU/CPU کم نیاورد و سیو خراب نشود
+  const isMobile =
+    typeof window !== "undefined" && window.innerWidth && window.innerWidth < 768;
+  const MAX = isMobile ? 900 : 1400,
     MIN = 400;
   let cw = MAX,
     ch = Math.round(MAX / ratio);

@@ -1,13 +1,13 @@
 <template>
   <div class="flex-1 min-h-0 flex flex-col bg-[var(--bg)]">
-    <main class="min-h-0 flex flex-col lg:flex-row lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
-      <!-- نقشه -->
-      <section class="relative flex-1 min-h-[340px] lg:min-h-0 border-b lg:border-b-0 border-[var(--border)]">
+    <main class="min-h-0 flex flex-col lg:flex-row lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden">
+      <!-- نقشه : در موبایل ارتفاع ثابت تا WebGL دیده شود؛ در دسکتاپ flex -->
+      <section class="relative w-full shrink-0 h-[58svh] min-h-[340px] max-h-[68svh] lg:h-auto lg:max-h-none lg:flex-1 lg:min-h-0 lg:shrink border-b lg:border-b-0 border-[var(--border)]">
         <MapPanel ref="mapPanelRef" :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" @csvFile="onCsvFile" />
       </section>
 
       <!-- پنل کناری واحد با تب‌ها -->
-      <aside class="lg:w-[400px] xl:w-[440px] flex-shrink-0 flex flex-col min-h-0 overflow-hidden border-t lg:border-t-0 lg:border-r border-[var(--border)] bg-[var(--surface)]">
+      <aside class="lg:w-[400px] xl:w-[440px] flex-shrink-0 flex flex-col min-h-0 lg:overflow-hidden overflow-visible border-t lg:border-t-0 lg:border-r border-[var(--border)] bg-[var(--surface)]">
         <!-- تب‌ها -->
         <div class="px-4 pt-3 pb-2 border-b border-[var(--border)]">
           <div class="flex gap-1 bg-[var(--surface2)] rounded-lg p-1 border border-[var(--border)]">
@@ -51,7 +51,7 @@
           <span class="text-sm font-bold text-[var(--accent)]">{{ areaInfo.text }}</span>
         </div>
 
-        <div class="flex-1 min-h-0 overflow-y-auto">
+        <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain" style="-webkit-overflow-scrolling:touch">
           <!-- تب جدول نقاط -->
           <PointsTable
             v-show="activeTab === 'points'"

@@ -1164,8 +1164,11 @@ export function useDrawing(map, pins) {
   }
 
   function setDrawMode(mode) {
-    // کلیک مجدد روی ابزار فعال نباید ترسیم جاری را پاک یا هندلر تکراری بسازد
-    if (drawMode.value === mode && !editingPin) return;
+    // تپ مجدد روی ابزار فعال = لغو/خاموش (مهم برای موبایل که Esc ندارد)
+    if (drawMode.value === mode && !editingPin && !showForm.value) {
+      cancelForm();
+      return;
+    }
     if (drawMode.value === mode && showForm.value) return;
     if (editingPin) exitPinEdit();
     measureActive.value = false;

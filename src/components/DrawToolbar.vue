@@ -1,15 +1,15 @@
 <template>
-  <div ref="toolbarEl" class="absolute top-3 left-3 z-40">
+  <div ref="toolbarEl" class="absolute top-12 sm:top-3 left-3 z-30">
     <div
       @click.stop
-      class="flex flex-col rounded-md shadow-lg p-2 gap-1.5 bg-white/10 backdrop-blur-md border border-white/20"
+      class="flex flex-col rounded-xl shadow-lg p-1.5 sm:p-2 gap-1.5 bg-white/90 sm:bg-white/10 backdrop-blur-md border border-white/20"
     >
       
       <!-- اندازه‌گیری -->
       <button
         @click="$emit('toggleMeasure')"
         title="اندازه‌گیری"
-        class="w-8 h-8 rounded flex items-center justify-center shadow-md transition"
+        class="tool-btn"
         :class="
           drawMode === 'measure'
             ? 'text-white bg-accent'
@@ -23,7 +23,7 @@
       <button
         @click="$emit('setDrawMode', 'polyline')"
         :class="[
-          'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
+          'tool-btn',
           drawMode === 'polyline'
             ? 'text-white bg-accent'
             : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)]',
@@ -41,7 +41,7 @@
       <button
         @click="$emit('setDrawMode', 'polygon')"
         :class="[
-          'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
+          'tool-btn',
           drawMode === 'polygon'
             ? 'text-white bg-accent'
             : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)]',
@@ -55,7 +55,7 @@
       <button
         @click="$emit('setDrawMode', 'rectangle')"
         :class="[
-          'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
+          'tool-btn',
           drawMode === 'rectangle'
             ? 'text-white bg-accent'
             : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)]',
@@ -69,7 +69,7 @@
       <button
         @click="$emit('setDrawMode', 'eraser')"
         :class="[
-          'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
+          'tool-btn',
           drawMode === 'eraser'
             ? 'text-white bg-[var(--danger)]'
             : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--danger)] hover:text-white',
@@ -85,7 +85,7 @@
       <button
         @click="$emit('toggleSearch')"
         :class="[
-          'w-8 h-8 rounded flex items-center justify-center shadow-md transition',
+          'tool-btn',
           searchActive
             ? 'text-white bg-accent'
             : 'text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)]',
@@ -98,14 +98,14 @@
       <!-- زوم -->
       <button
         @click="map?.zoomIn({ duration: 200 })"
-        class="w-8 h-8 rounded flex items-center justify-center shadow-md text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)] transition font-bold"
+        class="tool-btn text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)] font-bold"
         title="بزرگنمایی"
       >
         <i class="fas fa-plus text-sm"></i>
       </button>
       <button
         @click="map?.zoomOut({ duration: 200 })"
-        class="w-8 h-8 rounded flex items-center justify-center shadow-md text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)] transition font-bold"
+        class="tool-btn text-[var(--text)] bg-[var(--surface2)] hover:bg-[var(--surface3)] font-bold"
         title="کوچکنمایی"
       >
         <i class="fas fa-minus text-sm"></i>
@@ -129,3 +129,30 @@ defineEmits(["toggleMeasure", "setDrawMode", "openKroki", "toggleSearch"]);
 
 defineExpose({ toolbarEl });
 </script>
+
+<style scoped>
+.tool-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+  transition: background .15s, transform .1s;
+  touch-action: manipulation;
+  font-size: 1rem;
+}
+.tool-btn:active { transform: scale(.94); }
+@media (min-width: 640px) {
+  .tool-btn {
+    width: 2rem;
+    height: 2rem;
+    min-width: 0;
+    min-height: 0;
+    font-size: .875rem;
+  }
+}
+</style>

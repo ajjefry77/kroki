@@ -1,6 +1,6 @@
 <template>
-  <div class="relative w-full h-full">
-    <div ref="mapContainerRef" class="w-full h-full"></div>
+  <div class="relative w-full h-full min-h-[inherit] overflow-hidden bg-[var(--bg-elevated)]">
+    <div ref="mapContainerRef" class="absolute inset-0 w-full h-full" style="touch-action:none"></div>
 
     <!-- هشدار عدم پشتیبانی WebGL -->
     <div v-if="initError" class="absolute inset-0 z-50 flex items-center justify-center bg-[var(--bg)]">
@@ -19,10 +19,10 @@
     <!-- هشدار حالت ترسیم -->
     <div
       v-if="drawing?.drawMode && drawing.drawMode !== 'measure'"
-      class="absolute top-3 right-1/2 translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded shadow-lg z-[600] flex items-center gap-2 pointer-events-none"
+      class="absolute top-3 right-1/2 translate-x-1/2 max-w-[calc(100%-6rem)] bg-red-100 border border-red-400 text-red-700 px-3 py-1.5 rounded shadow-lg z-[600] flex items-center gap-2 pointer-events-none text-center"
     >
-      <i :class="drawing.drawMode === 'eraser' ? 'fas fa-eraser' : 'fas fa-pen animate-pulse'"></i>
-      <span class="text-sm font-medium whitespace-nowrap">
+      <i :class="drawing.drawMode === 'eraser' ? 'fas fa-eraser shrink-0' : 'fas fa-pen animate-pulse shrink-0'"></i>
+      <span class="text-[11px] sm:text-sm font-medium leading-5">
         {{ drawHint }}
       </span>
     </div>
@@ -38,11 +38,11 @@
       />
       <button
         @click="kmlInput?.click()"
-        class="px-3 py-1.5 rounded-lg shadow-md text-sm font-medium bg-accent text-white hover:brightness-110 transition"
+        class="px-2.5 sm:px-3 py-1.5 rounded-lg shadow-md text-xs sm:text-sm font-medium bg-accent text-white hover:brightness-110 transition whitespace-nowrap"
         title="آپلود فایل KML / KMZ / CSV"
       >
         <i class="fas fa-file-upload ml-1"></i>
-        آپلود KML / CSV
+        <span class="hidden xs:inline sm:inline">آپلود KML / CSV</span><span class="xs:hidden sm:hidden">آپلود</span>
       </button>
     </div>
 
@@ -61,11 +61,32 @@
     <!-- جستجوی آدرس / مختصات -->
     <MapSearchBox :map="mapProxy" :drawing="drawing" v-model:open="searchOpen" />
 
+    <!-- دکمه‌های پایان/لغو ترسیم برای موبایل (کیبورد Enter وجود ندارد) -->
+    <div
+      v-if="drawing && !drawing.showForm && !drawing.shape && drawing.canFinishDrawing"
+      class="absolute bottom-3 right-3 left-3 sm:left-auto z-30 flex items-center gap-2"
+    >
+      <button
+        class="btn btn-primary flex-1 sm:flex-none !py-2.5 text-sm shadow-xl"
+        @click="drawing.finishCurrentDrawing?.()"
+      >
+        <i class="fas fa-check ml-1"></i>
+        پایان ترسیم ({{ drawing.livePointCount }} نقطه)
+      </button>
+      <button
+        class="btn btn-ghost !py-2.5 shadow-xl bg-[var(--surface)]/90 backdrop-blur"
+        title="لغو ترسیم"
+        @click="drawing.cancelForm?.()"
+      >
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
     <!-- فرم ذخیره ترسیم (پس از پایان ترسیم با Enter نمایش داده می‌شود) -->
     <Transition name="modal">
       <div
         v-if="drawing?.showForm"
-        class="absolute top-16 right-3 z-40 w-72 rounded-lg shadow-xl border border-[var(--border-strong)] p-3 bg-[var(--surface)]"
+        class="absolute z-40 rounded-xl shadow-xl border border-[var(--border-strong)] p-3 bg-[var(--surface)] inset-x-3 bottom-3 sm:inset-x-auto sm:bottom-auto sm:top-16 sm:right-3 sm:w-72 max-h-[45%] sm:max-h-none overflow-y-auto"
         @click.stop
       >
         <div class="flex items-center justify-between mb-2">
@@ -123,7 +144,7 @@
     </Transition>
 
     <!-- نمایشگر مختصات مکان‌نما و زوم -->
-    <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 rounded-md bg-black/55 text-white text-[11px] font-medium flex items-center gap-3 pointer-events-none select-none" dir="ltr">
+    <div class="absolute bottom-3 left-3 z-30 px-2.5 py-1.5 rounded-md bg-black/55 text-white text-[10px] sm:text-[11px] font-medium hidden sm:flex items-center gap-3 pointer-events-none select-none" dir="ltr">
       <span v-if="hud.lng !== null" class="tracking-tight">
         <i class="fas fa-location-crosshairs ml-1 text-[10px]"></i>{{ hud.lng.toFixed(6) }}, {{ hud.lat.toFixed(6) }}
       </span>
@@ -494,6 +515,25 @@ function onMapClick(e) {
 
 let midPan = null;
 let touchPan = null;
+let resizeObserver = null;
+
+function isDrawingActive() {
+  const m = drawing.value?.drawMode;
+  return m === "polygon" || m === "polyline" || m === "rectangle" || m === "multi_point" || m === "circle" || m === "measure";
+}
+
+function syncPanState() {
+  if (!map) return;
+  try {
+    // هنگام ترسیم: پن با یک انگشت خاموش تا تپ = افزودن نقطه؛ حرکت با دو انگشت آزاد است.
+    // در حالت عادی: پن با یک انگشت روشن تا نقشه روی موبایل قابل جابه‌جایی باشد.
+    if (isDrawingActive()) {
+      if (map.dragPan) map.dragPan.disable();
+    } else {
+      if (map.dragPan) map.dragPan.enable();
+    }
+  } catch (e) {}
+}
 
 function onMidDown(e) {
   if (!map || e.button !== 1) return;
@@ -513,21 +553,30 @@ function onMidUp() {
   midPan = null;
 }
 function onTouchPanStart(e) {
+  // هنگام ترسیم، تپ تک‌انگشتی باید نقطه بگذارد نه اینکه نقشه را جابه‌جا کند
+  if (isDrawingActive()) {
+    touchPan = null;
+    return;
+  }
   if (e.touches.length !== 1) {
     touchPan = null;
     return;
   }
   const t = e.touches[0];
-  touchPan = { x: t.clientX, y: t.clientY, id: t.identifier };
+  touchPan = { x: t.clientX, y: t.clientY, id: t.identifier, moved: false };
 }
 function onTouchPanMove(e) {
   if (!touchPan || !map || e.touches.length !== 1) return;
+  if (isDrawingActive()) return;
   const t = e.touches[0];
   if (t.identifier !== touchPan.id) return;
-  e.preventDefault();
   const dx = t.clientX - touchPan.x;
   const dy = t.clientY - touchPan.y;
-  touchPan = { x: t.clientX, y: t.clientY, id: t.identifier };
+  // آستانه 6px تا تپ ساده (کلیک ترسیم) با پن اشتباه گرفته نشود
+  if (!touchPan.moved && Math.hypot(dx, dy) < 6) return;
+  touchPan.moved = true;
+  e.preventDefault();
+  touchPan = { x: t.clientX, y: t.clientY, id: t.identifier, moved: true };
   try {
     map.panBy([-dx, -dy], { animate: false });
   } catch (err) {}
@@ -563,6 +612,22 @@ function teardownCustomPan() {
   midPan = null;
   touchPan = null;
 }
+
+function setupResizeHandling() {
+  const onResize = () => {
+    try { map && map.resize(); } catch (e) {}
+  };
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", onResize);
+  try {
+    if (mapContainerRef.value && "ResizeObserver" in window) {
+      resizeObserver = new ResizeObserver(() => onResize());
+      resizeObserver.observe(mapContainerRef.value);
+    }
+  } catch (e) {}
+  return onResize;
+}
+let cleanupResize = null;
 
 function initMap() {
   initMapAsync().catch((e) => {
@@ -630,10 +695,16 @@ async function initMapAsync() {
 
   map.on("load", () => {
     mapProxy.value = map;
+    // پن/زوم لمسی برای موبایل فعال می‌ماند؛ غیرفعال‌سازی انتخابی در syncPanState
     try {
-      if (map.dragPan) map.dragPan.disable();
+      if (map.dragPan) map.dragPan.enable();
+      if (map.touchZoomRotate) map.touchZoomRotate.enable();
     } catch (e) {}
     setupCustomPan();
+    syncPanState();
+    cleanupResize = setupResizeHandling();
+    // بعد از لود کامل، یک resize تا کاشی‌ها در ارتفاع موبایل درست بچینند
+    requestAnimationFrame(() => { try { map.resize(); } catch (e) {} });
     drawing.value = reactive(useDrawing(map, props.pins));
     for (const p of props.pins || []) {
       if (p.shape && p.shape.type && p.type === "draw") {
@@ -667,10 +738,22 @@ async function initMapAsync() {
 onMounted(async () => {
   await nextTick();
   initMap();
+  // اگر کش لود دیر بیاید، بعد از ست‌شدن drawing وضعیت پن را همگام کن
+  watch(
+    () => drawing.value?.drawMode,
+    () => syncPanState(),
+  );
 });
 
 onUnmounted(() => {
   teardownCustomPan();
+  try { resizeObserver && resizeObserver.disconnect(); } catch (e) {}
+  try {
+    if (cleanupResize) {
+      window.removeEventListener("resize", cleanupResize);
+      window.removeEventListener("orientationchange", cleanupResize);
+    }
+  } catch (e) {}
   if (map) {
     map.remove();
     map = null;

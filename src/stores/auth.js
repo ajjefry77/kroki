@@ -29,7 +29,7 @@ import { faToEn, validatePassword } from "../utils/validators";
  * ورودی/خروجی همه متدها مثل قبل { success, ... } است تا کامپوننت‌ها دست نخورند.
  */
 
-export const KROKI_PRICE = 50000;
+export const KROKI_PRICE = 150000;
 export const WALLET_CARD = "5047-0611-3665-6671";
 export const CARD_OWNER = "جلیل باقرزاده";
 

@@ -368,6 +368,9 @@ function updatePreview() {
 onMounted(async () => {
   sizeCanvas();
   await nextTick();
+  try {
+    await document.fonts?.ready;
+  } catch (e) {}
   updatePreview();
   logger.info("step", "مشاهده پیش‌نمایش کروکی", { template: props.templateId });
 });
