@@ -1,5 +1,5 @@
 <template>
-  <header class="wizard-header h-14 flex items-center gap-2 px-3 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-40">
+  <header class="wizard-header relative overflow-visible h-14 flex items-center gap-2 px-3 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-50">
     <div class="flex items-center gap-2 flex-shrink-0">
       <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-md shadow-[var(--accent-glow-strong)]" />
       <div class="hidden sm:block">
@@ -63,7 +63,7 @@
         >{{ logCount }}</span>
       </button>
 
-      <div class="relative" v-if="userName">
+      <div class="relative isolate" v-if="userName">
         <button
           class="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition"
           title="حساب کاربری"
@@ -75,7 +75,8 @@
         <Transition name="drop">
           <div
             v-if="menuOpen"
-            class="absolute left-0 mt-2 w-[min(14rem,70vw)] rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden z-50"
+            class="absolute left-0 top-full mt-2 z-[80] w-[min(14rem,70vw)] rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden"
+            @click.stop
           >
             <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50">
               <div class="flex items-center gap-3">
@@ -108,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 
 const props = defineProps({
   steps: { type: Array, required: true },
@@ -122,6 +123,23 @@ const props = defineProps({
 const emit = defineEmits(["navigate", "toggleLog", "admin", "logout", "profile"]);
 
 const menuOpen = ref(false);
+
+function onDocClick() {
+  menuOpen.value = false;
+}
+function onEscape(e) {
+  if (e.key === "Escape") menuOpen.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener("click", onDocClick);
+  document.addEventListener("keydown", onEscape);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocClick);
+  document.removeEventListener("keydown", onEscape);
+});
 
 const currentIndex = computed(() =>
   Math.max(0, props.steps.findIndex((s) => s.id === props.current)),
@@ -143,6 +161,10 @@ function dotClass(i, id) {
 </script>
 
 <style scoped>
+.wizard-header {
+  overflow: visible;
+  isolation: isolate;
+}
 .step-active {
   background: linear-gradient(135deg, var(--accent), var(--accent-soft));
   border-color: transparent;

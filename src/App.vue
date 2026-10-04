@@ -226,6 +226,8 @@ function goHome() {
 }
 
 function onAuthSuccess() {
+  // اگر کاربر وسط مکثِ «در حال انتقال...» خودش برگشته باشد، جلو نبریمش
+  if (page.value !== "auth") return;
   const ret = authReturn.value;
   if (ret === "admin") {
     openAdmin();

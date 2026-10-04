@@ -7,7 +7,7 @@
     >
       <div
         ref="headerPill"
-        class="header-pill relative mx-auto transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden"
+        class="header-pill relative mx-auto transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-visible"
         :class="
           scrolled
             ? 'max-w-3xl rounded-[999px] border border-[var(--border)] bg-white/80 backdrop-blur-xl shadow-[0_12px_40px_rgba(23,43,77,0.14),0_2px_8px_rgba(250,108,4,0.08)]'
@@ -73,7 +73,7 @@
               ><span class="sm:hidden">ورود</span>
             </button>
 
-            <div v-if="authed" class="relative">
+            <div v-if="authed" class="relative isolate">
               <button
                 class="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition"
                 title="حساب کاربری"
@@ -85,7 +85,8 @@
               <Transition name="drop">
                 <div
                   v-if="menuOpen"
-                  class="absolute left-0 mt-2 w-[min(16rem,78vw)] rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden profile-menu"
+                  class="absolute left-0 top-full mt-2 z-[80] w-[min(16rem,78vw)] rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl overflow-hidden profile-menu"
+                  @click.stop
                 >
                   <div
                     class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50"
@@ -183,13 +184,17 @@
             </div>
           </div>
         </div>
-        <!-- نوار پیشرفت اسکرول داخل کپسول -->
+        <!-- نوار پیشرفت اسکرول داخل کپسول (توکار تا از گوشه‌های گرد بیرون نزند) -->
         <div
-          class="absolute bottom-0 right-0 left-0 h-[2.5px] bg-transparent overflow-hidden"
-          :class="scrolled ? 'rounded-b-[999px]' : ''"
+          class="absolute overflow-hidden pointer-events-none"
+          :class="
+            scrolled
+              ? 'bottom-[6px] left-6 right-6 h-[3px] rounded-full bg-black/[0.06]'
+              : 'bottom-0 right-0 left-0 h-[2.5px] bg-transparent'
+          "
         >
           <div
-            class="h-full bg-gradient-to-l from-[var(--accent-soft)] to-[var(--accent)] transition-[width] duration-150 ease-out"
+            class="h-full rounded-full bg-gradient-to-l from-[var(--accent-soft)] to-[var(--accent)] transition-[width] duration-150 ease-out"
             :style="{ width: scrollProgress + '%' }"
           ></div>
         </div>
@@ -991,6 +996,8 @@ onBeforeUnmount(() => {
 /* هدر کپسولی */
 .header-pill {
   will-change: max-width, border-radius, background-color, box-shadow, padding;
+  overflow: visible;
+  isolation: isolate;
 }
 section[id] {
   scroll-margin-top: 88px;
@@ -1426,6 +1433,8 @@ section[id] {
 
 .profile-menu {
   animation: menu-in 0.18s var(--ease-out);
+  position: absolute;
+  z-index: 80;
 }
 @keyframes menu-in {
   from {

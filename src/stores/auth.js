@@ -133,6 +133,17 @@ function logout() {
 setAuthToken(state.token);
 setUnauthorizedHandler(() => logout());
 
+/*
+ * اگر درست بعد از login/register یک 401 لحظه‌ای (race) باعث logout سراسری شود،
+ * نشست تازه‌ای که همین حالا از سرور گرفته‌ایم را برمی‌گردانیم تا کاربر
+ * بی‌دلیل از حساب بیرون نیفتد و در صفحه احراز هویت گیر نکند.
+ * فقط برای توکن تازه‌گرفته‌شده صدا زده می‌شود، نه برای توکن کهنه ابتدای برنامه.
+ */
+function restoreFreshSession(token, userData) {
+  if (state.token && state.user?.id) return;
+  applyAuth(token, userData);
+}
+
 async function loadWallet() {
   if (!state.user?.id) return;
   try {
@@ -183,6 +194,7 @@ async function login(username, password) {
     if (!token || !user) return { success: false, error: "پاسخ سرور نامعتبر است" };
     applyAuth(token, user);
     await refreshMe();
+    restoreFreshSession(token, user);
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message || "خطا در ورود به سامانه" };
@@ -198,7 +210,7 @@ async function register(payload) {
   const phone = faToEn(payload?.phone).trim();
   const username = cleanUsername(payload?.username) || phone;
   const password = String(payload?.password || "");
-  const agentCode = String(payload?.agentCode || "").trim();
+  const agentCode = faToEn(payload?.agentCode || "").trim();
   if (name.length < 3) return { success: false, error: "نام و نام خانوادگی را کامل وارد کنید" };
   if (!/^09\d{9}$/.test(phone)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
   const pwErr = validatePassword(password);
@@ -216,7 +228,22 @@ async function register(payload) {
     if (!token || !user) return { success: false, error: "پاسخ سرور نامعتبر است" };
     applyAuth(token, user);
     await refreshMe();
-    return { success: true };
+    restoreFreshSession(token, user);
+    // اعمال کد معرف دقیقاً با همان مسیر پنل کاربری (POST /referrals/redeem) تا
+    // کروکی رایگان تعلق بگیرد؛ خطای آن هرگز باعث شکست ثبت‌نام نمی‌شود
+    let referral = null;
+    if (agentCode) {
+      try {
+        const res = await redeemReferral(agentCode);
+        referral = res.success
+          ? { applied: true, freeKroki: res.freeKroki }
+          : { applied: false, error: res.error };
+      } catch (e) {
+        referral = { applied: false, error: e?.message || "خطا در اعمال کد معرف" };
+      }
+      restoreFreshSession(token, user);
+    }
+    return { success: true, referral };
   } catch (e) {
     return { success: false, error: e.message || "خطا در ثبت نام" };
   }
@@ -558,9 +585,10 @@ async function deleteKroki(id) {
 /* ---------------- معرفی ---------------- */
 
 async function redeemReferral(code) {
-  if (!String(code || "").trim()) return { success: false, error: "کد معرف را وارد کنید" };
+  const normalized = faToEn(code || "").trim();
+  if (!normalized) return { success: false, error: "کد معرف را وارد کنید" };
   try {
-    const d = await ReferralsApi.redeem(String(code).trim());
+    const d = await ReferralsApi.redeem(normalized);
     await loadWallet();
     await loadMyReferrals();
     return { success: true, granted: d?.granted, freeKroki: d?.free_kroki_count };

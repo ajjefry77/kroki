@@ -39,7 +39,7 @@
           <AuthAlert
             v-if="alert.message"
             :type="alert.type"
-            :title="alert.type === 'success' ? 'عملیات موفق' : 'خطا'"
+            :title="alert.title || (alert.type === 'success' ? 'عملیات موفق' : 'خطا')"
             :message="alert.message"
             @close="alert.message = ''"
           />
@@ -92,14 +92,14 @@
 
         <Captcha ref="captchaRef" @submit="submit" />
 
-        <button type="submit" class="btn btn-primary w-full !py-3 !text-base" :disabled="loading">
+        <button type="submit" class="btn btn-primary w-full !py-3 !text-base" :disabled="loading || navigating">
           <i class="fas fa-circle-notch fa-spin ml-1" v-if="loading"></i>
           <i :class="mode === 'login' ? 'fas fa-right-to-bracket ml-1' : 'fas fa-user-plus ml-1'" v-else></i>
           {{ loading ? "در حال انجام..." : mode === "login" ? "ورود به سامانه" : "ساخت حساب و ورود" }}
         </button>
       </form>
 
-      <button class="mt-5 w-full btn btn-ghost text-sm" @click="$emit('back')">
+      <button class="mt-5 w-full btn btn-ghost text-sm" :disabled="loading || navigating" @click="$emit('back')">
         <i class="fas fa-arrow-right ml-1"></i>
         بازگشت به صفحه اصلی
       </button>
@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from "vue";
+import { ref, reactive, computed, watch, onBeforeUnmount } from "vue";
 import { auth } from "../stores/auth";
 import { faToEn } from "../utils/validators";
 import Captcha from "./Captcha.vue";
@@ -118,9 +118,18 @@ const emit = defineEmits(["back", "success"]);
 
 const mode = ref("login");
 const loading = ref(false);
-const alert = reactive({ type: "error", message: "" });
+const navigating = ref(false);
+const alert = reactive({ type: "error", title: "", message: "" });
 const captchaRef = ref(null);
 const fields = reactive({ name: "", username: "", phone: "", password: "", agentCode: "" });
+let navTimer = 0;
+
+onBeforeUnmount(() => {
+  if (navTimer) {
+    clearTimeout(navTimer);
+    navTimer = 0;
+  }
+});
 
 const pwCheck = computed(() => ({
   length: fields.password.length >= 8,
@@ -131,44 +140,85 @@ const pwCheck = computed(() => ({
 // با عوض شدن حالت، چالش امنیتی تازه می‌شود
 watch(mode, () => {
   alert.type = "error";
+  alert.title = "";
   alert.message = "";
   captchaRef.value?.refresh();
 });
 
 function showError(msg) {
   alert.type = "error";
+  alert.title = "";
   alert.message = msg;
 }
 
 function showSuccess(msg) {
   alert.type = "success";
+  alert.title = "";
+  alert.message = msg;
+}
+
+function showWarning(title, msg) {
+  alert.type = "error";
+  alert.title = title;
   alert.message = msg;
 }
 
 async function submit() {
-  if (loading.value) return;
+  if (loading.value || navigating.value) return;
   if (!captchaRef.value?.validate()) {
     showError("کد امنیتی اشتباه است؛ کد جدید را وارد کنید");
     return;
   }
   loading.value = true;
+  alert.title = "";
   alert.message = "";
-  const result =
-    mode.value === "login"
-      ? await auth.login(fields.username, fields.password)
-      : await auth.register(fields);
-  loading.value = false;
-  if (result.success) {
-    showSuccess(mode.value === "login" ? "ورود با موفقیت انجام شد؛ در حال انتقال..." : "ثبت‌نام با موفقیت انجام شد؛ در حال انتقال...");
-    const done = () => {
-      fields.username = "";
-      fields.password = "";
-      emit("success");
-    };
-    setTimeout(done, 900);
-  } else {
-    showError(result.error);
+  try {
+    const result =
+      mode.value === "login"
+        ? await auth.login(fields.username, fields.password)
+        : await auth.register(fields);
+    if (result.success) {
+      const hadCode = mode.value === "register" && faToEn(fields.agentCode || "").trim();
+      if (mode.value === "login") {
+        showSuccess("ورود با موفقیت انجام شد؛ در حال انتقال...");
+      } else if (hadCode && result.referral?.applied) {
+        // همان پیام پنل کاربری تا رفتار هر دو فیلد یکسان باشد
+        showSuccess(
+          `ثبت‌نام با موفقیت انجام شد؛ کد معرف فعال شد و ${result.referral.freeKroki ?? ""} عدد کروکی رایگان دریافت کردید. در حال انتقال...`,
+        );
+      } else if (hadCode && result.referral && !result.referral.applied) {
+        // ثبت‌نام موفق است و حتماً وارد می‌شویم؛ فقط علت رد کد را نشان می‌دهیم
+        showWarning(
+          "توجه",
+          `حساب شما ساخته شد و در حال ورود هستید، اما کد معرف اعمال نشد: ${result.referral.error}`,
+        );
+      } else {
+        showSuccess("ثبت‌نام با موفقیت انجام شد؛ در حال انتقال...");
+      }
+      navigating.value = true;
+      // وقتی هشدار کد معرف هست، مکث بیشتری تا خوانده شود
+      const delay = hadCode && result.referral && !result.referral.applied ? 2200 : 900;
+      const done = () => {
+        navTimer = 0;
+        fields.name = "";
+        fields.username = "";
+        fields.phone = "";
+        fields.password = "";
+        fields.agentCode = "";
+        captchaRef.value?.refresh();
+        navigating.value = false;
+        emit("success");
+      };
+      navTimer = setTimeout(done, delay);
+    } else {
+      showError(result.error);
+      captchaRef.value?.refresh();
+    }
+  } catch (e) {
+    showError(e?.message || "خطای غیرمنتظره؛ دوباره تلاش کنید");
     captchaRef.value?.refresh();
+  } finally {
+    loading.value = false;
   }
 }
 </script>
