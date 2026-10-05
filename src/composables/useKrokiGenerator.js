@@ -242,6 +242,14 @@ function escapeHtml(s = " ") {
   );
 }
 
+// برچسب زون UTM همراه با N (نیم‌کره شمالی): 39 -> "39N"
+function zoneLabel(z) {
+  if (z === null || z === undefined || z === "") return "—";
+  const s = String(z).trim();
+  if (!s || s === "—") return "—";
+  return /N$/i.test(s) ? s.toUpperCase() : `${s}N`;
+}
+
 /*
  * فقط src امن برای <img> چاپ: دیتای تصویری مجاز، http(s) و blob داخلی.
  * بقیه (مثل javascript: یا data:text/html) حذف می‌شود.
@@ -358,6 +366,7 @@ export function useKrokiGenerator() {
         isClosed: pin.shape.type === "polygon",
         startIdx,
         count: positions.length,
+        pinId: pin.id,
       });
     }
     if (allPositions.length < 2) return null;
@@ -586,11 +595,22 @@ export function useKrokiGenerator() {
       state.shapeCentroids = centroidResults;
       const firstAddress = centroidResults.find((c) => c.address)?.address;
       if (firstAddress && !last.form.address) last.form.address = firstAddress;
-      state.edgeTexts = metas.map((meta) =>
-        Array(meta.isClosed ? meta.count : Math.max(meta.count - 1, 0)).fill(
-          "",
-        ),
-      );
+      // مجاورت‌ها از روی ترسیم (مودال «ترسیم جدید») خوانده می‌شوند، نه از پیش‌نمایش
+      const selectedById = new Map((geom.selected || []).map((p) => [p.id, p]));
+      state.edgeTexts = metas.map((meta) => {
+        const n = meta.isClosed ? meta.count : Math.max(meta.count - 1, 0);
+        const arr = Array(n).fill("");
+        try {
+          const pin = (meta.pinId && selectedById.get(meta.pinId)) || geom.selected?.[metas.indexOf(meta)];
+          const saved = pin?.shape?.adjacents;
+          if (Array.isArray(saved)) {
+            for (let i = 0; i < Math.min(n, saved.length); i++) {
+              arr[i] = String(saved[i] ?? "");
+            }
+          }
+        } catch (e) {}
+        return arr;
+      });
       state.ready = true;
       return true;
     } catch (err) {
@@ -920,18 +940,22 @@ export function useKrokiGenerator() {
     ctx.fillText(
       truncateText(
         ctx,
-        "سیستم مختصات: WGS84 / UTM — Zone " + (extra.zone || "—"),
+        "سیستم مختصات: WGS84 / UTM — Zone " + zoneLabel(extra.zone),
         half - Math.round(16 * k),
       ),
       mid - padX,
       by + headH2 + rowH * 0.5,
     );
     ctx.textAlign = "left";
+    // عدد مساحت بولد (وزن بیشتر) so در خروجی برجسته دیده شود
+    ctx.save();
+    ctx.font = `800 ${fRow}px Vazirmatn, Tahoma, sans-serif`;
     ctx.fillText(
       truncateText(ctx, "مساحت: " + extra.area, half - Math.round(16 * k)),
       mid + padX,
       by + headH2 + rowH * 0.5,
     );
+    ctx.restore();
     // ردیف سوم: کارشناس (راست) / پلاک ثبتی (چپ)
     ctx.textAlign = "right";
     ctx.fillText(
@@ -1428,15 +1452,16 @@ export function useKrokiGenerator() {
 
   function buildPrintHtml() {
     const t = template();
+    // جدول نقاط: ستون Y قبل از X (جای X و Y عوض شده) + زون با پسوند N
     const rows = state.utmPoints
       .map(
         (p, i) =>
-          `<tr><td>${i + 1}</td><td>${p.x.toFixed(2)}</td><td>${p.y.toFixed(2)}</td><td>${p.zone ?? state.utmZone ?? ""}</td></tr>`,
+          `<tr><td>${i + 1}</td><td>${p.y.toFixed(2)}</td><td>${p.x.toFixed(2)}</td><td>${zoneLabel(p.zone ?? state.utmZone ?? "")}</td></tr>`,
       )
       .join("");
 
     const centerRow = state.centerUtm
-      ? `<tr style="background:#eff6ff;font-weight:600"><td>مرکز</td><td>${state.centerUtm.x.toFixed(2)}</td><td>${state.centerUtm.y.toFixed(2)}</td><td>${state.centerUtm.zone ?? state.utmZone ?? ""}</td></tr>`
+      ? `<tr style="background:#eff6ff;font-weight:600"><td>مرکز</td><td>${state.centerUtm.y.toFixed(2)}</td><td>${state.centerUtm.x.toFixed(2)}</td><td>${zoneLabel(state.centerUtm.zone ?? state.utmZone ?? "")}</td></tr>`
       : "";
 
     const hasUtm = t.coordinateTable !== "none";
@@ -1456,8 +1481,8 @@ export function useKrokiGenerator() {
       ["کد ملی متقاضی", escapeHtml(last.form.clientNationalId) || "—"],
       ["شماره همراه متقاضی", escapeHtml(last.form.clientPhone) || "—"],
       ["نشانی ملک", escapeHtml(last.form.address) || "—"],
-      ["سیستم مختصات", `WGS84 / UTM — Zone: ${state.utmZone ?? "—"}`],
-      ["مساحت کل", `${state.areaM2.toFixed(2)} متر مربع`],
+      ["سیستم مختصات", `WGS84 / UTM — Zone: ${zoneLabel(state.utmZone ?? "—")}`],
+      ["مساحت کل", `<strong>${state.areaM2.toFixed(2)} متر مربع</strong>`],
       ["نهاد", escapeHtml(t.org)],
       ["کارشناس", escapeHtml(last.form.surveyor)],
       ["عرض معبر", `${escapeHtml(last.form.streetWidth) || "—"} متر`],
@@ -1482,18 +1507,46 @@ export function useKrokiGenerator() {
     const utmTable = hasUtm
       ? `<table class="utm-table">
         <thead>
-          <tr><th colspan="4">مختصات UTM — Zone: ${state.utmZone ?? "—"}</th></tr>
-          <tr><th>نقطه</th><th>X</th><th>Y</th><th>Zone</th></tr>
+          <tr><th colspan="4">مختصات UTM — Zone: ${zoneLabel(state.utmZone ?? "—")}</th></tr>
+          <tr><th>نقطه</th><th>Y</th><th>X</th><th>Zone</th></tr>
         </thead>
         <tbody>${rows}${centerRow}</tbody>
       </table>`
       : "";
 
-    const edgeTable =
-      state.edgeTexts.some((arr) => arr.some((x) => x))
-        ? `<div class="block-title">مجاورت‌ها</div>
+    // جدول مجاورت‌ها: به‌جای ستون «ترسیم»، ستون «طول» (طول هر ضلع به متر)
+    const edgeLenOf = (s, e) => {
+      try {
+        const pts = state.utmPoints || [];
+        const meta = (state.selectedShapesMeta || [])[s];
+        let a, b;
+        if (meta && meta.count >= 2) {
+          const aIdx = meta.startIdx + e;
+          let bIdx;
+          if (meta.isClosed) bIdx = meta.startIdx + ((e + 1) % meta.count);
+          else bIdx = meta.startIdx + e + 1;
+          a = pts[aIdx];
+          b = pts[bIdx];
+        } else {
+          a = pts[e];
+          b = pts[e + 1];
+        }
+        if (!a || !b) return "—";
+        const dx = Number(b.x) - Number(a.x);
+        const dy = Number(b.y) - Number(a.y);
+        if (!isFinite(dx) || !isFinite(dy)) return "—";
+        return Math.sqrt(dx * dx + dy * dy).toFixed(2);
+      } catch {
+        return "—";
+      }
+    };
+    const hasEdges =
+      (state.utmPoints || []).length >= 2 &&
+      (state.edgeTexts || []).length > 0;
+    const edgeTable = hasEdges
+      ? `<div class="block-title">مجاورت‌ها</div>
       <table class="utm-table">
-        <thead><tr><th>ترسیم</th><th>ضلع</th><th>مجاورت</th></tr></thead>
+        <thead><tr><th>ضلع</th><th>طول (متر)</th><th>مجاورت</th></tr></thead>
         <tbody>
           ${(() => {
             const _nw = findNorthWestIndex(state.utmPoints);
@@ -1502,11 +1555,9 @@ export function useKrokiGenerator() {
             return state.edgeTexts
               .map((texts, s) => {
                 const meta = state.selectedShapesMeta[s];
-                const shapeName =
-                  state.edgeTexts.length > 1 ? `ترسیم ${s + 1}` : "—";
+                const multi = state.edgeTexts.length > 1;
                 return texts
                   .map((txt, e) => {
-                    if (!txt) return "";
                     let edgeName = `${e + 1}`;
                     if (meta && meta.count >= 2) {
                       const a = _lbl(meta.startIdx + e);
@@ -1516,8 +1567,12 @@ export function useKrokiGenerator() {
                           ? _lbl(meta.startIdx + e + 1)
                           : null;
                       if (nb) edgeName = `${a}-${nb}`;
+                      if (multi) edgeName += ` (ترسیم ${s + 1})`;
+                    } else if (multi) {
+                      edgeName += ` (ترسیم ${s + 1})`;
                     }
-                    return `<tr><td>${shapeName}</td><td>${edgeName}</td><td>${escapeHtml(txt)}</td></tr>`;
+                    const len = edgeLenOf(s, e);
+                    return `<tr><td>${edgeName}</td><td>${len}</td><td>${escapeHtml(txt) || "—"}</td></tr>`;
                   })
                   .join("");
               })
@@ -1525,7 +1580,7 @@ export function useKrokiGenerator() {
           })()}
         </tbody>
       </table>`
-        : "";
+      : "";
 
     const disclaimer = `
     <div class="disclaimer">
@@ -1605,6 +1660,11 @@ export function useKrokiGenerator() {
     const finalHtml = html.replace("__SKETCH__", sketchImg);
     const landscape = state.orientation === "landscape";
 
+    // نام فایل خروجی PDF (عنوان تب چاپ): «اسم متقاضی + تاریخ»
+    const clientName = String(last.form.client || "کروکی").trim() || "کروکی";
+    const dateName = String(last.form.date || getTodayJalali()).trim() || getTodayJalali();
+    const pdfTitle = `${clientName} ${dateName}`.replace(/[<>:"/\\|?*]/g, " ").replace(/\s+/g, " ").trim();
+
     const iframe = document.createElement("iframe");
     iframe.style.cssText =
       "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
@@ -1616,7 +1676,7 @@ export function useKrokiGenerator() {
 <html dir="rtl" lang="fa">
 <head>
 <meta charset="utf-8">
-<title>&nbsp;</title>
+<title>${escapeHtml(pdfTitle)}</title>
 <style>${printCss(landscape)}</style>
 </head>
 <body>${finalHtml}</body>

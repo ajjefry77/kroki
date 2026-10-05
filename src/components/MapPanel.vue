@@ -86,7 +86,7 @@
     <Transition name="modal">
       <div
         v-if="drawing?.showForm"
-        class="absolute z-40 rounded-xl shadow-xl border border-[var(--border-strong)] p-3 bg-[var(--surface)] inset-x-3 bottom-3 sm:inset-x-auto sm:bottom-auto sm:top-16 sm:right-3 sm:w-72 max-h-[45%] sm:max-h-none overflow-y-auto"
+        class="absolute z-40 rounded-xl shadow-xl border border-[var(--border-strong)] p-3 bg-[var(--surface)] inset-x-3 bottom-3 sm:inset-x-auto sm:bottom-auto sm:top-16 sm:right-3 sm:w-80 max-h-[70%] sm:max-h-[calc(100%-5rem)] overflow-y-auto"
         @click.stop
       >
         <div class="flex items-center justify-between mb-2">
@@ -124,6 +124,44 @@
           class="input !py-1.5 text-xs mb-2 resize-none"
           placeholder="توضیح اختیاری"
         ></textarea>
+
+        <!-- مجاورت‌ها: چک‌باکس + فیلد هر ضلع بر اساس شماره گوشه‌ها (با اسکرول) -->
+        <div v-if="adjacencyCapable" class="mb-2 rounded-lg border border-[var(--border)] bg-[var(--surface2)]">
+          <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold px-2.5 py-2 select-none">
+            <input
+              v-model="drawing.formData.adjacentsEnabled"
+              type="checkbox"
+              class="accent-[var(--accent)] w-3.5 h-3.5"
+            />
+            <i class="fas fa-font text-[var(--accent)]"></i>
+            مجاورت‌ها
+            <span class="text-[10px] font-normal text-[var(--text-muted)]">({{ adjacencyNames.length }} ضلع)</span>
+          </label>
+          <div v-if="drawing.formData.adjacentsEnabled" class="px-2 pb-2">
+            <div class="max-h-[180px] overflow-y-auto space-y-1.5 pl-1" style="-webkit-overflow-scrolling:touch">
+              <div
+                v-for="(nm, i) in adjacencyNames"
+                :key="`${nm}-${i}`"
+                class="flex items-center gap-1.5"
+              >
+                <span class="shrink-0 text-[10px] font-semibold text-[var(--text-muted)] min-w-[3.2rem] text-center bg-[var(--surface)] border border-[var(--border)] rounded px-1 py-1">ضلع {{ nm }}</span>
+                <input
+                  v-model="drawing.formData.adjacents[i]"
+                  type="text"
+                  class="input !py-1 !text-[11px] flex-1 min-w-0"
+                  :placeholder="`مجاورت ضلع ${nm}`"
+                  @input="drawing.refreshAdjacencyLabels?.()"
+                />
+              </div>
+              <p v-if="!adjacencyNames.length" class="text-[10px] text-[var(--text-faint)] text-center py-2">
+                هنوز ضلعی ثبت نشده است.
+              </p>
+            </div>
+            <p class="text-[10px] text-[var(--text-faint)] mt-1.5 leading-4">
+              گوشه‌ها روی نقشه شماره‌گذاری شده‌اند؛ عنوان هر فیلد همان شماره ضلع است و متن تایپ‌شده به‌صورت زنده کنار همان ضلع نمایش داده می‌شود.
+            </p>
+          </div>
+        </div>
 
         <div class="text-[10px] text-[var(--text-faint)] mb-2 leading-5">
           برای جابه‌جایی: نقاط (رأس) یا مرکز (کل شکل) را روی نقشه درگ کنید.
@@ -224,6 +262,33 @@ const drawHint = computed(() => {
   if (mode === "eraser") return "حالت پاک کن: روی ترسیم مورد نظر کلیک کنید تا حذف شود";
   return "";
 });
+
+// مجاورت‌ها فقط برای پلی‌گان/خط (ترسیم جدید) — عنوان فیلدها بر اساس شماره گوشه‌های روی نقشه
+const adjacencyCapable = computed(() => {
+  const d = drawing.value;
+  if (!d) return false;
+  const t = d.shape?.type || d.drawMode;
+  return t === "polygon" || t === "polyline" || t === "rectangle";
+});
+const adjacencyNames = computed(() => {
+  try {
+    const d = drawing.value;
+    if (!d || typeof d.draftEdgeNames !== "function") return [];
+    return d.draftEdgeNames() || [];
+  } catch (e) {
+    return [];
+  }
+});
+
+// با تغییر تعداد نقاط، طول آرایه مجاورت‌ها را همگام کن تا فیلد هر ضلع سر جایش بماند
+watch(
+  () => drawing.value?.livePointCount,
+  () => {
+    try {
+      drawing.value?.syncAdjacents?.();
+    } catch (e) {}
+  },
+);
 
 function addGeoJSONSourceAndLayers(sourceId, geojson, pin) {
   map.addSource(sourceId, { type: "geojson", data: geojson });

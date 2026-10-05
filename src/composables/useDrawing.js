@@ -32,7 +32,7 @@ export function useDrawing(map, pins) {
   const color = ref("#ff0000");
   const measureActive = ref(false);
   const positions = reactive([]);
-  const formData = ref({ name: "", description: "" });
+  const formData = ref({ name: "", description: "", adjacentsEnabled: false, adjacents: [] });
   const showForm = ref(false);
   const shape = ref(null);
   const activeTab = ref("measurements");
@@ -158,6 +158,7 @@ export function useDrawing(map, pins) {
   function renderEditable(closed) {
     const pts = editingPointsRef();
     if (!pts || pts.length === 0) return;
+    syncAdjacents();
     updateTempSource(editingPointsForLonLat(pts), closed);
     if (drawMode.value === "polygon" || drawMode.value === "rectangle") {
       updatePolygonLabels(editingPointsForLonLat(pts));
@@ -350,29 +351,103 @@ export function useDrawing(map, pins) {
     const blng = b.lng ?? b.lon;
     return [(alng + blng) / 2, (a.lat + b.lat) / 2];
   }
-  function edgeFeature(a, b) {
+  function edgeFeature(a, b, adj) {
     const dist = measureDistance(
       [a.lng ?? a.lon, a.lat],
       [b.lng ?? b.lon, b.lat],
     );
+    const lenTxt = formatDistance(dist);
+    const adjTxt = String(adj ?? "").trim();
     return {
       type: "Feature",
       geometry: { type: "Point", coordinates: midCoord(a, b) },
-      properties: { kind: "edge", label: formatDistance(dist) },
+      properties: {
+        kind: "edge",
+        label: adjTxt ? `${adjTxt}\n${lenTxt}` : lenTxt,
+        adj: adjTxt,
+        len: lenTxt,
+      },
     };
+  }
+  // نقاط پیش‌نویس فعلی (نرمال‌شده) — مبنای شماره‌گذاری گوشه‌ها و مجاورت‌ها
+  function draftPoints() {
+    if (shape.value && Array.isArray(shape.value.positions)) {
+      return shape.value.positions.map((p) => ({ lng: p.lon ?? p.lng, lat: p.lat }));
+    }
+    return positions.map((p) => ({ lng: p.lng ?? p.lon, lat: p.lat }));
+  }
+  function draftType() {
+    return shape.value?.type || drawMode.value;
+  }
+  function draftEdgeCount() {
+    const pts = draftPoints();
+    const t = draftType();
+    if (t === "polygon" || t === "rectangle") {
+      return pts.length >= 2 ? pts.length : 0;
+    }
+    if (t === "polyline") {
+      return pts.length >= 2 ? pts.length - 1 : 0;
+    }
+    return 0;
+  }
+  function draftEdgeNames() {
+    const n = draftEdgeCount();
+    const pts = draftPoints();
+    const t = draftType();
+    const names = [];
+    for (let i = 0; i < n; i++) {
+      if ((t === "polygon" || t === "rectangle") && pts.length >= 2) {
+        const a = i + 1;
+        const b = (i + 1) % pts.length + 1;
+        names.push(`${a}-${b}`);
+      } else {
+        names.push(`${i + 1}-${i + 2}`);
+      }
+    }
+    return names;
+  }
+  // طول آرایه مجاورت‌ها را با تعداد اضلاع همگام می‌کند (مقادیر تایپ‌شده حفظ می‌شود)
+  function syncAdjacents() {
+    const n = draftEdgeCount();
+    const arr = formData.value.adjacents;
+    if (!Array.isArray(arr)) formData.value.adjacents = [];
+    const a = formData.value.adjacents;
+    while (a.length < n) a.push("");
+    if (a.length > n) a.length = n;
+  }
+  // بازسازی لیبل‌های روی نقشه تا متن مجاورت به‌صورت لایو کنار همان ضلع دیده شود
+  function refreshAdjacencyLabels() {
+    try {
+      const pts = draftPoints();
+      if (!pts.length) return;
+      const t = draftType();
+      if (t === "polygon" || t === "rectangle") updatePolygonLabels(pts);
+      else if (t === "polyline") updateLineLabels(pts);
+    } catch (e) {}
+  }
+  function vertexFeatures(pts) {
+    return pts.map((p, i) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [p.lng ?? p.lon, p.lat] },
+      properties: { kind: "vertex", label: String(i + 1) },
+    }));
   }
   function updatePolygonLabels(pts) {
     if (drawMode.value !== "polygon" && drawMode.value !== "rectangle") return;
     if (!ts.polygonLabelSourceId) return;
     const labelSrc = map.getSource(ts.polygonLabelSourceId);
     if (!labelSrc) return;
-    // لیبل مختصات UTM رئوس عمداً نمایش داده نمی‌شود؛ فقط طول اضلاع و مرکز
+    syncAdjacents();
+    // لیبل مختصات UTM رئوس عمداً نمایش داده نمی‌شود؛ فقط شماره گوشه + طول/مجاورت اضلاع و مرکز
+    const adj = formData.value.adjacents || [];
     const features = [];
+    // شماره گوشه‌ها
+    features.push(...vertexFeatures(pts));
     for (let i = 1; i < pts.length; i++) {
-      features.push(edgeFeature(pts[i - 1], pts[i]));
+      features.push(edgeFeature(pts[i - 1], pts[i], adj[i - 1]));
     }
     if (pts.length >= 3) {
-      features.push(edgeFeature(pts[pts.length - 1], pts[0]));
+      features.push(edgeFeature(pts[pts.length - 1], pts[0], adj[pts.length - 1]));
     }
     if (pts.length >= 3) {
       const c = computeCentroid(
@@ -392,9 +467,12 @@ export function useDrawing(map, pins) {
     if (drawMode.value !== "polyline" || !ts.lineLabelSourceId) return;
     const labelSrc = map.getSource(ts.lineLabelSourceId);
     if (!labelSrc) return;
+    syncAdjacents();
+    const adj = formData.value.adjacents || [];
     const features = [];
+    features.push(...vertexFeatures(pts));
     for (let i = 1; i < pts.length; i++) {
-      features.push(edgeFeature(pts[i - 1], pts[i]));
+      features.push(edgeFeature(pts[i - 1], pts[i], adj[i - 1]));
     }
     labelSrc.setData({ type: "FeatureCollection", features });
   }
@@ -481,7 +559,7 @@ export function useDrawing(map, pins) {
       source: labelSrcId,
       filter: ["==", ["get", "kind"], "edge"],
       layout: {
-        "text-field": ["get", "label"],
+        "text-field": ["get", "len"],
         "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
@@ -493,13 +571,32 @@ export function useDrawing(map, pins) {
         "text-halo-width": 2,
       },
     });
+    addTempLayer(ts.sourceId + "-edge-adj-label", {
+      type: "symbol",
+      source: labelSrcId,
+      filter: ["all", ["==", ["get", "kind"], "edge"], ["!=", ["get", "adj"], ""]],
+      layout: {
+        "text-field": ["get", "adj"],
+        "text-size": 11,
+        "text-offset": [0, -1.3],
+        "text-anchor": "bottom",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-font": MAP_TEXT_FONT,
+      },
+      paint: {
+        "text-color": "#1d4ed8",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 2,
+      },
+    });
     addTempLayer(ts.sourceId + "-vertex-label", {
       type: "symbol",
       source: labelSrcId,
-      filter: ["==", ["get", "kind"], "__disabled_vertex__"],
+      filter: ["==", ["get", "kind"], "vertex"],
       layout: {
         "text-field": ["get", "label"],
-        "text-size": 9,
+        "text-size": 12,
         "text-offset": [0, -1.2],
         "text-anchor": "bottom",
         "text-allow-overlap": true,
@@ -507,9 +604,9 @@ export function useDrawing(map, pins) {
         "text-font": MAP_TEXT_FONT,
       },
       paint: {
-        "text-color": "#1e3a8a",
-        "text-halo-color": "#ffffff",
-        "text-halo-width": 2,
+        "text-color": "#facc15",
+        "text-halo-color": "#111111",
+        "text-halo-width": 2.5,
       },
     });
     addTempLayer(ts.sourceId + "-center-point", {
@@ -574,7 +671,7 @@ export function useDrawing(map, pins) {
       source: labelSrcId,
       filter: ["==", ["get", "kind"], "edge"],
       layout: {
-        "text-field": ["get", "label"],
+        "text-field": ["get", "len"],
         "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
@@ -584,6 +681,44 @@ export function useDrawing(map, pins) {
         "text-color": "#b45309",
         "text-halo-color": "#ffffff",
         "text-halo-width": 2,
+      },
+    });
+    addTempLayer(ts.sourceId + "-edge-adj-label", {
+      type: "symbol",
+      source: labelSrcId,
+      filter: ["all", ["==", ["get", "kind"], "edge"], ["!=", ["get", "adj"], ""]],
+      layout: {
+        "text-field": ["get", "adj"],
+        "text-size": 11,
+        "text-offset": [0, -1.3],
+        "text-anchor": "bottom",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-font": MAP_TEXT_FONT,
+      },
+      paint: {
+        "text-color": "#1d4ed8",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 2,
+      },
+    });
+    addTempLayer(ts.sourceId + "-vertex-label", {
+      type: "symbol",
+      source: labelSrcId,
+      filter: ["==", ["get", "kind"], "vertex"],
+      layout: {
+        "text-field": ["get", "label"],
+        "text-size": 12,
+        "text-offset": [0, -1.2],
+        "text-anchor": "bottom",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-font": MAP_TEXT_FONT,
+      },
+      paint: {
+        "text-color": "#facc15",
+        "text-halo-color": "#111111",
+        "text-halo-width": 2.5,
       },
     });
     addTempLayer(ts.sourceId + "-center-point", {
@@ -665,7 +800,7 @@ export function useDrawing(map, pins) {
       source: labelSrcId,
       filter: ["==", ["get", "kind"], "edge"],
       layout: {
-        "text-field": ["get", "label"],
+        "text-field": ["get", "len"],
         "text-size": 10,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
@@ -677,13 +812,32 @@ export function useDrawing(map, pins) {
         "text-halo-width": 2,
       },
     });
+    addTempLayer(ts.sourceId + "-edge-adj-label", {
+      type: "symbol",
+      source: labelSrcId,
+      filter: ["all", ["==", ["get", "kind"], "edge"], ["!=", ["get", "adj"], ""]],
+      layout: {
+        "text-field": ["get", "adj"],
+        "text-size": 11,
+        "text-offset": [0, -1.3],
+        "text-anchor": "bottom",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-font": MAP_TEXT_FONT,
+      },
+      paint: {
+        "text-color": "#1d4ed8",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 2,
+      },
+    });
     addTempLayer(ts.sourceId + "-vertex-label", {
       type: "symbol",
       source: labelSrcId,
-      filter: ["==", ["get", "kind"], "__disabled_vertex__"],
+      filter: ["==", ["get", "kind"], "vertex"],
       layout: {
         "text-field": ["get", "label"],
-        "text-size": 9,
+        "text-size": 12,
         "text-offset": [0, -1.2],
         "text-anchor": "bottom",
         "text-allow-overlap": true,
@@ -691,9 +845,9 @@ export function useDrawing(map, pins) {
         "text-font": MAP_TEXT_FONT,
       },
       paint: {
-        "text-color": "#1e3a8a",
-        "text-halo-color": "#ffffff",
-        "text-halo-width": 2,
+        "text-color": "#facc15",
+        "text-halo-color": "#111111",
+        "text-halo-width": 2.5,
       },
     });
     addTempLayer(ts.sourceId + "-center-point", {
@@ -1117,6 +1271,8 @@ export function useDrawing(map, pins) {
     positions.length = 0;
     nameError.value = false;
     // پس از پایان ترسیم، شکل سبز می‌شود و فرم نام نمایش داده می‌شود
+    syncAdjacents();
+    refreshAdjacencyLabels();
     applyDisplayColor();
     showForm.value = true;
     // برای پلی‌گان و خط، دستگیره‌های درگ (رأس/مرکز) فعال می‌مانند تا کاربر بتواند
@@ -1180,6 +1336,7 @@ export function useDrawing(map, pins) {
     shape.value = null;
     // در حالت ترسیم فرم نام نمایش داده نمی‌شود؛ پس از Enter ظاهر می‌شود
     showForm.value = false;
+    formData.value = { name: "", description: "", adjacentsEnabled: false, adjacents: [] };
 
     if (mode === "eraser") {
       if (map) map.getCanvas().style.cursor = "crosshair";
@@ -1319,7 +1476,7 @@ export function useDrawing(map, pins) {
     cleanupHandlers();
     showForm.value = false;
     drawMode.value = "";
-    formData.value = { name: "", description: "" };
+    formData.value = { name: "", description: "", adjacentsEnabled: false, adjacents: [] };
     positions.length = 0;
     measurePoints.length = 0;
     measureActive.value = false;
@@ -1359,11 +1516,14 @@ export function useDrawing(map, pins) {
       alert("ترسیم کامل نشده است");
       return;
     }
+    syncAdjacents();
+    const adjEnabled = !!formData.value.adjacentsEnabled;
+    const adj = adjEnabled ? [...(formData.value.adjacents || [])] : [];
     const pin = {
       id: crypto.randomUUID(),
       name: formData.value.name,
       descr: formData.value.description,
-      shape: toRaw(shape.value),
+      shape: { ...toRaw(shape.value), adjacents: adj, adjacentsEnabled: adjEnabled },
       date: new Date(),
       save: -1,
       type: "draw",
@@ -1372,7 +1532,7 @@ export function useDrawing(map, pins) {
     pins.push(pin);
     drawMode.value = "";
     showForm.value = false;
-    formData.value = { name: "", description: "" };
+    formData.value = { name: "", description: "", adjacentsEnabled: false, adjacents: [] };
     rectStart = null;
     cleanupHandlers();
     clearTempLayers();
@@ -1442,6 +1602,7 @@ export function useDrawing(map, pins) {
     cleanupHandlers();
     showForm.value = false;
     drawMode.value = "";
+    formData.value = { name: "", description: "", adjacentsEnabled: false, adjacents: [] };
     measureActive.value = false;
     measurePoints.length = 0;
     positions.length = 0;
@@ -1461,6 +1622,7 @@ export function useDrawing(map, pins) {
     try {
       ensureVertexSquareImage(map);
     } catch (e) {}
+    syncAdjacents();
     if (shape.value) {
       const s = shape.value;
       clearTempLayers();
@@ -1769,7 +1931,15 @@ export function useDrawing(map, pins) {
     shape.value = pin.shape;
     drawMode.value = pin.shape.type;
     showForm.value = false;
+    // مجاورت‌های ذخیره‌شده را در فرم نگه دار تا لیبل‌های نقشه درست نمایش داده شوند
+    try {
+      const saved = Array.isArray(pin.shape.adjacents) ? [...pin.shape.adjacents] : [];
+      formData.value.adjacents = saved;
+      formData.value.adjacentsEnabled = !!pin.shape.adjacentsEnabled && saved.some((x) => String(x || "").trim());
+      if (!formData.value.adjacentsEnabled && saved.length) formData.value.adjacentsEnabled = saved.some((x) => String(x || "").trim());
+    } catch (e) {}
     renderDraftLayers();
+    refreshAdjacencyLabels();
     bindEditDrag();
     map.getCanvas().style.cursor = "crosshair";
   }
@@ -1834,5 +2004,9 @@ export function useDrawing(map, pins) {
     exitPinEdit,
     isEditingPin,
     editingPin: () => editingPin,
+    draftEdgeCount,
+    draftEdgeNames,
+    syncAdjacents,
+    refreshAdjacencyLabels,
   };
 }

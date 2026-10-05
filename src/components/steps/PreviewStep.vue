@@ -178,33 +178,6 @@
           </div>
         </div>
 
-        <!-- مجاورت‌ها — برای تمام قالب‌ها -->
-        <div v-if="gen.state.edgeTexts.length" class="card !rounded-2xl">
-          <div class="font-semibold text-sm mb-3 flex items-center gap-2">
-            <i class="fas fa-font text-[var(--accent)]"></i>
-            مجاورت‌ها (نام کوچه، معبر، ملک مجاور)
-          </div>
-          <p class="text-[10px] text-[var(--text-faint)] mb-3 -mt-2">
-            متن هر ضلع روی کروکی و در جدول مجاورت‌های خروجی چاپ می‌شود.
-          </p>
-          <div v-for="(shapeTexts, m) in gen.state.edgeTexts" :key="m" class="mb-3 last:mb-0">
-            <div class="text-[11px] text-[var(--text-muted)] mb-1.5">
-              {{ gen.state.edgeTexts.length > 1 ? `مجاورت‌ها — ترسیم ${m + 1}` : 'مجاورت‌ها' }}
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <input
-                v-for="(txt, i) in shapeTexts"
-                :key="i"
-                v-model="gen.state.edgeTexts[m][i]"
-                type="text"
-                class="input !py-1.5 !text-xs flex-1 min-w-[7rem]"
-                :placeholder="edgePlaceholder(m, i)"
-                @input="rerenderSoon"
-              />
-            </div>
-          </div>
-        </div>
-
       </template>
     </div>
 
@@ -225,9 +198,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
-import { getTemplate, vertexLabel } from "../../utils/templates";
-import { canvasSizeForPoints, findNorthWestIndex } from "../../utils/canvas";
+import { ref, computed, onMounted, nextTick, watch } from "vue";
+import { getTemplate } from "../../utils/templates";
+import { canvasSizeForPoints } from "../../utils/canvas";
 import { logger } from "../../utils/logger";
 
 const props = defineProps({
@@ -245,32 +218,6 @@ const customizeOpen = ref(false);
 const previewDoc = ref("");
 
 const currentTemplate = computed(() => getTemplate(props.templateId));
-
-// ایندکس شمال‌غربی روی نقاط UTM؛ مبنای نام‌گذاری رئوس A,B,C… یا 1,2,3…
-const nwIndex = computed(() => findNorthWestIndex(props.gen.state.utmPoints || []));
-
-function shapeVertexLabel(globalIdx) {
-  const style = currentTemplate.value?.vertexLabels || "numbers";
-  return String(vertexLabel(style, globalIdx, nwIndex.value));
-}
-
-// placeholder هر ضلع = دو گوشه آن ضلع، مثل A-B یا 1-2
-function edgePlaceholder(m, i) {
-  const metas = props.gen.state.selectedShapesMeta || [];
-  const meta = metas[m];
-  if (!meta) return `ضلع ${i + 1}`;
-  const count = meta.count || 0;
-  if (count < 2) return `ضلع ${i + 1}`;
-  const a = shapeVertexLabel(meta.startIdx + i);
-  let b;
-  if (meta.isClosed) {
-    b = shapeVertexLabel(meta.startIdx + ((i + 1) % count));
-  } else {
-    if (i + 1 >= count) return `ضلع ${i + 1}`;
-    b = shapeVertexLabel(meta.startIdx + i + 1);
-  }
-  return `${a}-${b}`;
-}
 
 const colorFields = [
   { key: "headerColor", label: "سربرگ / قاب" },
@@ -298,14 +245,6 @@ function rerender() {
   updatePreview();
 }
 
-// بازسازی با تأخیر برای ورودی‌های متنی تا هنگام تایپ، صفحه نپرد و فوکوس حفظ شود؛
-// فقط پیش‌نمایش بازسازی می‌شود، نه کل صفحه
-let previewTimer = null;
-function rerenderSoon(ms = 500) {
-  clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => updatePreview(), ms);
-}
-
 // ارتفاع iframe پیش‌نمایش را با ارتفاع واقعی محتوا هماهنگ می‌کند تا
 // برش نخورد و دقیقاً هم‌شکل خروجی چاپ باشد.
 // نکته: ارتفاع قبلی دست نمی‌خورد تا هنگام تایپ، صفحه بالا/پایین نپرد.
@@ -327,10 +266,6 @@ function sizeCanvas() {
   if (!size) return;
   canvasW.value = size.w;
   canvasH.value = size.h;
-}
-
-function renderSketchNow() {
-  updatePreview();
 }
 
 function updatePreview() {
@@ -375,10 +310,6 @@ onMounted(async () => {
   logger.info("step", "مشاهده پیش‌نمایش کروکی", { template: props.templateId });
 });
 
-onUnmounted(() => {
-  clearTimeout(previewTimer);
-});
-
 watch(
   () => props.templateId,
   () => {
@@ -397,14 +328,6 @@ watch(
   () => props.gen.state.styleOverrides,
   () => {
     updatePreview();
-  },
-  { deep: true },
-);
-
-watch(
-  () => props.gen.state.edgeTexts,
-  () => {
-    rerenderSoon();
   },
   { deep: true },
 );

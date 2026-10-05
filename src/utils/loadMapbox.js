@@ -37,10 +37,38 @@ function disableMapboxTelemetry(lib) {
 
 export function loadMapbox() {
   if (!libPromise)
-    libPromise = import("mapbox-gl").then((m) =>
-      disableMapboxTelemetry(m.default || m),
-    );
+    libPromise = import("mapbox-gl").then((m) => {
+      const lib = disableMapboxTelemetry(m.default || m);
+      ensureRtlTextPlugin(lib);
+      return lib;
+    });
   return libPromise;
+}
+
+// بدون این پلاگین، موتور رندر mapbox حروف فارسی/عربی را جدا جدا و
+// بدون چسبندگی نمایش می‌دهد. فایل پلاگین در public/ وندور شده تا بدون
+// وابستگی به CDN خارجی (که ممکن است فیلتر باشد) از همان origin لود شود.
+let rtlRegistered = false;
+function ensureRtlTextPlugin(lib) {
+  if (rtlRegistered) return;
+  rtlRegistered = true;
+  try {
+    if (lib && typeof lib.setRTLTextPlugin === "function") {
+      const status =
+        typeof lib.getRTLTextPluginStatus === "function"
+          ? lib.getRTLTextPluginStatus()
+          : "unavailable";
+      if (status === "unavailable") {
+        const base = import.meta.env.BASE_URL || "/";
+        const url =
+          (base.endsWith("/") ? base : base + "/") +
+          "mapbox-gl-rtl-text.js";
+        lib.setRTLTextPlugin(url, null, true);
+      }
+    }
+  } catch (_) {
+    /* ignore — در بدترین حالت متن فارسی جدا نمایش داده می‌شود */
+  }
 }
 
 export function loadMapboxCss() {
