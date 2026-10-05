@@ -109,6 +109,39 @@
         <!-- کانواس مخفی برای تولید تصویر کروکی (خارج از دید ولی قابل رندر) -->
         <canvas ref="sketchCanvasRef" class="preview-offscreen" :width="canvasW" :height="canvasH"></canvas>
 
+        <!-- مجاورت‌ها: برای ترسیم‌های KML که مودال «ترسیم جدید» را ندیده‌اند هم اینجا قابل تکمیل است -->
+        <div v-if="adjacencyShapes.length" class="card !rounded-2xl">
+          <div class="font-semibold text-sm flex items-center gap-2 mb-1">
+            <i class="fas fa-font text-[var(--accent)]"></i>
+            مجاورت‌ها
+            <span class="text-[11px] font-normal text-[var(--text-muted)]">({{ totalEdges }} ضلع)</span>
+          </div>
+          <p class="text-[11px] text-[var(--text-muted)] leading-5 mb-3">
+            عنوان هر فیلد همان شماره ضلع روی کروکی است؛ متن تایپ‌شده در کروکی و جدول مجاورت‌های خروجی نمایش داده می‌شود.
+          </p>
+          <div v-for="shape in adjacencyShapes" :key="'adj-' + shape.shapeIndex" class="mb-3 last:mb-0">
+            <div v-if="adjacencyShapes.length > 1" class="text-[11px] font-bold text-[var(--text-muted)] mb-1.5">
+              ترسیم {{ shape.shapeIndex + 1 }}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div
+                v-for="edge in shape.edges"
+                :key="`adj-${shape.shapeIndex}-${edge.edgeIndex}`"
+                class="flex items-center gap-1.5"
+              >
+                <span class="shrink-0 text-[10px] font-semibold text-[var(--text-muted)] min-w-[3.2rem] text-center bg-[var(--surface2)] border border-[var(--border)] rounded px-1 py-1.5">ضلع {{ edge.name }}</span>
+                <input
+                  type="text"
+                  class="input !py-1.5 !text-xs flex-1 min-w-0"
+                  :value="edge.value"
+                  :placeholder="`مجاورت ضلع ${edge.name}`"
+                  @input="setAdjacency(shape.shapeIndex, edge.edgeIndex, $event.target.value)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- شخصی‌سازی ظاهر کروکی -->
         <div class="card !rounded-2xl">
           <button type="button" class="w-full flex items-center justify-between" @click="customizeOpen = !customizeOpen">
@@ -199,8 +232,8 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from "vue";
-import { getTemplate } from "../../utils/templates";
-import { canvasSizeForPoints } from "../../utils/canvas";
+import { getTemplate, vertexLabel } from "../../utils/templates";
+import { canvasSizeForPoints, findNorthWestIndex } from "../../utils/canvas";
 import { logger } from "../../utils/logger";
 
 const props = defineProps({
@@ -218,6 +251,88 @@ const customizeOpen = ref(false);
 const previewDoc = ref("");
 
 const currentTemplate = computed(() => getTemplate(props.templateId));
+
+// ── مجاورت‌ها در پیش‌نمایش ──
+// ترسیم‌های KML مودال «ترسیم جدید» (تنها جای قبلی ورود مجاورت) را ندیده‌اند و
+// pin.shape.adjacents ندارند؛ این فیلدها همان مقادیر state.edgeTexts را ویرایش
+// می‌کنند تا در کروکی، جدول مجاورت‌ها و خروجی چاپ بیاید.
+function flattenPinList(list) {
+  const out = [];
+  for (const p of list || []) {
+    if (p && p.type === "group" && Array.isArray(p.children)) out.push(...flattenPinList(p.children));
+    else if (p) out.push(p);
+  }
+  return out;
+}
+
+function adjacencyEdgeName(shapeIndex, edgeIndex) {
+  try {
+    const metas = props.gen.state.selectedShapesMeta || [];
+    const meta = metas[shapeIndex];
+    const style = props.gen.template?.()?.vertexLabels ?? currentTemplate.value?.vertexLabels;
+    const nw = findNorthWestIndex(props.gen.state.utmPoints || []);
+    const lbl = (gi) => String(vertexLabel(style, gi, nw));
+    const multi = (props.gen.state.edgeTexts || []).length > 1;
+    let edgeName = `${edgeIndex + 1}`;
+    if (meta && meta.count >= 2) {
+      const a = lbl(meta.startIdx + edgeIndex);
+      const nb = meta.isClosed
+        ? lbl(meta.startIdx + ((edgeIndex + 1) % meta.count))
+        : edgeIndex + 1 < meta.count
+          ? lbl(meta.startIdx + edgeIndex + 1)
+          : null;
+      if (nb) edgeName = `${a}-${nb}`;
+      if (multi) edgeName += ` (ترسیم ${shapeIndex + 1})`;
+    } else if (multi) {
+      edgeName += ` (ترسیم ${shapeIndex + 1})`;
+    }
+    return edgeName;
+  } catch (e) {
+    return `${edgeIndex + 1}`;
+  }
+}
+
+const adjacencyShapes = computed(() => {
+  const texts = props.gen.state.edgeTexts || [];
+  return texts
+    .map((arr, s) => ({
+      shapeIndex: s,
+      edges: (arr || []).map((v, i) => ({
+        edgeIndex: i,
+        name: adjacencyEdgeName(s, i),
+        value: v ?? "",
+      })),
+    }))
+    .filter((sh) => sh.edges.length > 0);
+});
+
+const totalEdges = computed(() => adjacencyShapes.value.reduce((n, sh) => n + sh.edges.length, 0));
+
+function setAdjacency(shapeIndex, edgeIndex, value) {
+  const v = String(value ?? "");
+  try {
+    const texts = props.gen.state.edgeTexts;
+    if (texts && texts[shapeIndex] && edgeIndex < texts[shapeIndex].length) {
+      texts[shapeIndex][edgeIndex] = v;
+    }
+  } catch (e) {}
+  // روی خود ترسیم هم ذخیره شود تا با بازگشت و محاسبه مجدد از بین نرود
+  try {
+    const pinId = props.gen.state.selectedShapesMeta?.[shapeIndex]?.pinId;
+    const pins = flattenPinList(props.gen.last?.pins || []);
+    const pin = pins.find((p) => p.id === pinId);
+    if (pin) {
+      if (!pin.shape) pin.shape = {};
+      const n = props.gen.state.edgeTexts?.[shapeIndex]?.length ?? 0;
+      const arr = Array.isArray(pin.shape.adjacents) ? [...pin.shape.adjacents] : [];
+      while (arr.length < n) arr.push("");
+      arr[edgeIndex] = v;
+      pin.shape.adjacents = arr;
+      pin.shape.adjacentsEnabled = arr.some((x) => String(x || "").trim());
+    }
+  } catch (e) {}
+  rerender();
+}
 
 const colorFields = [
   { key: "headerColor", label: "سربرگ / قاب" },
