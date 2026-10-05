@@ -8,4 +8,8 @@ export const ReferralsApi = {
   create: (body) => request("POST", "/referrals", { body }),
   update: (id, patch) => request("PATCH", `/referrals/${id}`, { body: patch }),
   remove: (id) => request("DELETE", `/referrals/${id}`),
+  // کد معرف شخصی هر کاربر: هر کس این کد را وارد کند زیرمجموعه مالک کد می‌شود
+  myCode: () => request("GET", "/referrals/my-code"),
+  ensureMyCode: () => request("POST", "/referrals/my-code", { body: {} }),
+  saveMyCode: (code) => request("PUT", "/referrals/my-code", { body: { code } }),
 };

@@ -294,6 +294,43 @@
 
       <!-- معرفی -->
       <section v-else-if="activeTab === 'referrals'">
+        <!-- کد معرف شخصی من -->
+        <div class="card !rounded-2xl p-4 mb-4">
+          <div class="font-bold text-sm mb-1 flex items-center gap-2">
+            <i class="fas fa-id-badge text-[var(--accent)]"></i> کد معرف من
+          </div>
+          <p class="text-[11px] text-[var(--text-muted)] leading-5 mb-3">
+            این کد را به دیگران بدهید؛ هر کس این کد را وارد کند، زیرمجموعه شما می‌شود.
+          </p>
+          <div v-if="!editingMyCode" class="flex items-center gap-2 flex-wrap">
+            <span class="font-extrabold tracking-widest text-xl px-4 py-2 rounded-xl border border-dashed border-[var(--accent)]/50 bg-[var(--accent-glow)] text-[var(--accent-soft)]" dir="ltr">{{ myReferralCode || "—" }}</span>
+            <button class="btn btn-ghost btn-sm" :disabled="!myReferralCode" @click="copyMyCode">
+              <i class="fas mr-0.5" :class="myCodeCopied ? 'fa-check' : 'fa-copy'"></i>
+              {{ myCodeCopied ? "کپی شد" : "کپی" }}
+            </button>
+            <button class="btn btn-secondary btn-sm" @click="startEditMyCode">
+              <i class="fas fa-pen ml-1"></i> {{ myReferralCode ? "تغییر کد" : "ثبت کد" }}
+            </button>
+            <button v-if="!myReferralCode" class="btn btn-ghost btn-sm" :disabled="myCodeSaving" @click="makeMyCode">
+              <i v-if="myCodeSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
+              <i v-else class="fas fa-wand-magic-sparkles ml-1"></i> ساخت خودکار
+            </button>
+          </div>
+          <div v-else class="flex items-center gap-2">
+            <input v-model="myCodeDraft" type="text" class="input" dir="ltr" placeholder="مثلاً ALI123" maxlength="32" @keyup.enter="saveMyCode" />
+            <button class="btn btn-primary btn-sm shrink-0" :disabled="!myCodeDraft || myCodeSaving" @click="saveMyCode">
+              <i v-if="myCodeSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
+              <i v-else class="fas fa-check ml-1"></i> ذخیره
+            </button>
+            <button class="btn btn-ghost btn-sm shrink-0" @click="editingMyCode = false">انصراف</button>
+          </div>
+          <Transition name="modal">
+            <div v-if="myCodeMsg" class="mt-3 rounded-xl px-4 py-3 text-sm font-medium" :class="myCodeMsgOk ? 'bg-[var(--success-glow)] border border-[var(--success)]/30 text-[var(--success)]' : 'bg-[var(--danger-glow)] border border-[var(--danger)]/30 text-[var(--danger)]'">
+              <i class="fas ml-1" :class="myCodeMsgOk ? 'fa-circle-check' : 'fa-circle-xmark'"></i>{{ myCodeMsg }}
+            </div>
+          </Transition>
+        </div>
+
         <div class="card !rounded-2xl p-4 mb-4">
           <div class="font-bold text-sm mb-3 flex items-center gap-2">
             <i class="fas fa-ticket text-[var(--accent)]"></i> فعال‌سازی کد معرف
@@ -309,6 +346,34 @@
               <i class="fas ml-1" :class="referralMsgOk ? 'fa-circle-check' : 'fa-circle-xmark'"></i>{{ referralMsg }}
             </div>
           </Transition>
+        </div>
+
+        <div class="font-bold text-sm mt-5 mb-3 flex items-center gap-2">
+          <i class="fas fa-sitemap text-[var(--accent)]"></i> زیرمجموعه‌های من
+          <span class="text-[11px] text-[var(--text-muted)] font-semibold">({{ subordinates.length }})</span>
+        </div>
+        <div class="card !rounded-2xl overflow-hidden mb-5">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>نام</th>
+                  <th>شماره همراه</th>
+                  <th>تاریخ عضویت</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="subordinates.length === 0">
+                  <td colspan="3" class="text-center text-[var(--text-faint)] py-10">هنوز زیرمجموعه‌ای ندارید؛ کد معرف خود را به اشتراک بگذارید</td>
+                </tr>
+                <tr v-for="s in subordinates" :key="s.id">
+                  <td class="text-xs font-semibold">{{ s.full_name || s.name || s.username }}</td>
+                  <td class="text-xs" dir="ltr">{{ s.phone || s.username }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(s.created_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="font-bold text-sm mb-3 flex items-center gap-2">
@@ -575,6 +640,55 @@ const referralMsg = ref("");
 const referralMsgOk = ref(true);
 const myReferrals = computed(() => auth.state.myReferrals);
 
+// کد معرف شخصی من: هر کس آن را وارد کند زیرمجموعه من می‌شود
+const myReferralCode = computed(
+  () => auth.state.myReferralCode || auth.state.myAgent?.code || user.value?.referralCode || "",
+);
+const editingMyCode = ref(false);
+const myCodeDraft = ref("");
+const myCodeSaving = ref(false);
+const myCodeMsg = ref("");
+const myCodeMsgOk = ref(true);
+const myCodeCopied = ref(false);
+
+async function copyMyCode() {
+  if (!myReferralCode.value) return;
+  try {
+    await navigator.clipboard.writeText(myReferralCode.value);
+    myCodeCopied.value = true;
+    setTimeout(() => (myCodeCopied.value = false), 1800);
+  } catch {}
+}
+
+function startEditMyCode() {
+  myCodeDraft.value = myReferralCode.value || "";
+  myCodeMsg.value = "";
+  editingMyCode.value = true;
+}
+
+async function makeMyCode() {
+  myCodeMsg.value = "";
+  myCodeSaving.value = true;
+  const res = await auth.ensureMyReferralCode();
+  myCodeSaving.value = false;
+  myCodeMsgOk.value = res.success;
+  myCodeMsg.value = res.success
+    ? res.code
+      ? "کد معرف شخصی شما آماده شد."
+      : "درخواستی ثبت شد؛ کد شما به‌زودی فعال می‌شود."
+    : res.error;
+}
+
+async function saveMyCode() {
+  myCodeMsg.value = "";
+  myCodeSaving.value = true;
+  const res = await auth.saveMyReferralCode(myCodeDraft.value);
+  myCodeSaving.value = false;
+  myCodeMsgOk.value = res.success;
+  myCodeMsg.value = res.success ? "کد معرف شخصی شما ذخیره شد." : res.error;
+  if (res.success) editingMyCode.value = false;
+}
+
 async function redeem() {
   referralMsg.value = "";
   const res = await auth.redeemReferral(String(referralCode.value).trim());
@@ -582,7 +696,10 @@ async function redeem() {
   referralMsg.value = res.success
     ? `کد معرف فعال شد؛ ${res.freeKroki ?? ""} عدد کروکی رایگان دریافت کردید.`
     : res.error;
-  if (res.success) referralCode.value = "";
+  if (res.success) {
+    referralCode.value = "";
+    auth.loadSubordinates().catch(() => {});
+  }
 }
 
 function hexToRgb(hex) {
@@ -608,8 +725,11 @@ watch(activeTab, (tab) => {
     auth.myKrokis();
   } else if (tab === "referrals") {
     auth.loadMyReferrals();
+    auth.loadMyReferralCode();
+    auth.loadSubordinates();
   } else if (tab === "agent") {
     auth.loadMyAgent();
+    auth.loadMyReferralCode();
     auth.loadSubordinates();
   }
 });
@@ -620,6 +740,8 @@ onMounted(() => {
   auth.loadTemplates();
   auth.myKrokis();
   auth.loadMyReferrals();
+  auth.loadMyReferralCode();
+  auth.loadSubordinates();
 });
 </script>
 

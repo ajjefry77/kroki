@@ -69,6 +69,7 @@ const state = reactive({
   cityPrices: [],
   myAgent: null,
   subordinates: [],
+  myReferralCode: "",
   agencyRequests: [],
   adminAgents: [],
   agentDetail: null,
@@ -89,6 +90,8 @@ function normalizeUser(u) {
     wallet: Number(u?.wallet_balance ?? u?.wallet ?? 0),
     freeKroki: Number(u?.free_kroki_count ?? u?.freeKroki ?? 0),
     active: u?.active !== false,
+    referralCode: u?.referral_code || u?.referralCode || u?.agent_code || "",
+    referredBy: u?.referred_by ?? u?.referredBy ?? null,
   };
 }
 
@@ -119,6 +122,7 @@ function logout() {
   state.cityPrices = [];
   state.myAgent = null;
   state.subordinates = [];
+  state.myReferralCode = "";
   state.agencyRequests = [];
   state.adminAgents = [];
   state.agentDetail = null;
@@ -617,7 +621,7 @@ async function loadAllReferrals() {
   }
 }
 
-async function createReferral({ code, free_kroki_amount, max_uses, expires_at } = {}) {
+async function createReferral({ code, free_kroki_amount, max_uses, expires_at, user_id } = {}) {
   try {
     const body = {
       code: String(code || "").trim(),
@@ -625,11 +629,116 @@ async function createReferral({ code, free_kroki_amount, max_uses, expires_at } 
       max_uses: Number(max_uses) || 1,
       expires_at: expires_at || "",
     };
+    // اتصال کد به یک کاربر خاص: هر کس این کد را وارد کند زیرمجموعه آن کاربر می‌شود
+    if (user_id !== undefined && user_id !== null && String(user_id).trim() !== "") {
+      body.user_id = user_id;
+    }
     await ReferralsApi.create(body);
     await loadAllReferrals();
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message || "خطا در ساخت کد معرف" };
+  }
+}
+
+/* ---------------- کد معرف شخصی هر کاربر ----------------
+ * هر کاربر یک کد معرف یکتا دارد؛ هر کس آن کد را (در ثبت‌نام یا پنل کاربری)
+ * وارد کند، زیرمجموعه مالک کد می‌شود و کروکی رایگان می‌گیرد.
+ */
+
+function extractCode(payload) {
+  if (!payload) return "";
+  if (typeof payload === "string") return payload;
+  return (
+    payload.code ||
+    payload.referral_code ||
+    payload.referralCode ||
+    payload.agent_code ||
+    payload?.referral?.code ||
+    ""
+  );
+}
+
+async function loadMyReferralCode() {
+  // ۱) تلاش با اندپوینت اختصاصی کد شخصی
+  try {
+    const d = await ReferralsApi.myCode();
+    const code = String(extractCode(d) || "").trim();
+    if (code) {
+      state.myReferralCode = code;
+      return { success: true, code };
+    }
+  } catch {}
+  // ۲) fallback: کد نمایندگی (برای سازگاری با بک‌اند فعلی)
+  try {
+    const d = await AgencyApi.me();
+    const code = String(d?.code || d?.agent_code || "").trim();
+    if (code) {
+      state.myReferralCode = code;
+      if (!state.myAgent) state.myAgent = d;
+      return { success: true, code };
+    }
+  } catch {}
+  // ۳) fallback آخر: کدی که همراه پروفایل کاربر آمده
+  const fallback = String(state.user?.referralCode || "").trim();
+  if (fallback) {
+    state.myReferralCode = fallback;
+    return { success: true, code: fallback };
+  }
+  return { success: true, code: "" };
+}
+
+async function ensureMyReferralCode() {
+  const existing = await loadMyReferralCode();
+  if (existing?.code) return existing;
+  try {
+    const d = await ReferralsApi.ensureMyCode();
+    const code = String(extractCode(d) || "").trim();
+    if (code) {
+      state.myReferralCode = code;
+      return { success: true, code };
+    }
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در ساخت کد معرف شخصی" };
+  }
+  return { success: true, code: state.myReferralCode || "" };
+}
+
+async function saveMyReferralCode(code) {
+  const normalized = faToEn(code || "").trim().toUpperCase();
+  if (!normalized) return { success: false, error: "کد معرف را وارد کنید" };
+  try {
+    const d = await ReferralsApi.saveMyCode(normalized);
+    const saved = String(extractCode(d) || normalized).trim();
+    state.myReferralCode = saved;
+    await refreshMe().catch(() => {});
+    return { success: true, code: saved };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در ذخیره کد معرف شخصی" };
+  }
+}
+
+/* ادمین: تعریف/تغییر کد معرف یک کاربر خاص */
+async function adminSetUserReferralCode(userId, code) {
+  const normalized = faToEn(code || "").trim().toUpperCase();
+  if (!normalized) return { success: false, error: "کد معرف را وارد کنید" };
+  // ۱) اندپوینت اختصاصی
+  try {
+    const d = await UsersApi.setReferralCode(userId, normalized);
+    const saved = String(extractCode(d) || normalized).trim();
+    const u = state.users.find((x) => String(x.id) === String(userId));
+    if (u) u.referralCode = saved;
+    return { success: true, code: saved };
+  } catch (firstErr) {
+    // ۲) fallback: PATCH عمومی کاربر (اگر بک‌اند referral_code را بپذیرد)
+    try {
+      await UsersApi.update(userId, { referral_code: normalized });
+      const u = state.users.find((x) => String(x.id) === String(userId));
+      if (u) u.referralCode = normalized;
+      return { success: true, code: normalized };
+    } catch {
+      return { success: false, error: firstErr.message || "خطا در ثبت کد معرف کاربر" };
+    }
   }
 }
 
@@ -1093,6 +1202,10 @@ export const auth = {
   createReferral,
   updateReferral,
   deleteReferral,
+  loadMyReferralCode,
+  ensureMyReferralCode,
+  saveMyReferralCode,
+  adminSetUserReferralCode,
   loadUsers,
   setRole,
   setFreeKroki,

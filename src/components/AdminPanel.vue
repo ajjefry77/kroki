@@ -180,18 +180,19 @@
                   <th>نقش</th>
                   <th>موجودی (تومان)</th>
                   <th>کروکی رایگان</th>
+                  <th>کد معرف شخصی</th>
                   <th>وضعیت</th>
                   <th>عملیات</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="usersLoading">
-                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">
+                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">
                     <i class="fas fa-circle-notch fa-spin ml-1"></i> در حال دریافت کاربران...
                   </td>
                 </tr>
                 <tr v-else-if="filteredUsers.length === 0">
-                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">کاربری یافت نشد</td>
+                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">کاربری یافت نشد</td>
                 </tr>
                 <tr v-for="u in filteredUsers" :key="u.id">
                   <td>
@@ -243,6 +244,23 @@
                         <span class="field-unit">عدد</span>
                       </div>
                     </div>
+                  </td>
+                  <td>
+                    <div class="flex items-center gap-1">
+                      <input
+                        type="text"
+                        class="input !w-28 !py-1.5 !text-xs text-center tracking-widest"
+                        dir="ltr"
+                        placeholder="—"
+                        :value="referralCodeDrafts[u.id] ?? u.referralCode ?? ''"
+                        @input="referralCodeDrafts[u.id] = $event.target.value"
+                        @keyup.enter="saveUserReferralCode(u)"
+                      />
+                      <button class="btn btn-secondary btn-xs" :disabled="busy" title="ثبت کد معرف برای این کاربر" @click="saveUserReferralCode(u)">
+                        <i class="fas fa-check text-xs"></i>
+                      </button>
+                    </div>
+                    <div class="text-[10px] text-[var(--text-faint)] mt-1 leading-4">هر کس این کد را وارد کند<br />زیرمجموعه این کاربر می‌شود</div>
                   </td>
                   <td>
                     <button
@@ -402,6 +420,17 @@
               <input v-model="referralForm.expires_at" type="text" class="input" dir="ltr" placeholder="خالی = بدون انقضا" />
             </div>
           </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">مالک کد (اختیاری — هر کس این کد را وارد کند زیرمجموعه او می‌شود)</label>
+              <select v-model="referralForm.user_id" class="input">
+                <option value="">بدون مالک (کد عمومی)</option>
+                <option v-for="u in auth.state.users" :key="u.id" :value="u.id">
+                  {{ u.name || u.username }} — {{ u.username }}
+                </option>
+              </select>
+            </div>
+          </div>
           <div class="flex items-center gap-2">
             <button class="btn btn-primary btn-sm" :disabled="referralSaving" @click="createReferral">
               <i v-if="referralSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
@@ -418,6 +447,7 @@
               <thead>
                 <tr>
                   <th>کد</th>
+                  <th>مالک (زیرمجموعه‌ساز)</th>
                   <th>کروکی رایگان</th>
                   <th>استفاده شده</th>
                   <th>سقف</th>
@@ -428,10 +458,11 @@
               </thead>
               <tbody>
                 <tr v-if="referrals.length === 0">
-                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
+                  <td colspan="8" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
                 </tr>
                 <tr v-for="r in referrals" :key="r.id">
                   <td class="text-xs font-bold tracking-widest" dir="ltr">{{ r.code }}</td>
+                  <td class="text-xs">{{ r.owner_name || r.full_name || r.username || (r.user_id ? "کاربر " + r.user_id : "—") }}</td>
                   <td class="text-xs">{{ r.free_kroki_amount }}</td>
                   <td class="text-xs" dir="ltr">{{ r.used_count }} / {{ r.max_uses }}</td>
                   <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.expires_at) }}</td>
@@ -943,10 +974,11 @@ const adminTransactions = computed(() => auth.state.adminTransactions);
 const roles = computed(() => auth.state.roles);
 const referrals = computed(() => auth.state.referrals);
 
-const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: 1, expires_at: "" });
+const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: 1, expires_at: "", user_id: "" });
 const referralSaving = ref(false);
 const referralMsg = ref("");
 const referralMsgOk = ref(true);
+const referralCodeDrafts = reactive({});
 
 const cityPrices = computed(() => auth.state.cityPrices);
 const newCity = reactive({ city: "", price: "" });
@@ -1120,6 +1152,7 @@ async function createReferral() {
     free_kroki_amount: referralForm.free_kroki_amount,
     max_uses: referralForm.max_uses,
     expires_at: referralForm.expires_at,
+    user_id: referralForm.user_id,
   });
   referralSaving.value = false;
   referralMsgOk.value = res.success;
@@ -1129,6 +1162,24 @@ async function createReferral() {
     referralForm.free_kroki_amount = 1;
     referralForm.max_uses = 1;
     referralForm.expires_at = "";
+    referralForm.user_id = "";
+  }
+}
+
+async function saveUserReferralCode(u) {
+  const draft = referralCodeDrafts[u.id] ?? u.referralCode ?? "";
+  if (!String(draft || "").trim()) {
+    showToast("کد معرف را وارد کنید", "error");
+    return;
+  }
+  busy.value = true;
+  const res = await auth.adminSetUserReferralCode(u.id, draft);
+  busy.value = false;
+  if (res.success) {
+    delete referralCodeDrafts[u.id];
+    showToast(`کد معرف ${u.name || u.username} ثبت شد: ${res.code}`);
+  } else {
+    showToast(res.error || "خطا در ثبت کد معرف کاربر", "error");
   }
 }
 

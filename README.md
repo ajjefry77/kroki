@@ -300,19 +300,23 @@ npm run preview
 ### کدهای معرف
 | متد | مسیر | توضیح |
 |-----|------|-------|
-| `POST` | `/api/referrals/redeem` | اعمال کد معرف |
+| `POST` | `/api/referrals/redeem` | اعمال کد معرف (واردکننده زیرمجموعه مالک کد می‌شود) |
 | `GET` | `/api/referrals/my` | کدهای معرف من |
 | `GET` | `/api/referrals` | همه کدها (ادمین) |
-| `POST` | `/api/referrals` | ایجاد کد معرف |
+| `POST` | `/api/referrals` | ایجاد کد معرف (با `user_id` اختیاری برای اتصال به مالک) |
 | `PATCH` | `/api/referrals/:id` | ویرایش کد معرف |
 | `DELETE` | `/api/referrals/:id` | حذف کد معرف |
+| `GET` | `/api/referrals/my-code` | کد معرف شخصی کاربر جاری |
+| `POST` | `/api/referrals/my-code` | ساخت خودکار کد شخصی (اگر ندارد) |
+| `PUT` | `/api/referrals/my-code` | ثبت/تغییر کد شخصی (`{ code }`) |
 
 ### کاربران (ادمین)
 | متد | مسیر | توضیح |
 |-----|------|-------|
-| `GET` | `/api/users` | لیست کاربران |
+| `GET` | `/api/users` | لیست کاربران (شامل `referral_code`) |
 | `PATCH` | `/api/users/:id` | ویرایش کاربر |
 | `POST` | `/api/users/:id/credit` | شارژ کیف پول کاربر |
+| `POST` | `/api/users/:id/referral-code` | تعریف کد معرف شخصی برای کاربر (`{ code }`) |
 
 ### پنل ادمین
 | متد | مسیر | توضیح |

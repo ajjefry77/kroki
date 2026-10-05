@@ -61,8 +61,9 @@
         </div>
 
         <div v-if="mode === 'register'">
-          <label class="block mb-1.5 text-xs font-medium">کد معرف نماینده (اختیاری)</label>
-          <input v-model="fields.agentCode" type="text" class="input ltr" dir="ltr" placeholder="کد نماینده" maxlength="32" autocomplete="off" spellcheck="false" />
+          <label class="block mb-1.5 text-xs font-medium">کد معرف (اختیاری)</label>
+          <input v-model="fields.agentCode" type="text" class="input ltr" dir="ltr" placeholder="کد معرف معرف شما" maxlength="32" autocomplete="off" spellcheck="false" />
+          <p class="mt-1 text-[10px] text-[var(--text-faint)]">با وارد کردن کد معرف یک کاربر، زیرمجموعه او می‌شوید و کروکی رایگان می‌گیرید.</p>
         </div>
 
         <div>
