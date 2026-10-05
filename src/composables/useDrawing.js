@@ -1530,6 +1530,9 @@ export function useDrawing(map, pins) {
       selected: true,
     };
     pins.push(pin);
+    // پیش‌نویس کاملاً پاک شود تا لایه موقت روی لیبل‌های ذخیره‌شده نیفتد
+    // و جدول «در حال ترسیم» کهنه نماند
+    shape.value = null;
     drawMode.value = "";
     showForm.value = false;
     formData.value = { name: "", description: "", adjacentsEnabled: false, adjacents: [] };
@@ -1826,7 +1829,7 @@ export function useDrawing(map, pins) {
     if (!map || !pin || !pin.shape) return;
     const ids = pin.shape._sourceIds || [];
     ids.forEach((sid) => {
-      [sid + "-fill", sid + "-line", sid + "-point", sid + "-points"].forEach(
+      [sid + "-fill", sid + "-line", sid + "-point", sid + "-points", sid + "-vlabel", sid + "-elen", sid + "-eadj"].forEach(
         (lid) => {
           if (map.getLayer(lid)) {
             map.setLayoutProperty(lid, "visibility", visible ? "visible" : "none");
@@ -1947,6 +1950,18 @@ export function useDrawing(map, pins) {
   // خروج از حالت ویرایش و اعمال تغییرات روی شکل سبز ذخیره‌شده
   function exitPinEdit() {
     if (!editingPin) return;
+    // مجاورت‌های فرم را با تعداد جدید اضلاع همگام و روی ترسیم ذخیره کن
+    // تا لیبل‌های دائمی نقشه هم به‌روز شوند
+    try {
+      const sh = editingPin.shape;
+      if (sh && (sh.type === "polygon" || sh.type === "polyline") && Array.isArray(sh.positions)) {
+        const n = sh.type === "polygon" ? sh.positions.length : sh.positions.length - 1;
+        const a = [...(formData.value.adjacents || [])];
+        while (a.length < n) a.push("");
+        a.length = Math.max(n, 0);
+        sh.adjacents = a;
+      }
+    } catch (e) {}
     try {
       updatePinGeometry(map, editingPin);
     } catch (e) {

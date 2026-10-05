@@ -14,15 +14,27 @@ export function unregisterDrawLayer(id) {
 
 export function bringDrawingsToFront(map) {
   if (!map || typeof map.getLayer !== "function") return;
+  const isLabelLayer = (id) => /-(vlabel|elen|eadj)$/.test(id || "");
+  // اول لایه‌های موجود را جدا کن و شناسه‌های حذف‌شده را از رجیستری پاک کن
+  const alive = [];
   registry.forEach((id) => {
     if (map.getLayer(id)) {
-      try {
-        map.moveLayer(id);
-      } catch (e) {
-        /* layer may not exist yet, ignore */
-      }
+      alive.push(id);
     } else {
       registry.delete(id);
+    }
+  });
+  // اول شکل‌ها (fill/line/...) بعد لیبل‌ها (شماره/طول/مجاورت) به بالا منتقل
+  // می‌شوند تا نوشته‌ها همیشه روی شکل باشند، نه زیر آن
+  const ordered = [
+    ...alive.filter((id) => !isLabelLayer(id)),
+    ...alive.filter((id) => isLabelLayer(id)),
+  ];
+  ordered.forEach((id) => {
+    try {
+      map.moveLayer(id);
+    } catch (e) {
+      /* layer may not exist yet, ignore */
     }
   });
 }

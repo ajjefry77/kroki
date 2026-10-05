@@ -1,5 +1,126 @@
 import { getDashArray, ensurePointSymbolImages, pointIcon } from "./drawStyle";
 import { registerDrawLayer, bringDrawingsToFront } from "./layerOrder";
+import { measureDistance, formatDistance } from "./useDrawingHelpers";
+
+// فونت لیبل‌های متنی روی نقشه (مشابه حالت در حال ترسیم در useDrawing.js)
+const MAP_TEXT_FONT = ["Droid Sans", "Arial Unicode MS Bold"];
+
+// فیچرهای لیبل دائمی یک ترسیم ذخیره‌شده: شماره گوشه‌ها + طول/مجاورت اضلاع
+export function buildPinLabelFeatures(pin) {
+  const s = pin?.shape;
+  if (!s || (s.type !== "polygon" && s.type !== "polyline")) return null;
+  const pts = s.positions || [];
+  if (pts.length < 2) return null;
+  const features = [];
+  pts.forEach((p, i) => {
+    features.push({
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [Number(p.lon ?? p.lng), Number(p.lat)],
+      },
+      properties: { kind: "vertex", label: String(i + 1) },
+    });
+  });
+  const adj = Array.isArray(s.adjacents) ? s.adjacents : [];
+  const edgeCount = s.type === "polygon" ? pts.length : pts.length - 1;
+  for (let i = 0; i < edgeCount; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    if (!a || !b) continue;
+    const alng = Number(a.lon ?? a.lng);
+    const alat = Number(a.lat);
+    const blng = Number(b.lon ?? b.lng);
+    const blat = Number(b.lat);
+    if (!isFinite(alng) || !isFinite(alat) || !isFinite(blng) || !isFinite(blat))
+      continue;
+    let len = "";
+    try {
+      len = formatDistance(measureDistance([alng, alat], [blng, blat]));
+    } catch (e) {
+      len = "";
+    }
+    const adjTxt = String(adj[i] ?? "").trim();
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [(alng + blng) / 2, (alat + blat) / 2] },
+      properties: {
+        kind: "edge",
+        label: adjTxt ? `${adjTxt}\n${len}` : len,
+        adj: adjTxt,
+        len,
+      },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+function addPinLabelLayers(map, sourceId, labelSourceId, visibility) {
+  map.addLayer({
+    id: sourceId + "-elen",
+    type: "symbol",
+    source: labelSourceId,
+    filter: ["==", ["get", "kind"], "edge"],
+    layout: {
+      "text-field": ["get", "len"],
+      "text-size": 10,
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+      "text-font": MAP_TEXT_FONT,
+      visibility,
+    },
+    paint: {
+      "text-color": "#b45309",
+      "text-halo-color": "#ffffff",
+      "text-halo-width": 2,
+    },
+  });
+  map.addLayer({
+    id: sourceId + "-eadj",
+    type: "symbol",
+    source: labelSourceId,
+    filter: ["all", ["==", ["get", "kind"], "edge"], ["!=", ["get", "adj"], ""]],
+    layout: {
+      "text-field": ["get", "adj"],
+      "text-size": 11,
+      "text-offset": [0, -1.3],
+      "text-anchor": "bottom",
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+      "text-font": MAP_TEXT_FONT,
+      visibility,
+    },
+    paint: {
+      "text-color": "#1d4ed8",
+      "text-halo-color": "#ffffff",
+      "text-halo-width": 2,
+    },
+  });
+  map.addLayer({
+    id: sourceId + "-vlabel",
+    type: "symbol",
+    source: labelSourceId,
+    filter: ["==", ["get", "kind"], "vertex"],
+    layout: {
+      "text-field": ["get", "label"],
+      "text-size": 12,
+      "text-offset": [0, -1.2],
+      "text-anchor": "bottom",
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+      "text-font": MAP_TEXT_FONT,
+      visibility,
+    },
+    paint: {
+      "text-color": "#facc15",
+      "text-halo-color": "#111111",
+      "text-halo-width": 2.5,
+    },
+  });
+  registerDrawLayer(sourceId + "-elen");
+  registerDrawLayer(sourceId + "-eadj");
+  registerDrawLayer(sourceId + "-vlabel");
+}
 
 // بازسازی داده‌های هندسی یک ترسیم روی نقشه پس از ویرایش نقاط آن (دستی، CSV یا KML)
 export function updatePinGeometry(map, pin) {
@@ -25,6 +146,14 @@ export function updatePinGeometry(map, pin) {
         },
       ],
     });
+    // لیبل‌های دائمی (شماره گوشه‌ها + طول/مجاورت) هم به‌روزرسانی شوند
+    try {
+      const labelSrc = map.getSource(sourceId + "-labels");
+      if (labelSrc) {
+        const fc = buildPinLabelFeatures(pin);
+        if (fc) labelSrc.setData(fc);
+      }
+    } catch (e) {}
   } else if (s.type === "point") {
     source.setData({
       type: "FeatureCollection",
@@ -100,6 +229,16 @@ export function renderPinOnMap(map, pin) {
       },
       layout: { visibility },
     });
+    // لیبل‌های دائمی: شماره گوشه‌ها + طول و مجاورت اضلاع (بعد از ذخیره هم می‌مانند)
+    const labelSourceId = sourceId + "-labels";
+    map.addSource(labelSourceId, {
+      type: "geojson",
+      data: buildPinLabelFeatures(pin) || {
+        type: "FeatureCollection",
+        features: [],
+      },
+    });
+    addPinLabelLayers(map, sourceId, labelSourceId, visibility);
   } else if (s.type === "point") {
     map.addSource(sourceId, {
       type: "geojson",

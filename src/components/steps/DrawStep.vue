@@ -346,7 +346,7 @@ function setPinVisibility(pin, visible) {
   if (!m || !pin?.shape) return;
   const ids = pin.shape._sourceIds || [];
   for (const sid of ids) {
-    for (const suffix of ["-fill", "-line", "-point", "-points"]) {
+    for (const suffix of ["-fill", "-line", "-point", "-points", "-vlabel", "-elen", "-eadj"]) {
       const lid = sid + suffix;
       try {
         if (m.getLayer(lid))
