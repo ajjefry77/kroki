@@ -50,14 +50,14 @@
           <input v-model="fields.name" type="text" class="input" placeholder="نام و نام خانوادگی" maxlength="100" autocomplete="name" spellcheck="false" />
         </div>
 
-        <div>
+        <div v-if="mode === 'login'">
           <label class="block mb-1.5 text-xs font-medium">نام کاربری *</label>
-          <input v-model="fields.username" type="text" class="input" required placeholder="شماره همراه یا ایمیل" maxlength="64" autocomplete="username" spellcheck="false" />
+          <input v-model="fields.username" type="text" class="input" required placeholder="شماره همراه یا نام کاربری" maxlength="64" autocomplete="username" spellcheck="false" />
         </div>
 
         <div v-if="mode === 'register'">
-          <label class="block mb-1.5 text-xs font-medium">شماره همراه</label>
-          <input v-model="fields.phone" type="tel" inputmode="numeric" dir="ltr" class="input ltr" placeholder="09xxxxxxxxx" maxlength="11" autocomplete="tel" @input="fields.phone = faToEn(fields.phone).replace(/[^\d]/g, '').slice(0, 11)" />
+          <label class="block mb-1.5 text-xs font-medium">شماره همراه *</label>
+          <input v-model="fields.phone" type="tel" inputmode="numeric" dir="ltr" class="input ltr" required placeholder="09xxxxxxxxx" maxlength="11" autocomplete="tel" @input="fields.phone = faToEn(fields.phone).replace(/[^\d]/g, '').slice(0, 11)" />
         </div>
 
         <div v-if="mode === 'register'">

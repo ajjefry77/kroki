@@ -1481,6 +1481,7 @@ export function useKrokiGenerator() {
       ["کد ملی متقاضی", escapeHtml(last.form.clientNationalId) || "—"],
       ["شماره همراه متقاضی", escapeHtml(last.form.clientPhone) || "—"],
       ["نشانی ملک", escapeHtml(last.form.address) || "—"],
+      ["نوع برداشت اولیه", escapeHtml(last.form.initialSurveyType || last.form.initial_survey_type) || "—"],
       ["سیستم مختصات", `WGS84 / UTM — Zone: ${zoneLabel(state.utmZone ?? "—")}`],
       ["مساحت کل", `<strong>${state.areaM2.toFixed(2)} متر مربع</strong>`],
       ["نهاد", escapeHtml(t.org)],

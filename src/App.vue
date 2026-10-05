@@ -182,6 +182,7 @@ const krokiForm = reactive({
   surveyor: "",
   plaque: "",
   streetWidth: "",
+  initialSurveyType: "",
   logo: "",
   description: "",
 });
@@ -478,6 +479,7 @@ function restart() {
   krokiForm.surveyor = "";
   krokiForm.plaque = "";
   krokiForm.streetWidth = "";
+  krokiForm.initialSurveyType = "";
   krokiForm.logo = "";
   krokiForm.description = "";
   krokiForm.date = getTodayJalali();

@@ -177,6 +177,7 @@
               <thead>
                 <tr>
                   <th>کاربر</th>
+                  <th>شهر</th>
                   <th>نقش</th>
                   <th>موجودی (تومان)</th>
                   <th>کروکی رایگان</th>
@@ -187,18 +188,20 @@
               </thead>
               <tbody>
                 <tr v-if="usersLoading">
-                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">
+                  <td colspan="8" class="text-center text-[var(--text-faint)] py-10">
                     <i class="fas fa-circle-notch fa-spin ml-1"></i> در حال دریافت کاربران...
                   </td>
                 </tr>
                 <tr v-else-if="filteredUsers.length === 0">
-                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">کاربری یافت نشد</td>
+                  <td colspan="8" class="text-center text-[var(--text-faint)] py-10">کاربری یافت نشد</td>
                 </tr>
                 <tr v-for="u in filteredUsers" :key="u.id">
                   <td>
                     <div class="text-xs font-semibold">{{ u.name }}</div>
                     <div class="text-[10px] text-[var(--text-muted)]" dir="ltr">{{ u.username }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)]" dir="ltr">{{ u.phone }}</div>
                   </td>
+                  <td class="text-xs">{{ u.city || "—" }}</td>
                   <td>
                     <div class="role-dropdown" :class="{ open: roleOpenId === u.id }">
                       <button class="role-trigger" @click.stop="roleOpenId = roleOpenId === u.id ? null : u.id">
@@ -263,8 +266,10 @@
                       <button class="btn btn-secondary btn-xs" :disabled="busy" title="ثبت کد معرف برای این کاربر" @click="saveUserReferralCode(u)">
                         <i class="fas fa-check text-xs"></i>
                       </button>
+                      <button v-if="u.referralCode" class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" title="حذف کد معرف شخصی" @click="deleteUserReferralCode(u)">
+                        <i class="fas fa-trash text-xs"></i>
+                      </button>
                     </div>
-                    <div class="text-[10px] text-[var(--text-faint)] mt-1 leading-4">هر کس این کد را وارد کند<br />زیرمجموعه این کاربر می‌شود</div>
                   </td>
                   <td>
                     <button
@@ -425,7 +430,7 @@
             </div>
           </div>
           <p class="text-[11px] text-[var(--text-muted)] leading-5 mb-3">
-            برای وصل کردن کد به یک کاربر خاص (زیرمجموعه‌سازی)، از جدول کاربران ستون «کد معرف شخصی» استفاده کنید.
+            کدهای شخصی کاربران هم در جدول «کدهای شخصی کاربران» پایین همین صفحه می‌آیند و قابل ویرایش‌اند.
           </p>
           <div class="flex items-center gap-2">
             <button class="btn btn-primary btn-sm" :disabled="referralSaving" @click="createReferral">
@@ -437,7 +442,10 @@
           </div>
         </div>
 
-        <div class="card !rounded-2xl overflow-hidden">
+        <div class="font-bold text-sm mb-3 flex items-center gap-2">
+          <i class="fas fa-ticket text-[var(--accent)]"></i> کدهای عمومی
+        </div>
+        <div class="card !rounded-2xl overflow-hidden mb-6">
           <div class="overflow-x-auto">
             <table>
               <thead>
@@ -455,10 +463,46 @@
                   <td colspan="6" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
                 </tr>
                 <tr v-for="r in referrals" :key="r.id">
-                  <td class="text-xs font-bold tracking-widest" dir="ltr">{{ r.code }}</td>
-                  <td class="text-xs">{{ r.free_kroki_amount }}</td>
-                  <td class="text-xs" dir="ltr">{{ r.used_count }} / {{ r.max_uses }}</td>
-                  <td class="text-xs text-[var(--text-muted)]">{{ r.expires_at ? fmtDate(r.expires_at) : "بدون انقضا" }}</td>
+                  <td>
+                    <input
+                      type="text"
+                      class="input !w-32 !py-1.5 !text-xs text-center tracking-widest"
+                      dir="ltr"
+                      :value="referralEditDrafts[r.id]?.code ?? r.code"
+                      @input="setReferralDraft(r.id, 'code', $event.target.value)"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="1"
+                      class="input !w-20 !py-1.5 !text-xs text-center"
+                      dir="ltr"
+                      :value="referralEditDrafts[r.id]?.free_kroki_amount ?? r.free_kroki_amount"
+                      @input="setReferralDraft(r.id, 'free_kroki_amount', $event.target.value)"
+                    />
+                  </td>
+                  <td class="text-xs whitespace-nowrap" dir="ltr">
+                    {{ r.used_count }} /
+                    <input
+                      type="number"
+                      min="1"
+                      class="input !w-20 !py-1.5 !text-xs text-center inline-block"
+                      dir="ltr"
+                      :value="referralEditDrafts[r.id]?.max_uses ?? r.max_uses"
+                      @input="setReferralDraft(r.id, 'max_uses', $event.target.value)"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      class="input !w-32 !py-1.5 !text-xs text-center"
+                      dir="ltr"
+                      placeholder="بدون انقضا"
+                      :value="referralEditDrafts[r.id]?.expires_at ?? r.expires_at ?? ''"
+                      @input="setReferralDraft(r.id, 'expires_at', $event.target.value)"
+                    />
+                  </td>
                   <td>
                     <button
                       class="px-2 py-1 rounded-full text-[10px] font-semibold transition"
@@ -470,61 +514,83 @@
                     </button>
                   </td>
                   <td>
-                    <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="removeReferral(r)">
-                      <i class="fas fa-trash text-xs"></i>
-                    </button>
+                    <div class="flex items-center gap-1">
+                      <button class="btn btn-secondary btn-xs" :disabled="busy" title="ذخیره ویرایش" @click="saveReferralEdit(r)">
+                        <i class="fas fa-floppy-disk text-xs"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="removeReferral(r)">
+                        <i class="fas fa-trash text-xs"></i>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
-      </section>
 
-      <!-- شهرها و قیمت‌ها -->
-      <section v-else-if="activeTab === 'cities'">
-        <div class="card !rounded-2xl p-4 mb-4">
-          <div class="font-bold text-sm mb-3 flex items-center gap-2">
-            <i class="fas fa-city text-[var(--accent)]"></i> افزودن شهر جدید
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input v-model="newCity.city" type="text" class="input" placeholder="نام شهر" />
-            <input v-model.number="newCity.price" type="number" min="0" class="input" dir="ltr" placeholder="مبلغ هر کروکی (تومان)" />
-            <button class="btn btn-primary btn-sm" :disabled="citySaving || !newCity.city" @click="addCity">
-              <i class="fas fa-plus ml-1"></i> افزودن
-            </button>
-          </div>
+        <div class="font-bold text-sm mb-3 flex items-center gap-2">
+          <i class="fas fa-id-badge text-[var(--accent)]"></i> کدهای شخصی کاربران
+          <span class="text-[11px] text-[var(--text-muted)] font-semibold">({{ personalReferralCodes.length }})</span>
         </div>
-
         <div class="card !rounded-2xl overflow-hidden">
           <div class="overflow-x-auto">
             <table>
               <thead>
                 <tr>
-                  <th>شهر</th>
-                  <th>مبلغ هر کروکی</th>
+                  <th>کاربر</th>
+                  <th>کد معرف شخصی</th>
+                  <th>کروکی رایگان</th>
+                  <th>زیرمجموعه</th>
                   <th>عملیات</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="cityPrices.length === 0">
-                  <td colspan="3" class="text-center text-[var(--text-faint)] py-10">شهری ثبت نشده است</td>
+                <tr v-if="personalReferralCodes.length === 0">
+                  <td colspan="5" class="text-center text-[var(--text-faint)] py-10">هنوز کد شخصی برای کاربران ثبت نشده است — از تب کاربران ستون «کد معرف شخصی» ثبت کنید</td>
                 </tr>
-                <tr v-for="c in cityPrices" :key="c.city">
-                  <td class="text-xs font-semibold">{{ c.city }}</td>
+                <tr v-for="p in personalReferralCodes" :key="p.id">
+                  <td>
+                    <div class="text-xs font-semibold">{{ p.full_name || p.name || p.username }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)]" dir="ltr">{{ p.phone || p.username }}</div>
+                  </td>
+                  <td>
+                    <div class="flex items-center gap-1">
+                      <input
+                        type="text"
+                        class="input !w-32 !py-1.5 !text-xs text-center tracking-widest"
+                        dir="ltr"
+                        :value="personalCodeDrafts[p.id] ?? p.code ?? p.referral_code ?? ''"
+                        @input="personalCodeDrafts[p.id] = $event.target.value"
+                        @keyup.enter="savePersonalCode(p)"
+                      />
+                      <button class="btn btn-secondary btn-xs" :disabled="busy" title="ذخیره ویرایش کد شخصی" @click="savePersonalCode(p)">
+                        <i class="fas fa-check text-xs"></i>
+                      </button>
+                    </div>
+                  </td>
                   <td>
                     <input
                       type="number"
-                      class="input !w-32"
+                      min="0"
+                      max="1000"
+                      class="input !w-20 !py-1.5 !text-xs text-center"
                       dir="ltr"
-                      :value="cityPriceDrafts[c.city] ?? c.price"
-                      @input="cityPriceDrafts[c.city] = $event.target.value"
+                      :value="personalFreeDrafts[p.id] ?? p.free_kroki_amount ?? 1"
+                      @input="personalFreeDrafts[p.id] = $event.target.value"
+                      @keyup.enter="savePersonalCode(p)"
                     />
                   </td>
+                  <td class="text-xs" dir="ltr">{{ p.subordinate_count ?? "—" }}</td>
                   <td>
-                    <button class="btn btn-secondary btn-xs" :disabled="citySaving" @click="saveCityPrice(c)">
-                      <i class="fas fa-floppy-disk ml-1"></i> ذخیره
-                    </button>
+                    <div class="flex items-center gap-1">
+                      <button class="btn btn-ghost btn-xs" title="رفتن به کاربر" @click="goToUser(p.id)">
+                        <i class="fas fa-user text-xs"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" title="حذف کد شخصی" @click="deletePersonalCode(p)">
+                        <i class="fas fa-trash text-xs"></i>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -939,7 +1005,6 @@ const tabs = computed(() => [
   { id: "transactions", label: "تراکنش‌ها", icon: "fa-clock-rotate-left", badge: null },
   { id: "roles", label: "نقش‌ها", icon: "fa-user-shield", badge: null },
   { id: "referrals", label: "معرفی", icon: "fa-ticket", badge: null },
-  { id: "cities", label: "شهرها", icon: "fa-city", badge: null },
   { id: "agencyRequests", label: "درخواست نمایندگی", icon: "fa-user-clock", badge: pendingAgencyCount.value || null },
   { id: "expertRequests", label: "درخواست‌های همکاری", icon: "fa-handshake", badge: pendingExpertCount.value || null },
   { id: "experts", label: "کارشناسان", icon: "fa-user-tie", badge: null },
@@ -965,17 +1030,16 @@ const adminKrokis = computed(() => auth.state.adminKrokis);
 const adminTransactions = computed(() => auth.state.adminTransactions);
 const roles = computed(() => auth.state.roles);
 const referrals = computed(() => auth.state.referrals);
+const personalReferralCodes = computed(() => auth.state.personalReferralCodes?.length ? auth.state.personalReferralCodes : auth.state.users.filter((u) => u.referralCode).map((u) => ({ id: u.id, username: u.username, full_name: u.name, phone: u.phone, code: u.referralCode, free_kroki_amount: Number(u.personalFreeKroki ?? 1) })));
 
 const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: 1, expires_at: "" });
 const referralSaving = ref(false);
 const referralMsg = ref("");
 const referralMsgOk = ref(true);
 const referralCodeDrafts = reactive({});
-
-const cityPrices = computed(() => auth.state.cityPrices);
-const newCity = reactive({ city: "", price: "" });
-const citySaving = ref(false);
-const cityPriceDrafts = reactive({});
+const referralEditDrafts = reactive({});
+const personalCodeDrafts = reactive({});
+const personalFreeDrafts = reactive({});
 
 const agencyRequests = computed(() => auth.state.agencyRequests.filter((r) => r.status === "pending"));
 const pendingAgencyCount = computed(() => agencyRequests.value.length);
@@ -991,25 +1055,7 @@ const adminAgents = computed(() => auth.state.adminAgents);
 const openAgentId = ref(null);
 const agentDetail = computed(() => auth.state.agentDetail);
 
-async function saveCityPrice(row) {
-  citySaving.value = true;
-  const res = await auth.setCityPrice(row.city, cityPriceDrafts[row.city] ?? row.price);
-  citySaving.value = false;
-  if (!res.success) showToast(res.error || "خطا در ثبت قیمت", "error");
-}
-
-async function addCity() {
-  if (!newCity.city.trim()) return;
-  citySaving.value = true;
-  const res = await auth.setCityPrice(newCity.city, newCity.price);
-  citySaving.value = false;
-  if (res.success) {
-    newCity.city = "";
-    newCity.price = "";
-  } else {
-    showToast(res.error || "خطا در افزودن شهر", "error");
-  }
-}
+const tabLoaded = reactive({ krokis: false, transactions: false, roles: false, referrals: false, agencyRequests: false, agents: false, expertRequests: false, experts: false });
 
 async function decideAgency(r, approve) {
   busy.value = true;
@@ -1047,8 +1093,6 @@ function toggleAgent(a) {
 }
 
 watch(agentCityFilter, (c) => auth.loadAdminAgents(c));
-
-const tabLoaded = reactive({ krokis: false, transactions: false, roles: false, referrals: false, cities: false, agencyRequests: false, agents: false, expertRequests: false, experts: false });
 
 function showToast(message, type = "success") {
   toast.value = { message, type };
@@ -1173,11 +1217,90 @@ async function saveUserReferralCode(u) {
   }
 }
 
+async function deleteUserReferralCode(u) {
+  if (!confirm(`کد شخصی «${u.referralCode}» حذف شود؟`)) return;
+  busy.value = true;
+  const res = await auth.adminDeleteUserReferralCode(u.id);
+  busy.value = false;
+  if (res.success) {
+    delete referralCodeDrafts[u.id];
+    showToast("کد شخصی حذف شد.");
+  } else {
+    showToast(res.error || "خطا در حذف کد شخصی", "error");
+  }
+}
+
 async function toggleReferral(r) {
   busy.value = true;
   const res = await auth.updateReferral(r.id, { is_active: !r.is_active });
   busy.value = false;
   if (!res.success) showToast(res.error || "خطا در تغییر وضعیت کد", "error");
+}
+
+function setReferralDraft(id, field, value) {
+  if (!referralEditDrafts[id]) referralEditDrafts[id] = {};
+  referralEditDrafts[id][field] = value;
+}
+
+async function saveReferralEdit(r) {
+  const d = referralEditDrafts[r.id] || {};
+  const patch = {};
+  if (d.code !== undefined && String(d.code).trim() && String(d.code).trim().toUpperCase() !== r.code) patch.code = String(d.code).trim();
+  if (d.free_kroki_amount !== undefined && d.free_kroki_amount !== "" && Number(d.free_kroki_amount) !== Number(r.free_kroki_amount)) patch.free_kroki_amount = Number(d.free_kroki_amount);
+  if (d.max_uses !== undefined && d.max_uses !== "" && Number(d.max_uses) !== Number(r.max_uses)) patch.max_uses = Number(d.max_uses);
+  if (d.expires_at !== undefined && (d.expires_at || "") !== (r.expires_at || "")) patch.expires_at = d.expires_at || "";
+  if (!Object.keys(patch).length) {
+    showToast("تغییری برای ذخیره وجود ندارد");
+    return;
+  }
+  busy.value = true;
+  const res = await auth.updateReferral(r.id, patch);
+  busy.value = false;
+  if (res.success) {
+    delete referralEditDrafts[r.id];
+    showToast("کد معرف ویرایش شد.");
+  } else {
+    showToast(res.error || "خطا در ویرایش کد", "error");
+  }
+}
+
+async function savePersonalCode(p) {
+  const draft = personalCodeDrafts[p.id] ?? p.code ?? "";
+  if (!String(draft || "").trim()) {
+    showToast("کد معرف را وارد کنید", "error");
+    return;
+  }
+  const freeDraft = personalFreeDrafts[p.id] ?? p.free_kroki_amount ?? 1;
+  busy.value = true;
+  const res = await auth.adminSetUserReferralCode(p.id, draft, freeDraft);
+  busy.value = false;
+  if (res.success) {
+    delete personalCodeDrafts[p.id];
+    delete personalFreeDrafts[p.id];
+    showToast(`کد معرف ${p.full_name || p.username} به‌روزرسانی شد: ${res.code}`);
+  } else {
+    showToast(res.error || "خطا در ویرایش کد شخصی", "error");
+  }
+}
+
+async function deletePersonalCode(p) {
+  if (!confirm(`کد شخصی «${p.code}» حذف شود؟ زیرمجموعه‌های قبلی حفظ می‌شوند.`)) return;
+  busy.value = true;
+  const res = await auth.adminDeleteUserReferralCode(p.id);
+  busy.value = false;
+  if (res.success) {
+    delete personalCodeDrafts[p.id];
+    delete personalFreeDrafts[p.id];
+    showToast("کد شخصی حذف شد.");
+  } else {
+    showToast(res.error || "خطا در حذف کد شخصی", "error");
+  }
+}
+
+function goToUser(id) {
+  const u = auth.state.users.find((x) => String(x.id) === String(id));
+  activeTab.value = "users";
+  if (u) q.value = u.username || "";
 }
 
 async function removeReferral(r) {
@@ -1240,9 +1363,8 @@ watch(activeTab, (tab) => {
   } else if (tab === "referrals" && !tabLoaded.referrals) {
     tabLoaded.referrals = true;
     auth.loadAllReferrals();
-  } else if (tab === "cities" && !tabLoaded.cities) {
-    tabLoaded.cities = true;
-    auth.loadCityPrices();
+    auth.loadPersonalReferralCodes().catch(() => {});
+    if (!auth.state.users.length) auth.loadUsers().catch(() => {});
   } else if (tab === "agencyRequests") {
     tabLoaded.agencyRequests = true;
     auth.loadAgencyRequests();

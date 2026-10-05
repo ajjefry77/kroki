@@ -102,8 +102,7 @@
               </div>
               <div>
                 <label class="block mb-1.5 font-medium text-xs">شهر ملک</label>
-                <input v-model="form.city" type="text" class="input" placeholder="مثلاً تهران (تعیین‌کننده قیمت)" maxlength="100" />
-                <p class="text-[10px] text-[var(--text-faint)] mt-1">قیمت کروکی بر اساس تعرفه همین شهر حساب می‌شود.</p>
+                <input v-model="form.city" type="text" class="input" placeholder="مثلاً تهران" maxlength="100" />
               </div>
               <div>
                 <label class="block mb-1.5 font-medium text-xs">کارشناس / نقشه‌بردار</label>
@@ -116,6 +115,10 @@
               <div>
                 <label class="block mb-1.5 font-medium text-xs">عرض معبر</label>
                 <input v-model="form.streetWidth" type="text" class="input" placeholder="مثلاً ۱۲ متر" />
+              </div>
+              <div>
+                <label class="block mb-1.5 font-medium text-xs">نوع برداشت اولیه</label>
+                <input v-model="form.initialSurveyType" type="text" class="input" placeholder="مثلاً زمینی / هوایی / ثبتی" maxlength="100" />
               </div>
               <div class="sm:col-span-2 lg:col-span-3">
                 <label class="block mb-1.5 font-medium text-xs">توضیحات تکمیلی</label>
@@ -431,29 +434,10 @@ const polyVerts = [
   [60, 80],
 ];
 
-const price = computed(() => serverPrice.value ?? KROKI_PRICE);
+const price = computed(() => KROKI_PRICE);
 const originalPrice = computed(() => KROKI_ORIGINAL_PRICE);
-// نمایش تخفیف فقط وقتی قیمت واقعی همان قیمت پیش‌فرض است
-const showDiscount = computed(() => price.value === KROKI_PRICE);
-
-// قیمت واقعی از سرور (همان عددی که در پرداخت کسر می‌شود)؛ با تغییر شهر به‌روز می‌شود
-const serverPrice = ref(null);
-let priceTimer = 0;
-async function refreshPrice() {
-  try {
-    serverPrice.value = await auth.effectivePrice(props.form.city);
-  } catch {
-    serverPrice.value = KROKI_PRICE;
-  }
-}
-watch(
-  () => props.form.city,
-  () => {
-    if (priceTimer) clearTimeout(priceTimer);
-    priceTimer = setTimeout(refreshPrice, 400);
-  },
-);
-onMounted(refreshPrice);
+// قیمت فعلا ثابت است و بر اساس شهر نیست
+const showDiscount = computed(() => true);
 
 const missingList = computed(() => {
   const f = props.form;

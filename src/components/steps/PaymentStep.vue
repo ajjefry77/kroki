@@ -248,10 +248,10 @@ const props = defineProps({
 
 const emit = defineEmits(["back", "done"]);
 
-const price = computed(() => serverPrice.value ?? KROKI_PRICE);
+const price = computed(() => KROKI_PRICE);
 const originalPrice = computed(() => KROKI_ORIGINAL_PRICE);
-const showDiscount = computed(() => price.value === KROKI_PRICE);
-const serverPrice = ref(null);
+// قیمت فعلا ثابت است و بر اساس شهر نیست
+const showDiscount = computed(() => true);
 const bankCard = auth.WALLET_CARD;
 const cardOwner = auth.CARD_OWNER;
 
@@ -363,6 +363,7 @@ async function pay() {
       address: props.form.address || "",
       city: props.form.city || "",
       street_width: props.form.streetWidth || "",
+      initial_survey_type: props.form.initialSurveyType || "",
       description: props.form.description || "",
       logo_url: props.form.logo || "",
       geometry_points: pts,
@@ -409,11 +410,6 @@ async function pay() {
 onMounted(() => {
   if (isAdmin.value) payMode.value = "admin";
   else if (freeKroki.value > 0) payMode.value = "free";
-  // قیمت واقعی از سرور (همان عددی که کسر می‌شود)
-  auth.effectivePrice(props.form.city).then((p) => {
-    serverPrice.value = p;
-    if (charge.amount === KROKI_PRICE) charge.amount = p;
-  }).catch(() => {});
   logger.info("step", "ورود به صفحه پرداخت", { amount: price.value, wallet: wallet.value, free: freeKroki.value, admin: isAdmin.value });
 });
 </script>

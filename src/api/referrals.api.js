@@ -12,4 +12,6 @@ export const ReferralsApi = {
   myCode: () => request("GET", "/referrals/my-code"),
   ensureMyCode: () => request("POST", "/referrals/my-code", { body: {} }),
   saveMyCode: (code) => request("PUT", "/referrals/my-code", { body: { code } }),
+  // ادمین: لیست کدهای شخصی کاربران (کنار بقیه کدها در تب معرفی)
+  personalAll: () => request("GET", "/referrals/personal/all"),
 };

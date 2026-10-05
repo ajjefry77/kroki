@@ -61,6 +61,7 @@ const state = reactive({
   transactions: [],
   myKrokis: [],
   referrals: [],
+  personalReferralCodes: [],
   myReferrals: [],
   stats: null,
   adminKrokis: [],
@@ -87,11 +88,13 @@ function normalizeUser(u) {
     phone: u?.phone || "",
     name: u?.full_name || u?.name || u?.username || "",
     full_name: u?.full_name || "",
+    city: u?.city || "",
     role: u?.role || u?.role_name || "user",
     wallet: Number(u?.wallet_balance ?? u?.wallet ?? 0),
     freeKroki: Number(u?.free_kroki_count ?? u?.freeKroki ?? 0),
     active: u?.active !== false,
     referralCode: u?.referral_code || u?.referralCode || u?.agent_code || "",
+    personalFreeKroki: Number(u?.referral_free_kroki ?? u?.personalFreeKroki ?? u?.free_kroki_amount ?? 1),
     referredBy: u?.referred_by ?? u?.referredBy ?? null,
   };
 }
@@ -115,6 +118,7 @@ function logout() {
   state.transactions = [];
   state.myKrokis = [];
   state.referrals = [];
+  state.personalReferralCodes = [];
   state.myReferrals = [];
   state.stats = null;
   state.adminKrokis = [];
@@ -212,8 +216,9 @@ function cleanUsername(s) {
 
 async function register(payload) {
   const name = String(payload?.name || "").trim();
-  const phone = faToEn(payload?.phone).trim();
-  const username = cleanUsername(payload?.username) || phone;
+  const phone = faToEn(payload?.phone || payload?.username || "").trim();
+  // نام کاربری فقط شماره تماس است
+  const username = phone;
   const password = String(payload?.password || "");
   const agentCode = faToEn(payload?.agentCode || "").trim();
   if (name.length < 3) return { success: false, error: "نام و نام خانوادگی را کامل وارد کنید" };
@@ -616,9 +621,27 @@ async function loadAllReferrals() {
   try {
     const d = await ReferralsApi.list();
     state.referrals = listOf(d) || [];
+    try {
+      const p = await ReferralsApi.personalAll();
+      state.personalReferralCodes = listOf(p) || [];
+    } catch {}
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message || "خطا در دریافت کدهای معرف" };
+  }
+}
+
+async function loadPersonalReferralCodes() {
+  try {
+    const p = await ReferralsApi.personalAll();
+    state.personalReferralCodes = listOf(p) || [];
+    return { success: true };
+  } catch (e) {
+    // fallback: از روی لیست کاربران
+    state.personalReferralCodes = (state.users || [])
+      .filter((u) => u.referralCode)
+      .map((u) => ({ id: u.id, username: u.username, full_name: u.name, phone: u.phone, code: u.referralCode, free_kroki_amount: Number(u.personalFreeKroki ?? 1) }));
+    return { success: true };
   }
 }
 
@@ -715,28 +738,60 @@ async function saveMyReferralCode(code) {
   }
 }
 
-/* ادمین: تعریف/تغییر کد معرف یک کاربر خاص */
-async function adminSetUserReferralCode(userId, code) {
+/* ادمین: تعریف/تغییر کد معرف یک کاربر خاص (+ سهمیه کروکی رایگان آن کد) */
+async function adminSetUserReferralCode(userId, code, freeKrokiAmount) {
   const normalized = faToEn(code || "").trim().toUpperCase();
   if (!normalized) return { success: false, error: "کد معرف را وارد کنید" };
+  const free = freeKrokiAmount === undefined || freeKrokiAmount === "" ? undefined : Math.floor(Number(freeKrokiAmount));
+  if (free !== undefined && (!Number.isFinite(free) || free < 0 || free > 1000))
+    return { success: false, error: "تعداد کروکی رایگان باید بین ۰ تا ۱۰۰۰ باشد" };
   // ۱) اندپوینت اختصاصی
   try {
-    const d = await UsersApi.setReferralCode(userId, normalized);
+    const d = await UsersApi.setReferralCode(userId, normalized, free);
     const saved = String(extractCode(d) || normalized).trim();
+    const savedFree = Number(d?.free_kroki_amount ?? free);
     const u = state.users.find((x) => String(x.id) === String(userId));
-    if (u) u.referralCode = saved;
+    if (u) {
+      u.referralCode = saved;
+      if (Number.isFinite(savedFree)) u.personalFreeKroki = savedFree;
+    }
+    await loadPersonalReferralCodes().catch(() => {});
     return { success: true, code: saved };
   } catch (firstErr) {
     // ۲) fallback: PATCH عمومی کاربر (اگر بک‌اند referral_code را بپذیرد)
     try {
-      await UsersApi.update(userId, { referral_code: normalized });
+      const body = { referral_code: normalized };
+      if (free !== undefined) body.referral_free_kroki = free;
+      await UsersApi.update(userId, body);
       const u = state.users.find((x) => String(x.id) === String(userId));
-      if (u) u.referralCode = normalized;
+      if (u) {
+        u.referralCode = normalized;
+        if (free !== undefined) u.personalFreeKroki = free;
+      }
+      await loadPersonalReferralCodes().catch(() => {});
       return { success: true, code: normalized };
     } catch {
       return { success: false, error: firstErr.message || "خطا در ثبت کد معرف کاربر" };
     }
   }
+}
+
+/* ادمین: پاک کردن کد معرف شخصی یک کاربر */
+async function adminDeleteUserReferralCode(userId) {
+  try {
+    await UsersApi.deleteReferralCode(userId);
+  } catch (firstErr) {
+    // fallback برای بک‌اند قدیمی: PATCH با کد خالی
+    try {
+      await UsersApi.update(userId, { referral_code: "" });
+    } catch {
+      return { success: false, error: firstErr.message || "خطا در حذف کد معرف" };
+    }
+  }
+  const u = state.users.find((x) => String(x.id) === String(userId));
+  if (u) u.referralCode = "";
+  state.personalReferralCodes = (state.personalReferralCodes || []).filter((p) => String(p.id) !== String(userId));
+  return { success: true };
 }
 
 async function updateReferral(id, patch) {
@@ -917,19 +972,12 @@ async function setCityPrice(city, price) {
   }
 }
 
-function priceForCity(city) {
-  const row = state.cityPrices.find((c) => c.city === city);
-  return row ? Number(row.price) || KROKI_PRICE : KROKI_PRICE;
+function priceForCity(_city) {
+  return KROKI_PRICE;
 }
 
-/* قیمت واقعی قابل پرداخت برای یک شهر — همان عددی که سرور در pay کسر می‌کند.
- * در صورت خطا، قیمت پیش‌فرض فرانت برمی‌گردد تا فرم قفل نشود. */
-async function effectivePrice(city) {
-  try {
-    const d = await KrokisApi.price(city);
-    const p = Number(d?.price);
-    if (Number.isFinite(p) && p > 0) return p;
-  } catch {}
+/* قیمت واقعی قابل پرداخت — فعلا ثابت است و بر اساس شهر نیست */
+async function effectivePrice(_city) {
   return KROKI_PRICE;
 }
 
@@ -1208,6 +1256,7 @@ export const auth = {
   redeemReferral,
   loadMyReferrals,
   loadAllReferrals,
+  loadPersonalReferralCodes,
   createReferral,
   updateReferral,
   deleteReferral,
@@ -1215,6 +1264,7 @@ export const auth = {
   ensureMyReferralCode,
   saveMyReferralCode,
   adminSetUserReferralCode,
+  adminDeleteUserReferralCode,
   loadUsers,
   setRole,
   setFreeKroki,
