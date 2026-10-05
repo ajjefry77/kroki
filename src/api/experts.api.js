@@ -12,7 +12,6 @@ import { request } from "./client";
  */
 export const ExpertsApi = {
   list: () => request("GET", "/experts", { auth: false }),
-  myRequests: () => request("GET", "/expert-requests/mine"),
   requests: () => request("GET", "/expert-requests"),
   decide: (id, approve) =>
     request("POST", `/expert-requests/${id}/${approve ? "approve" : "reject"}`),

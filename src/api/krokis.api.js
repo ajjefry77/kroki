@@ -6,6 +6,8 @@ export const KrokisApi = {
   update: (id, body) => request("PATCH", `/krokis/${id}`, { body }),
   list: () => request("GET", "/krokis"),
   get: (id) => request("GET", `/krokis/${id}`),
+  // قیمت واقعی قابل پرداخت برای یک شهر (همان عددی که سرور در pay کسر می‌کند)
+  price: (city) => request("GET", `/krokis/price${city ? `?city=${encodeURIComponent(city)}` : ""}`),
   track: (code) => request("GET", `/krokis/track/${encodeURIComponent(code)}`),
   pay: (id, mode) => request("POST", `/krokis/${id}/pay`, { body: { mode } }),
   issue: (id, pdfUrl) =>

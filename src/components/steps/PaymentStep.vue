@@ -59,7 +59,10 @@
               </div>
               <div class="border-t border-[var(--border)] pt-3 flex items-center justify-between">
                 <span class="text-xs text-[var(--text-muted)]">مبلغ هر کروکی</span>
-                <span class="font-extrabold text-[var(--accent-soft)] text-lg">{{ formatPrice(price) }}</span>
+                <span class="font-extrabold text-[var(--accent-soft)] text-lg">
+                  <span v-if="showDiscount" class="font-medium text-sm text-[var(--text-faint)] line-through">{{ formatPrice(originalPrice) }}</span>
+                  {{ formatPrice(price) }}
+                </span>
               </div>
             </div>
           </div>
@@ -233,7 +236,7 @@ import { ref, reactive, computed, onMounted } from "vue";
 import { getTemplate } from "../../utils/templates";
 import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
-import { auth, fmtMoney, KROKI_PRICE } from "../../stores/auth";
+import { auth, fmtMoney, KROKI_PRICE, KROKI_ORIGINAL_PRICE } from "../../stores/auth";
 import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
 
 const props = defineProps({
@@ -245,7 +248,10 @@ const props = defineProps({
 
 const emit = defineEmits(["back", "done"]);
 
-const price = computed(() => KROKI_PRICE);
+const price = computed(() => serverPrice.value ?? KROKI_PRICE);
+const originalPrice = computed(() => KROKI_ORIGINAL_PRICE);
+const showDiscount = computed(() => price.value === KROKI_PRICE);
+const serverPrice = ref(null);
 const bankCard = auth.WALLET_CARD;
 const cardOwner = auth.CARD_OWNER;
 
@@ -355,7 +361,7 @@ async function pay() {
       surveyor: props.form.surveyor || "",
       plaque: props.form.plaque || "",
       address: props.form.address || "",
-      city: "",
+      city: props.form.city || "",
       street_width: props.form.streetWidth || "",
       description: props.form.description || "",
       logo_url: props.form.logo || "",
@@ -403,6 +409,11 @@ async function pay() {
 onMounted(() => {
   if (isAdmin.value) payMode.value = "admin";
   else if (freeKroki.value > 0) payMode.value = "free";
+  // قیمت واقعی از سرور (همان عددی که کسر می‌شود)
+  auth.effectivePrice(props.form.city).then((p) => {
+    serverPrice.value = p;
+    if (charge.amount === KROKI_PRICE) charge.amount = p;
+  }).catch(() => {});
   logger.info("step", "ورود به صفحه پرداخت", { amount: price.value, wallet: wallet.value, free: freeKroki.value, admin: isAdmin.value });
 });
 </script>

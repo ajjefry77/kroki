@@ -101,6 +101,11 @@
                 <p class="text-[10px] text-[var(--text-faint)] mt-1">به‌صورت خودکار از روی موقعیت ملک پیشنهاد و قابل ویرایش است.</p>
               </div>
               <div>
+                <label class="block mb-1.5 font-medium text-xs">شهر ملک</label>
+                <input v-model="form.city" type="text" class="input" placeholder="مثلاً تهران (تعیین‌کننده قیمت)" maxlength="100" />
+                <p class="text-[10px] text-[var(--text-faint)] mt-1">قیمت کروکی بر اساس تعرفه همین شهر حساب می‌شود.</p>
+              </div>
+              <div>
                 <label class="block mb-1.5 font-medium text-xs">کارشناس / نقشه‌بردار</label>
                 <input v-model="form.surveyor" type="text" class="input" placeholder="نام کارشناس (اختیاری)" />
               </div>
@@ -257,7 +262,10 @@
               </div>
               <div class="flex items-center justify-between gap-2">
                 <dt class="text-[var(--text-muted)]">هزینه</dt>
-                <dd class="font-extrabold text-[var(--accent-soft)]" dir="ltr">{{ fmtMoney(price) }} <span class="text-[10px] font-medium text-[var(--text-muted)]">تومان</span></dd>
+                <dd class="font-extrabold text-[var(--accent-soft)]" dir="ltr">
+                  <span v-if="showDiscount" class="font-medium text-[var(--text-faint)] line-through">{{ fmtMoney(originalPrice) }}</span>
+                  {{ fmtMoney(price) }} <span class="text-[10px] font-medium text-[var(--text-muted)]">تومان</span>
+                </dd>
               </div>
             </dl>
             <button class="btn btn-primary w-full !py-3" :disabled="!valid" @click="submit">
@@ -293,12 +301,12 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, onBeforeUnmount } from "vue";
+import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel, getUserTemplates } from "../../utils/templates";
 import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
 import { eligiblePinsOf, suggestAddressForPositions } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
-import { fmtMoney, KROKI_PRICE } from "../../stores/auth";
+import { auth, fmtMoney, KROKI_PRICE, KROKI_ORIGINAL_PRICE } from "../../stores/auth";
 
 onMounted(() => {
   document.addEventListener("click", closeDrop);
@@ -423,7 +431,29 @@ const polyVerts = [
   [60, 80],
 ];
 
-const price = computed(() => KROKI_PRICE);
+const price = computed(() => serverPrice.value ?? KROKI_PRICE);
+const originalPrice = computed(() => KROKI_ORIGINAL_PRICE);
+// نمایش تخفیف فقط وقتی قیمت واقعی همان قیمت پیش‌فرض است
+const showDiscount = computed(() => price.value === KROKI_PRICE);
+
+// قیمت واقعی از سرور (همان عددی که در پرداخت کسر می‌شود)؛ با تغییر شهر به‌روز می‌شود
+const serverPrice = ref(null);
+let priceTimer = 0;
+async function refreshPrice() {
+  try {
+    serverPrice.value = await auth.effectivePrice(props.form.city);
+  } catch {
+    serverPrice.value = KROKI_PRICE;
+  }
+}
+watch(
+  () => props.form.city,
+  () => {
+    if (priceTimer) clearTimeout(priceTimer);
+    priceTimer = setTimeout(refreshPrice, 400);
+  },
+);
+onMounted(refreshPrice);
 
 const missingList = computed(() => {
   const f = props.form;

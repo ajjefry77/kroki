@@ -202,8 +202,8 @@
                   <td>
                     <div class="role-dropdown" :class="{ open: roleOpenId === u.id }">
                       <button class="role-trigger" @click.stop="roleOpenId = roleOpenId === u.id ? null : u.id">
-                        <span class="role-dot" :class="u.role === 'admin' ? 'admin' : 'user'"></span>
-                        <span class="role-text">{{ u.role === 'admin' ? 'مدیر' : 'کاربر' }}</span>
+                        <span class="role-dot" :class="u.role === 'admin' ? 'admin' : u.role === 'agent' ? 'agent' : 'user'"></span>
+                        <span class="role-text">{{ u.role === 'admin' ? 'مدیر' : u.role === 'agent' ? 'نماینده' : 'کاربر' }}</span>
                         <i class="fas fa-chevron-down role-chevron"></i>
                       </button>
                       <Transition name="drop">
@@ -211,6 +211,10 @@
                           <button class="role-option" :class="{ selected: u.role === 'user' }" @click="setRole(u, 'user'); roleOpenId = null">
                             <span class="role-dot user"></span>
                             کاربر
+                          </button>
+                          <button class="role-option" :class="{ selected: u.role === 'agent' }" @click="setRole(u, 'agent'); roleOpenId = null">
+                            <span class="role-dot agent"></span>
+                            نماینده
                           </button>
                           <button class="role-option" :class="{ selected: u.role === 'admin' }" @click="setRole(u, 'admin'); roleOpenId = null">
                             <span class="role-dot admin"></span>
@@ -420,17 +424,9 @@
               <input v-model="referralForm.expires_at" type="text" class="input" dir="ltr" placeholder="خالی = بدون انقضا" />
             </div>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-            <div>
-              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">مالک کد (اختیاری — هر کس این کد را وارد کند زیرمجموعه او می‌شود)</label>
-              <select v-model="referralForm.user_id" class="input">
-                <option value="">بدون مالک (کد عمومی)</option>
-                <option v-for="u in auth.state.users" :key="u.id" :value="u.id">
-                  {{ u.name || u.username }} — {{ u.username }}
-                </option>
-              </select>
-            </div>
-          </div>
+          <p class="text-[11px] text-[var(--text-muted)] leading-5 mb-3">
+            برای وصل کردن کد به یک کاربر خاص (زیرمجموعه‌سازی)، از جدول کاربران ستون «کد معرف شخصی» استفاده کنید.
+          </p>
           <div class="flex items-center gap-2">
             <button class="btn btn-primary btn-sm" :disabled="referralSaving" @click="createReferral">
               <i v-if="referralSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
@@ -447,10 +443,8 @@
               <thead>
                 <tr>
                   <th>کد</th>
-                  <th>مالک (زیرمجموعه‌ساز)</th>
                   <th>کروکی رایگان</th>
-                  <th>استفاده شده</th>
-                  <th>سقف</th>
+                  <th>مصرف / سقف</th>
                   <th>انقضا</th>
                   <th>وضعیت</th>
                   <th>عملیات</th>
@@ -458,14 +452,12 @@
               </thead>
               <tbody>
                 <tr v-if="referrals.length === 0">
-                  <td colspan="8" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
+                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
                 </tr>
                 <tr v-for="r in referrals" :key="r.id">
                   <td class="text-xs font-bold tracking-widest" dir="ltr">{{ r.code }}</td>
-                  <td class="text-xs">{{ r.owner_name || r.full_name || r.username || (r.user_id ? "کاربر " + r.user_id : "—") }}</td>
                   <td class="text-xs">{{ r.free_kroki_amount }}</td>
                   <td class="text-xs" dir="ltr">{{ r.used_count }} / {{ r.max_uses }}</td>
-                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.expires_at) }}</td>
                   <td class="text-xs text-[var(--text-muted)]">{{ r.expires_at ? fmtDate(r.expires_at) : "بدون انقضا" }}</td>
                   <td>
                     <button
@@ -974,7 +966,7 @@ const adminTransactions = computed(() => auth.state.adminTransactions);
 const roles = computed(() => auth.state.roles);
 const referrals = computed(() => auth.state.referrals);
 
-const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: 1, expires_at: "", user_id: "" });
+const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: 1, expires_at: "" });
 const referralSaving = ref(false);
 const referralMsg = ref("");
 const referralMsgOk = ref(true);
@@ -1152,7 +1144,6 @@ async function createReferral() {
     free_kroki_amount: referralForm.free_kroki_amount,
     max_uses: referralForm.max_uses,
     expires_at: referralForm.expires_at,
-    user_id: referralForm.user_id,
   });
   referralSaving.value = false;
   referralMsgOk.value = res.success;
@@ -1162,7 +1153,6 @@ async function createReferral() {
     referralForm.free_kroki_amount = 1;
     referralForm.max_uses = 1;
     referralForm.expires_at = "";
-    referralForm.user_id = "";
   }
 }
 
@@ -1481,6 +1471,11 @@ function closeRoleDropdown() {
 .role-dot.user {
   background: var(--info);
   box-shadow: 0 0 6px var(--info-glow);
+}
+
+.role-dot.agent {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning-glow);
 }
 
 .role-text {

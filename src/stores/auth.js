@@ -30,6 +30,7 @@ import { faToEn, validatePassword } from "../utils/validators";
  */
 
 export const KROKI_PRICE = 150000;
+export const KROKI_ORIGINAL_PRICE = 300000;
 export const WALLET_CARD = "5047-0611-3665-6671";
 export const CARD_OWNER = "جلیل باقرزاده";
 
@@ -621,7 +622,7 @@ async function loadAllReferrals() {
   }
 }
 
-async function createReferral({ code, free_kroki_amount, max_uses, expires_at, user_id } = {}) {
+async function createReferral({ code, free_kroki_amount, max_uses, expires_at } = {}) {
   try {
     const body = {
       code: String(code || "").trim(),
@@ -629,10 +630,6 @@ async function createReferral({ code, free_kroki_amount, max_uses, expires_at, u
       max_uses: Number(max_uses) || 1,
       expires_at: expires_at || "",
     };
-    // اتصال کد به یک کاربر خاص: هر کس این کد را وارد کند زیرمجموعه آن کاربر می‌شود
-    if (user_id !== undefined && user_id !== null && String(user_id).trim() !== "") {
-      body.user_id = user_id;
-    }
     await ReferralsApi.create(body);
     await loadAllReferrals();
     return { success: true };
@@ -781,7 +778,7 @@ async function loadUsers() {
 }
 
 async function setRole(userId, role) {
-  const want = role === "admin" ? "admin" : "user";
+  const want = ["admin", "user", "agent"].includes(role) ? role : "user";
   try {
     await UsersApi.update(userId, { role: want });
     const u = state.users.find((x) => String(x.id) === String(userId));
@@ -923,6 +920,17 @@ async function setCityPrice(city, price) {
 function priceForCity(city) {
   const row = state.cityPrices.find((c) => c.city === city);
   return row ? Number(row.price) || KROKI_PRICE : KROKI_PRICE;
+}
+
+/* قیمت واقعی قابل پرداخت برای یک شهر — همان عددی که سرور در pay کسر می‌کند.
+ * در صورت خطا، قیمت پیش‌فرض فرانت برمی‌گردد تا فرم قفل نشود. */
+async function effectivePrice(city) {
+  try {
+    const d = await KrokisApi.price(city);
+    const p = Number(d?.price);
+    if (Number.isFinite(p) && p > 0) return p;
+  } catch {}
+  return KROKI_PRICE;
 }
 
 /* ---------------- نمایندگان (هرمی) ---------------- */
@@ -1163,6 +1171,7 @@ function syncUser() {
 export const auth = {
   state,
   KROKI_PRICE,
+  KROKI_ORIGINAL_PRICE,
   WALLET_CARD,
   CARD_OWNER,
   isAuthenticated,
@@ -1221,6 +1230,7 @@ export const auth = {
   loadCityPrices,
   setCityPrice,
   priceForCity,
+  effectivePrice,
   loadMyAgent,
   loadSubordinates,
   requestAgency,
