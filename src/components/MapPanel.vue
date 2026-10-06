@@ -39,10 +39,10 @@
       <button
         @click="kmlInput?.click()"
         class="px-2.5 sm:px-3 py-1.5 rounded-lg shadow-md text-xs sm:text-sm font-medium bg-accent text-white hover:brightness-110 transition whitespace-nowrap"
-        title="آپلود فایل KML / KMZ / CSV"
+        title="آپلود فایل KML / KMZ / GPS"
       >
         <i class="fas fa-file-upload ml-1"></i>
-        <span class="hidden xs:inline sm:inline">آپلود KML / CSV</span><span class="xs:hidden sm:hidden">آپلود</span>
+        <span class="hidden xs:inline sm:inline">آپلود KML / GPS</span><span class="xs:hidden sm:hidden">آپلود</span>
       </button>
     </div>
 
@@ -216,6 +216,7 @@ import { loadMap } from "../utils/loadMapbox";
 import { kmlToGeoJSON, readKmlText } from "../utils/kml";
 import { registerDrawLayer, bringDrawingsToFront } from "../utils/layerOrder";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
+import { selectOnlyPin, flattenPins, setPinVisibleOnMap } from "../utils/pins";
 import { loadMapView, saveMapView } from "../utils/sessionPersist";
 
 const props = defineProps({
@@ -466,6 +467,18 @@ async function onKmlChange(e) {
         );
         kmlExtendBounds(bounds, single.coordinates);
         props.pins.push(pin);
+        // تک‌انتخابی: فقط اولین ترسیم ایمپورت‌شده انتخاب می‌ماند
+        if (added === 0) {
+          try {
+            selectOnlyPin(props.pins, pin.id, map);
+          } catch (e) {}
+        } else {
+          pin.selected = false;
+          if (pin.shape) pin.shape.show = false;
+          try {
+            setPinVisibilityOnMap(map, pin, false);
+          } catch (e) {}
+        }
         added++;
       }
 
@@ -811,6 +824,14 @@ async function initMapAsync() {
         } catch (e) {}
       }
     }
+    // ترسیم‌های انتخاب‌نشده (تک‌انتخابی) روی نقشه مخفی می‌مانند
+    try {
+      for (const p of flattenPins(props.pins)) {
+        if (p.selected === false || (p.shape && p.shape.show === false)) {
+          setPinVisibilityOnMap(map, p, false);
+        }
+      }
+    } catch (e) {}
     // پیش‌نویس ناقص (حتی ۱ نقطه) را بعد رفرش سر جایش برگردان
     try {
       const ok = drawing.value?.restoreDraftFromStorage?.();

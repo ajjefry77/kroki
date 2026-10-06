@@ -2,19 +2,21 @@
   <div>
     <label class="block mb-1.5 text-xs font-medium">کد امنیتی *</label>
     <div class="flex items-stretch gap-2">
-      <input
-        v-model="answer"
-        type="text"
-        class="input ltr flex-1 text-center tracking-[0.3em]"
-        dir="ltr"
-        maxlength="6"
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="characters"
-        spellcheck="false"
-        placeholder="·····"
-        @keyup.enter="$emit('submit')"
-      />
+        <input
+          v-model="answer"
+          type="text"
+          inputmode="numeric"
+          class="input ltr flex-1 text-center tracking-[0.3em]"
+          dir="ltr"
+          maxlength="6"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          placeholder="·····"
+          @input="answer = answer.replace(/[^\d]/g, '').slice(0, 6)"
+          @keyup.enter="$emit('submit')"
+        />
       <button
         type="button"
         class="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface2)] px-1.5 hover:border-[var(--accent)] transition"
@@ -46,8 +48,8 @@ import { ref, onMounted } from "vue";
 
 defineEmits(["submit"]);
 
-// حروف/ارقام بدون ابهام (بدون 0/O و 1/I/l)
-const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+// فقط رقم (کپچای عددی)
+const ALPHABET = "0123456789";
 const CODE_LEN = 5;
 
 const canvasRef = ref(null);
@@ -109,9 +111,9 @@ function refresh() {
   draw();
 }
 
-/** بررسی پاسخ (غیرحساس به بزرگی/کوچکی)؛ در صورت اشتباه چالش تازه می‌سازد */
+/** بررسی پاسخ؛ در صورت اشتباه چالش تازه می‌سازد */
 function validate() {
-  const ok = answer.value.trim().toUpperCase() === code.value.toUpperCase();
+  const ok = answer.value.trim() === code.value;
   if (!ok) refresh();
   return ok;
 }

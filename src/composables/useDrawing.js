@@ -19,6 +19,7 @@ import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
 import { ensureVertexSquareImage, VERTEX_SQUARE_IMAGE } from "../utils/drawStyle";
 import { logger } from "../utils/logger";
 import { saveDraft, loadDraft, clearDraft } from "../utils/sessionPersist";
+import { selectOnlyPin } from "../utils/pins";
 
 // رنگ ترسیم: قرمز هنگام در حال ترسیم، سبز پس از پایان
 export const DRAFT_COLOR = "#ff0000";
@@ -1547,6 +1548,10 @@ export function useDrawing(map, pins) {
       clearDraft();
     } catch (e) {}
     renderNewPin(pin);
+    // فقط همین ترسیم انتخاب می‌ماند (تک‌انتخابی)؛ بقیه مخفی می‌شوند
+    try {
+      selectOnlyPin(pins, pin.id, map);
+    } catch (e) {}
   };
 
   function getPointsCount() {

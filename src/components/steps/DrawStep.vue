@@ -93,12 +93,13 @@
               >
                 <input
                   v-if="canToggle(p)"
-                  v-model="p.selected"
-                  type="checkbox"
+                  type="radio"
+                  name="kroki-pin-select"
+                  :checked="p.selected !== false"
                   class="accent-[var(--accent)]"
-                  :title="p.selected === false ? 'فعال‌سازی و نمایش روی نقشه' : 'غیرفعال‌سازی و مخفی کردن از نقشه'"
+                  title="انتخاب این ترسیم برای کروکی"
                   @click.stop
-                  @change="onToggle(p)"
+                  @change="onSelectOnly(p)"
                 />
                 <i class="w-4 text-center text-xs" :class="shapeIcon(p)"></i>
                 <div class="flex-1 min-w-0">
@@ -157,7 +158,7 @@
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> با کلیک روی هر ترسیم (اینجا یا در جدول نقاط)، نقاط آن برای ویرایش نمایش داده می‌شود — نقاط KML نیز قابل ویرایش‌اند.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> جابه‌جایی نقشه با نگه داشتن غلتک (دکمه وسط) موس انجام می‌شود؛ نگه داشتن کلیک چپ نقشه را جابه‌جا نمی‌کند.</li>
                 <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> در حالت ویرایش، با راست‌کلیک روی یک نقطه روی نقشه حذف می‌شود و با دکمه «افزودن نقطه با کلیک روی نقشه» می‌توانید با کلیک روی نقشه نقطه اضافه کنید.</li>
-                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> تیک ترسیم‌ها نمایش و شرکت آن‌ها در کروکی را کنترل می‌کند؛ با برداشتن تیک، ترسیم از نقشه محو و غیرفعال می‌شود.</li>
+                <li><i class="fas fa-circle text-[7px] ml-1.5 align-middle"></i> از دکمه رادیویی کنار هر ترسیم، فقط یک ترسیم را برای کروکی انتخاب کنید؛ ترسیم انتخاب‌شده روی نقشه می‌ماند و بقیه مخفی می‌شوند.</li>
               </ul>
             </div>
 
@@ -361,15 +362,25 @@ function setPinVisibility(pin, visible) {
   }
 }
 
-// قطع/وصل تیک چک‌باکس: نمایش/مخفی‌سازی روی نقشه و فعال/غیرفعال‌سازی ترسیم
-function onToggle(p) {
-  const visible = p.selected !== false;
-  if (p.shape) p.shape.show = visible;
-  if (!visible && activePinId.value === p.id) {
-    drawingRef.value?.exitPinEdit?.();
-    activePinId.value = null;
+// انتخاب تکی ترسیم (رادیو): فقط همین ترسیم در کروکی می‌آید و روی نقشه می‌ماند
+function onSelectOnly(p) {
+  for (const q of flatPins.value) {
+    const on = q.id === p.id;
+    q.selected = on;
+    if (q.shape) q.shape.show = on;
+    setPinVisibility(q, on);
   }
-  setPinVisibility(p, visible);
+  // اگر ترسیم دیگری در حال ویرایش بود، از ویرایش خارج شو
+  try {
+    const d = drawingRef.value;
+    if (d && typeof d.editingPin === "function" && d.editingPin() && d.editingPin().id !== p.id) {
+      d.exitPinEdit?.();
+    }
+  } catch (e) {}
+  if (activePinId.value && activePinId.value !== p.id) {
+    const still = flatPins.value.find((x) => x.id === activePinId.value);
+    if (!still || still.selected === false) activePinId.value = null;
+  }
 }
 
 function flatten(list) {

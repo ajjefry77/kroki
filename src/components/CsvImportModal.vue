@@ -233,6 +233,8 @@ const cols = reactive({
   zone: 0,
 });
 
+const MAX_CSV_POINTS = 20;
+
 const shapeType = ref("polygon");
 const shapeName = ref("");
 
@@ -502,6 +504,11 @@ function loadFromText(text, filename = "") {
 
   shapeName.value = filename.replace(/\.(csv|txt)$/i, "") || "";
   shapeType.value = stats.value.valid >= 3 ? "polygon" : "polyline";
+  // سقف ۲۰ نقطه: فایل‌های پرنقطه پذیرفته نمی‌شوند
+  if (stats.value.valid > MAX_CSV_POINTS) {
+    errorMsg.value = `فایل بیشتر از ${MAX_CSV_POINTS} نقطه دارد (معتبر: ${stats.value.valid}). فقط تا ${MAX_CSV_POINTS} نقطه مجاز است.`;
+    return false;
+  }
   dialog.value = true;
   logger.info("draw", "باز شدن پنل Import CSV", { file: filename });
   return true;
@@ -530,6 +537,10 @@ function confirm() {
     return;
   }
   const { points, invalidRows } = collectPoints();
+  if (points.length > MAX_CSV_POINTS) {
+    errorMsg.value = `فایل بیشتر از ${MAX_CSV_POINTS} نقطه دارد (معتبر: ${points.length}). فقط تا ${MAX_CSV_POINTS} نقطه مجاز است.`;
+    return;
+  }
   if (points.length < min) {
     errorMsg.value = shapeType.value === "polygon"
       ? `برای پلی‌گان حداقل ۳ نقطه معتبر لازم است. (معتبر: ${points.length})`
@@ -546,7 +557,7 @@ function confirm() {
   dialog.value = false;
 }
 
-defineExpose({ loadFile, loadFromText, close });
+defineExpose({ loadFile, loadFromText, close, getError: () => errorMsg.value });
 </script>
 
 <style scoped>

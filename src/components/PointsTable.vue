@@ -245,6 +245,7 @@
           </div>
           <p class="text-[9px] text-[var(--text-faint)] leading-4">
             پس از انتخاب فایل، پنل «انتخاب ستون‌ها» باز می‌شود؛ Lat/Lon یا UTM و در صورت نیاز فیلدهای GPS (HRMS، PDOP و …) را مشخص کنید.
+            حداکثر ۲۰ نقطه در هر فایل پذیرفته می‌شود.
           </p>
 
           <button class="btn btn-primary btn-xs w-full" :disabled="!canCreate" @click="createShape">
@@ -274,6 +275,7 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from "vue";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
+import { selectOnlyPin } from "../utils/pins";
 import { toUTM, fromUTM } from "../utils/useDrawingHelpers";
 import { logger } from "../utils/logger";
 import CsvImportModal from "./CsvImportModal.vue";
@@ -479,7 +481,10 @@ async function importCsvFile(file, onDone) {
   csvLoading.value = true;
   try {
     const ok = await csvModalRef.value?.loadFile(file);
-    if (!ok) alert("نقطه معتبری در فایل CSV پیدا نشد یا فایل خالی است.");
+    if (!ok) {
+      const reason = csvModalRef.value?.getError?.();
+      alert(reason || "نقطه معتبری در فایل CSV پیدا نشد یا فایل خالی است.");
+    }
     else logger.info("draw", "باز شدن پنل Import CSV", { file: file.name });
   } catch {
     alert("خطا در خواندن فایل CSV");
@@ -523,6 +528,10 @@ function onCsvImportConfirm({ points, shapeType, name, invalidRows }) {
   };
   props.pins.push(pin);
   if (props.map) renderPinOnMap(props.map, pin);
+  // تک‌انتخابی: فقط همین ترسیم انتخاب می‌ماند
+  try {
+    selectOnlyPin(props.pins, pin.id, props.map);
+  } catch (e) {}
   emit("created", pin, { edit: false });
   if (invalidRows?.length) {
     logger.warn("draw", "ردیف‌های نامعتبر CSV نادیده گرفته شد", { count: invalidRows.length });
@@ -638,6 +647,10 @@ function createShape() {
 
   props.pins.push(pin);
   if (props.map) renderPinOnMap(props.map, pin);
+  // تک‌انتخابی: فقط همین ترسیم انتخاب می‌ماند
+  try {
+    selectOnlyPin(props.pins, pin.id, props.map);
+  } catch (e) {}
 
   builderName.value = "";
   builderPoints.value = [

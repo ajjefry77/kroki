@@ -155,6 +155,7 @@ import {
   saveGenSnapshot,
   clearGen,
 } from "./utils/sessionPersist";
+import { normalizeSingleSelection } from "./utils/pins";
 
 import LandingPage from "./components/LandingPage.vue";
 import Loading from "./components/Loading.vue";
@@ -214,6 +215,10 @@ try {
       // تاریخ‌ها به صورت رشته ذخیره شده‌اند؛ همان‌طور نگه می‌داریم
       pins.push(p);
     });
+    // تک‌انتخابی: اگر چند ترسیم انتخاب مانده، فقط آخری می‌ماند
+    try {
+      normalizeSingleSelection(pins);
+    } catch (e) {}
   }
 } catch (e) {}
 const map = ref(null);
@@ -777,7 +782,13 @@ function pinsFromSavedKroki(k) {
         if (!copy.type) copy.type = "draw";
         out.push(copy);
       }
-      if (out.length) return out;
+      if (out.length) {
+        // تک‌انتخابی
+        try {
+          normalizeSingleSelection(out);
+        } catch (e) {}
+        return out;
+      }
     }
     // fallback قدیمی: فقط مختصات تخت
     const pts = Array.isArray(k?.geometry_points) ? k.geometry_points : [];

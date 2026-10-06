@@ -178,6 +178,28 @@ export function updatePinGeometry(map, pin) {
   }
 }
 
+// نمایش/مخفی‌سازی همه لایه‌های یک ترسیم (شکل + لیبل‌های شماره/طول/مجاورت)
+// روی نقشه؛ سورس لیبل‌ها (`<id>-labels`) هم پوشش داده می‌شود.
+export function setPinVisibilityOnMap(map, pin, visible) {
+  if (!map || typeof map.getStyle !== "function" || !pin?.shape) return;
+  const sids = new Set(Array.isArray(pin.shape._sourceIds) ? pin.shape._sourceIds : []);
+  if (!sids.size) {
+    sids.add("draw-pin-" + pin.id);
+    sids.add("file-" + pin.id);
+  }
+  for (const s of [...sids]) sids.add(s + "-labels");
+  let layers = [];
+  try {
+    layers = map.getStyle().layers || [];
+  } catch (e) {}
+  for (const l of layers) {
+    if (!sids.has(l.source)) continue;
+    try {
+      map.setLayoutProperty(l.id, "visibility", visible ? "visible" : "none");
+    } catch (e) {}
+  }
+}
+
 export function renderPinOnMap(map, pin) {
   if (!map || !pin || !pin.shape || !pin.shape.type) return;
   const s = pin.shape;

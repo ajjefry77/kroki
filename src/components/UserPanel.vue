@@ -304,9 +304,8 @@
                         <i class="fas fa-pen text-xs"></i>
                       </button>
                       <button
-                        v-if="k.status === 'draft'"
                         class="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--danger)] hover:brightness-110 transition"
-                        title="حذف پیش‌نویس"
+                        title="حذف کروکی"
                         :disabled="deletingId === k.id"
                         @click="removeKroki(k)"
                       >
@@ -692,7 +691,7 @@ async function editDraftDrawing(k) {
 }
 
 async function removeKroki(k) {
-  if (!confirm(`پیش‌نویس «${k.title}» حذف شود؟`)) return;
+  if (!confirm(`کروکی «${k.title}» (${k.tracking_code}) برای همیشه حذف شود؟`)) return;
   deletingId.value = k.id;
   try {
     const res = await auth.deleteKroki(k.id);
