@@ -323,6 +323,11 @@ function cancelName() {
 
 function onRemove(p) {
   if (activePinId.value === p.id) activePinId.value = null;
+  // اگر همین ترسیم در حال ویرایش روی نقشه است، اول از حالت ویرایش خارج شو
+  // تا لایه موقت ویرایش روی نقشه جا نماند
+  try {
+    if (drawingRef.value?.isEditingPin?.(p)) drawingRef.value.exitPinEdit?.();
+  } catch (e) {}
   emit("removePin", p);
 }
 

@@ -244,6 +244,9 @@ const props = defineProps({
   pins: { type: Object, required: true },
   form: { type: Object, required: true },
   templateId: { type: String, default: "technical" },
+  // اگر در حال ادامه یک پیش‌نویسِ ذخیره‌شده در سرور باشیم، به‌جای ساخت
+  // کروکی جدید همان را به‌روزرسانی و پرداخت می‌کنیم
+  editingKrokiId: { type: [Number, String, null], default: null },
 });
 
 const emit = defineEmits(["back", "done"]);
@@ -327,6 +330,36 @@ function geometryPoints() {
   return geom.allPositions.map((p) => ({ lat: Number(p.lat), lon: Number(p.lon ?? p.lng) }));
 }
 
+// کل ترسیم‌ها (نام، رنگ، مجاورت‌ها، ...) برای ذخیره کامل در سرور
+function drawingData() {
+  try {
+    const flat = [];
+    const walk = (arr) => {
+      for (const p of arr || []) {
+        if (p && p.type === "group" && Array.isArray(p.children)) walk(p.children);
+        else if (p) flat.push(p);
+      }
+    };
+    walk(props.pins);
+    return flat
+      .filter((p) => p && p.shape && p.selected !== false)
+      .map((p) => {
+        let copy = null;
+        try {
+          copy = JSON.parse(
+            JSON.stringify(p, (k, v) => (k === "_sourceIds" ? undefined : v)),
+          );
+        } catch (e) {
+          return null;
+        }
+        return copy;
+      })
+      .filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
+
 async function pay() {
   if (payError.value) payError.value = "";
   if (!props.form.client?.trim()) {
@@ -367,12 +400,27 @@ async function pay() {
       description: props.form.description || "",
       logo_url: props.form.logo || "",
       geometry_points: pts,
+      // ───── ذخیره کامل کروکی (ترسیم‌ها + ظاهر + تصویر ماهواره) ─────
+      template_key: props.templateId || "technical",
+      drawing_data: drawingData(),
+      map_image: props.gen.state?.mapImage || "",
+      orientation: props.gen.state?.orientation || "portrait",
+      style_overrides: { ...(props.gen.state?.styleOverrides || {}) },
+      edge_texts: JSON.parse(JSON.stringify(props.gen.state?.edgeTexts || [])),
     };
 
-    const created = await auth.createKroki(payload, props.templateId);
-    if (!created.success) throw new Error(created.error);
-    const id = created.kroki?.id;
-    if (!id) throw new Error("پاسخ سرور نامعتبر است");
+    let id = props.editingKrokiId || null;
+    if (id) {
+      // ادامه پیش‌نویسِ قبلی: به‌روزرسانی همان رکورد
+      const updated = await auth.updateKroki(id, payload);
+      if (!updated.success) throw new Error(updated.error);
+      id = updated.kroki?.id || id;
+    } else {
+      const created = await auth.createKroki(payload, props.templateId);
+      if (!created.success) throw new Error(created.error);
+      id = created.kroki?.id;
+      if (!id) throw new Error("پاسخ سرور نامعتبر است");
+    }
 
     let kroki;
     if (isAdmin.value) {

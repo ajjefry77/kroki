@@ -7,7 +7,7 @@
 
       <AdminPanel v-else-if="page === 'admin'" key="admin" @home="goHome" />
 
-      <UserPanel v-else-if="page === 'userpanel'" key="userpanel" @home="goHome" />
+      <UserPanel v-else-if="page === 'userpanel'" key="userpanel" @home="goHome" @editDraft="openDraftForEdit" />
 
       <AgencyRequestPage v-else-if="page === 'agency-request'" key="agency-request" @home="goHome" />
 
@@ -86,6 +86,7 @@
               :pins="pins"
               :form="krokiForm"
               :template-id="templateId"
+              :editing-kroki-id="editingKrokiId"
               @back="go('preview')"
               @done="onPaymentDone"
             />
@@ -101,6 +102,32 @@
               @restart="restart"
               @home="go('landing')"
             />
+
+            <div v-else-if="step === 'done'" key="done-restored" class="flex-1 flex items-center justify-center px-4 py-10">
+              <div class="card !rounded-3xl py-12 text-center max-w-lg w-full">
+                <div class="w-20 h-20 mx-auto rounded-full bg-[var(--success-glow)] border-2 border-[var(--success)] flex items-center justify-center mb-6">
+                  <i class="fas fa-circle-check text-3xl text-[var(--success)]"></i>
+                </div>
+                <h2 class="text-xl font-extrabold mb-2">سفارش شما ثبت و پرداخت شد</h2>
+                <p v-if="trackingCode" class="text-sm text-[var(--text-muted)] mb-2">
+                  کد پیگیری: <span class="font-bold text-[var(--accent-soft)]" dir="ltr">{{ trackingCode }}</span>
+                </p>
+                <p class="text-xs text-[var(--text-muted)] leading-6 mb-8">
+                  اطلاعات ترسیم پس از پرداخت از این دستگاه پاک شد.<br />
+                  برای دانلود مجدد کروکی به «کروکی‌های من» بروید.
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button class="btn btn-primary !px-8 !py-3" @click="openUserPanel">
+                    <i class="fas fa-drafting-compass ml-2"></i>
+                    کروکی‌های من
+                  </button>
+                  <button class="btn btn-ghost !px-8 !py-3" @click="restart">
+                    <i class="fas fa-plus ml-2"></i>
+                    سفارش جدید
+                  </button>
+                </div>
+              </div>
+            </div>
 
             <div v-else-if="step === 'preview' || step === 'payment' || step === 'done'" key="gen-loading" class="flex-1 flex items-center justify-center">
               <Loading :active="true" title="در حال آماده‌سازی..." message="لطفاً چند لحظه صبر کنید" />
@@ -163,13 +190,14 @@ const savedWizard = (() => {
     return null;
   }
 })();
-// پیش‌نمایش و پرداخت هم با snapshot قابلیت بازیابی دارند ( Cai gen در ادامه)؛
-// فقط done چون trackingCode سمت سرور است به preview برمی‌گردد.
+// پیش‌نمایش و پرداخت با snapshot قابلیت بازیابی دارند؛
+// مرحله done هم با کد پیگیری نگه داشته می‌شود (ترسیم‌ها بعد پرداخت پاک‌اند
+// و دانلود مجدد از «کروکی‌های من» انجام می‌شود)
 const _savedStep = savedWizard?.step;
 const _initialStep = (() => {
   if (_savedStep === "draw" || _savedStep === "info") return _savedStep;
   if (_savedStep === "preview" || _savedStep === "payment") return _savedStep;
-  if (_savedStep === "done") return "preview";
+  if (_savedStep === "done") return "done";
   return "landing";
 })();
 const step = ref(_initialStep);
@@ -190,7 +218,9 @@ try {
 } catch (e) {}
 const map = ref(null);
 const templateId = ref(savedWizard?.templateId || "technical");
-const trackingCode = ref("");
+const trackingCode = ref(savedWizard?.trackingCode || "");
+// وقتی یک پیش‌نویسِ ذخیره‌شده در سرور را برای ادامه/ویرایش باز می‌کنیم
+const editingKrokiId = ref(null);
 const logOpen = ref(false);
 const logStats = computed(() => logger.getStats());
 
@@ -213,6 +243,7 @@ function ensureGen() {
 // ---------- ماندگاری پیش‌نمایش (gen) ----------
 let genPersistTimer = null;
 function persistGen() {
+  if (persistSuspended) return;
   try {
     const g = gen.value;
     if (!g || !g.state?.ready) return;
@@ -327,7 +358,11 @@ const krokiForm = reactive({
 
 // با رفرش، ترسیم‌ها و فرم نباید پاک شوند → ذخیره خودکار در localStorage
 let persistTimer = null;
+// بعد از پرداخت، هیچ‌چیز از کروکی پرداخت‌شده نباید در حافظه بماند؛
+// با این پرچم، ذخیره خودکار (حتی beforeunload) تا سفارش بعدی متوقف می‌شود
+let persistSuspended = false;
 function persistSession() {
+  if (persistSuspended) return;
   try {
     savePins(pins);
   } catch (e) {}
@@ -336,6 +371,7 @@ function persistSession() {
       step: step.value,
       reachedIndex: reachedIndex.value,
       templateId: templateId.value,
+      trackingCode: trackingCode.value || "",
       form: { ...krokiForm },
     });
   } catch (e) {}
@@ -392,6 +428,8 @@ function go(id) {
   if (idx !== -1) {
     reachedIndex.value = Math.max(reachedIndex.value, idx);
   }
+  // ورود به ترسیم یعنی شروع کار جدید → ذخیره خودکار دوباره فعال شود
+  if (id === "draw") persistSuspended = false;
   step.value = id;
 }
 
@@ -486,6 +524,7 @@ function start() {
   logger.info("step", "شروع فرآیند ساخت کروکی");
   page.value = "app";
   reachedIndex.value = 0;
+  persistSuspended = false;
   ensureGen().catch(() => {});
   step.value = "draw";
 }
@@ -602,7 +641,10 @@ function removePin(pin) {
   if (!m) return;
   const removeSource = (sid) => {
     if (!sid) return;
-    const layers = m.getStyle().layers || [];
+    let layers = [];
+    try {
+      layers = m.getStyle().layers || [];
+    } catch (e) {}
     layers
       .filter((l) => l.source === sid)
       .forEach((l) => {
@@ -611,14 +653,19 @@ function removePin(pin) {
         } catch (e) {}
       });
     try {
-      m.removeSource(sid);
+      if (m.getSource(sid)) m.removeSource(sid);
     } catch (e) {}
   };
-  if (pin.shape?._sourceIds?.length) {
-    pin.shape._sourceIds.forEach((sid) => removeSource(sid));
-  } else if (pin.shape) {
-    removeSource("draw-pin-" + pin.id);
+  // علاوه بر سورس اصلی، سورس لیبل‌ها (شماره رئوس/طول اضلاع/مجاورت‌ها) هم
+  // باید پاک شود وگرنه اطلاعات نقاط روی نقشه می‌ماند
+  const sids = [];
+  if (pin.shape?._sourceIds?.length) sids.push(...pin.shape._sourceIds);
+  if (pin.shape) {
+    sids.push("draw-pin-" + pin.id);
+    sids.push("file-" + pin.id);
   }
+  const allSids = [...new Set([...sids, ...sids.map((s) => s + "-labels")])];
+  allSids.forEach((sid) => removeSource(sid));
   logger.info("draw", "حذف ترسیم", { name: pin.name, id: pin.id });
 }
 
@@ -663,13 +710,176 @@ async function onInfoSubmit() {
 
 function onPaymentDone(result) {
   trackingCode.value = result?.trackingCode || "";
+  editingKrokiId.value = null;
+  // کروکی در سرور ثبت و پرداخت شده («کروکی‌های من»)؛ پس هیچ‌چیز از آن —
+  // نه ترسیم‌ها، نه فرم، نه پیش‌نویس، نه پیش‌نمایش — نباید در حافظه بماند
+  persistSuspended = true;
+  try {
+    pins.splice(0, pins.length);
+  } catch (e) {}
+  try {
+    savePins([]);
+  } catch (e) {}
+  try {
+    clearDraft();
+  } catch (e) {}
+  try {
+    clearGen();
+  } catch (e) {}
+  try {
+    saveWizard({
+      step: "done",
+      reachedIndex: reachedIndex.value,
+      templateId: "technical",
+      trackingCode: trackingCode.value || "",
+      form: { ...defaultKrokiForm() },
+    });
+  } catch (e) {}
   go("done");
 }
 
+// فرم خالی پیش‌فرض برای پاک‌سازی حافظه بعد پرداخت
+function defaultKrokiForm() {
+  return {
+    title: "پلان وضعیت موجود",
+    client: "",
+    clientPhone: "",
+    clientNationalId: "",
+    address: "",
+    city: "",
+    date: getTodayJalali(),
+    surveyor: "",
+    plaque: "",
+    streetWidth: "",
+    initialSurveyType: "",
+    logo: "",
+    description: "",
+  };
+}
+
+// بازگردانی یک کروکی ذخیره‌شده (پیش‌نویس) به ویزارد برای ادامه/ویرایش ترسیم
+function pinsFromSavedKroki(k) {
+  const out = [];
+  try {
+    const dd = k?.drawing_data;
+    if (Array.isArray(dd) && dd.length) {
+      for (const p of dd) {
+        if (!p || !p.shape) continue;
+        let copy = null;
+        try {
+          copy = JSON.parse(JSON.stringify(p));
+        } catch (e) {
+          continue;
+        }
+        if (copy.shape) delete copy.shape._sourceIds;
+        copy.selected = copy.selected !== false;
+        if (!copy.id) copy.id = crypto.randomUUID();
+        if (!copy.type) copy.type = "draw";
+        out.push(copy);
+      }
+      if (out.length) return out;
+    }
+    // fallback قدیمی: فقط مختصات تخت
+    const pts = Array.isArray(k?.geometry_points) ? k.geometry_points : [];
+    const positions = pts
+      .map((p) => ({
+        lon: Number(p.lon ?? p.lng ?? p.x),
+        lat: Number(p.lat ?? p.y),
+        height: 0,
+      }))
+      .filter((p) => Number.isFinite(p.lon) && Number.isFinite(p.lat));
+    if (positions.length >= 2) {
+      out.push({
+        id: crypto.randomUUID(),
+        name: k?.title || "کروکی بازیابی‌شده",
+        descr: "",
+        shape: {
+          type: "polygon",
+          positions,
+          color: "#ff0000",
+          outlineColor: "#ff0000",
+          opacity: 0.7,
+          width: 3,
+          show: true,
+        },
+        date: new Date(),
+        save: -1,
+        type: "draw",
+        selected: true,
+      });
+    }
+  } catch (e) {}
+  return out;
+}
+
+function formFromSavedKroki(k) {
+  return {
+    title: k?.title ?? "پلان وضعیت موجود",
+    client: k?.client_name ?? "",
+    clientPhone: k?.client_phone ?? "",
+    clientNationalId: k?.client_national_id ?? "",
+    address: k?.address ?? "",
+    city: k?.city ?? "",
+    date: k?.survey_date || getTodayJalali(),
+    surveyor: k?.surveyor ?? "",
+    plaque: k?.plaque ?? "",
+    streetWidth: k?.street_width ?? "",
+    initialSurveyType: k?.initial_survey_type ?? "",
+    logo: k?.logo_url ?? "",
+    description: k?.description ?? "",
+  };
+}
+
+async function openDraftForEdit(kroki) {
+  if (!kroki) return;
+  let full = kroki;
+  // لیست سبک است؛ جزئیات کامل (ترسیم‌ها) را بگیر
+  if (!Array.isArray(full.drawing_data) && (!Array.isArray(full.geometry_points) || !full.geometry_points.length)) {
+    try {
+      const d = await auth.getKroki(full.id);
+      if (d?.success && d?.kroki) full = d.kroki;
+    } catch (e) {}
+  }
+  if (pins.length) {
+    const ok = confirm("ترسیم‌های فعلی جایگزین می‌شود. ادامه می‌دهید؟");
+    if (!ok) return;
+  }
+  pins.splice(0, pins.length);
+  const restored = pinsFromSavedKroki(full);
+  if (!restored.length) {
+    alert("ترسیم معتبری در این کروکی یافت نشد.");
+    return;
+  }
+  restored.forEach((p) => pins.push(p));
+  Object.assign(krokiForm, formFromSavedKroki(full));
+  templateId.value = full.template_key || templateId.value || "technical";
+  editingKrokiId.value = full.id;
+  persistSuspended = false;
+  try {
+    clearDraft();
+  } catch (e) {}
+  try {
+    clearGen();
+  } catch (e) {}
+  if (gen.value) {
+    try {
+      gen.value.state.ready = false;
+      gen.value.state.errorMsg = "";
+    } catch (e) {}
+  }
+  reachedIndex.value = 0;
+  page.value = "app";
+  step.value = "draw";
+  persistSession();
+  logger.info("kroki", "باز شدن پیش‌نویس ذخیره‌شده برای ویرایش", { id: full.id });
+}
+
 function restart() {
+  persistSuspended = false;
   pins.splice(0, pins.length);
   templateId.value = "technical";
   trackingCode.value = "";
+  editingKrokiId.value = null;
   krokiForm.title = "پلان وضعیت موجود";
   krokiForm.client = "";
   krokiForm.clientPhone = "";

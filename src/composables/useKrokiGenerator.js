@@ -303,6 +303,29 @@ function computeNWIndex(pts) {
   return best;
 }
 
+/*
+ * اسنپ‌شات سبک از بوم نقشه: کوچک‌سازی به حداکثر ۸۰۰px و خروجی JPEG فشرده.
+ * عکس ماهواره‌ای با PNG چند مگابایت می‌شود؛ با JPEG/~0.78 حدود ۱۰۰–۳۰۰KB
+ * تا هم ذخیره در سرور مطمئن باشد و هم حافظه محلی پر نشود.
+ */
+function snapshotCanvas(srcCanvas, maxSide = 800, quality = 0.78) {
+  const w = srcCanvas?.width || 0;
+  const h = srcCanvas?.height || 0;
+  if (!w || !h) return "";
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  const cw = Math.max(1, Math.round(w * scale));
+  const ch = Math.max(1, Math.round(h * scale));
+  const c = document.createElement("canvas");
+  c.width = cw;
+  c.height = ch;
+  const ctx = c.getContext("2d");
+  // زمینه سفید چون JPEG آلفا ندارد
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.drawImage(srcCanvas, 0, 0, cw, ch);
+  return c.toDataURL("image/jpeg", quality);
+}
+
 export function useKrokiGenerator() {
   const state = reactive({
     generating: false,
@@ -467,7 +490,7 @@ export function useKrokiGenerator() {
         );
         await new Promise((r) => setTimeout(r, isMobileView ? 400 : 200));
         try {
-          dataUrl = map.getCanvas().toDataURL("image/png");
+          dataUrl = snapshotCanvas(map.getCanvas(), 800, 0.78);
         } catch (e) {
           dataUrl = "";
         }

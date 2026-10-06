@@ -271,11 +271,12 @@
                   <th>متقاضی</th>
                   <th>تاریخ</th>
                   <th>وضعیت</th>
+                  <th>عملیات</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="myKrokis.length === 0">
-                  <td colspan="5" class="text-center text-[var(--text-faint)] py-10">کروکی‌ای ثبت نشده است</td>
+                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">کروکی‌ای ثبت نشده است</td>
                 </tr>
                 <tr v-for="k in myKrokis" :key="k.id">
                   <td class="text-xs font-bold text-[var(--accent-soft)]" dir="ltr">{{ k.tracking_code }}</td>
@@ -285,11 +286,48 @@
                   <td>
                     <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="krokiStatusClass(k.status)">{{ krokiStatusLabel(k.status) }}</span>
                   </td>
+                  <td>
+                    <div class="flex items-center gap-1">
+                      <button
+                        class="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--accent)] hover:brightness-110 transition"
+                        title="مشاهده و دانلود مجدد"
+                        @click="viewerKroki = k"
+                      >
+                        <i class="fas fa-eye text-xs"></i>
+                      </button>
+                      <button
+                        v-if="k.status === 'draft'"
+                        class="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--info)] hover:brightness-110 transition"
+                        title="ادامه و ویرایش ترسیم"
+                        @click="editDraftDrawing(k)"
+                      >
+                        <i class="fas fa-pen text-xs"></i>
+                      </button>
+                      <button
+                        v-if="k.status === 'draft'"
+                        class="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center text-[var(--danger)] hover:brightness-110 transition"
+                        title="حذف پیش‌نویس"
+                        :disabled="deletingId === k.id"
+                        @click="removeKroki(k)"
+                      >
+                        <i class="fas text-xs" :class="deletingId === k.id ? 'fa-circle-notch fa-spin' : 'fa-trash'"></i>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
+
+        <!-- مودال مشاهده / دانلود مجدد / ویرایش -->
+        <SavedKrokiViewer
+          v-if="viewerKroki"
+          :kroki="viewerKroki"
+          @close="viewerKroki = null"
+          @updated="onViewerUpdated"
+          @editDrawing="onViewerEditDrawing"
+        />
       </section>
 
       <!-- معرفی -->
@@ -456,8 +494,9 @@ import { ref, reactive, computed, onMounted, watch } from "vue";
 import { auth, fmtMoney, fmtDate } from "../stores/auth";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS } from "../utils/templates";
 import TemplateDesigner from "./TemplateDesigner.vue";
+import SavedKrokiViewer from "./SavedKrokiViewer.vue";
 
-defineEmits(["home"]);
+const emit = defineEmits(["home", "editDraft"]);
 
 const user = computed(() => auth.state.user);
 const wallet = computed(() => auth.walletOf());
@@ -632,6 +671,45 @@ function krokiStatusLabel(s) {
   if (s === "issued") return "صادر شده";
   if (s === "paid") return "پرداخت شده";
   return "پیش‌نویس";
+}
+
+// ───── عملیات کروکی‌های ذخیره‌شده ─────
+const viewerKroki = ref(null);
+const deletingId = ref(null);
+
+async function editDraftDrawing(k) {
+  // جزئیات کامل را بگیر و به ویزارد بفرست تا ترسیم ادامه/ویرایش شود
+  try {
+    const res = await auth.getKroki(k.id);
+    if (res.success && res.kroki) {
+      emit("editDraft", res.kroki);
+      return;
+    }
+    emit("editDraft", k);
+  } catch (e) {
+    emit("editDraft", k);
+  }
+}
+
+async function removeKroki(k) {
+  if (!confirm(`پیش‌نویس «${k.title}» حذف شود؟`)) return;
+  deletingId.value = k.id;
+  try {
+    const res = await auth.deleteKroki(k.id);
+    if (!res.success) alert(res.error || "خطا در حذف کروکی");
+    else await auth.myKrokis();
+  } finally {
+    deletingId.value = null;
+  }
+}
+
+async function onViewerUpdated() {
+  await auth.myKrokis();
+}
+
+function onViewerEditDrawing(full) {
+  viewerKroki.value = null;
+  emit("editDraft", full);
 }
 
 // معرفی
