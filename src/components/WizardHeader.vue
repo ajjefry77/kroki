@@ -1,6 +1,6 @@
 <template>
-  <header class="wizard-header relative overflow-visible h-14 flex items-center gap-2 px-3 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-50">
-    <div class="flex items-center gap-2 flex-shrink-0">
+  <header class="wizard-header relative overflow-visible h-14 grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 md:px-6 bg-[var(--surface)] border-b border-[var(--border)] flex-shrink-0 z-50">
+    <div class="flex items-center gap-2 justify-self-start min-w-0">
       <img src="/favicon.png" alt="لوگوی سامانه کروکی" class="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-md shadow-[var(--accent-glow-strong)]" />
       <div class="hidden sm:block">
         <div class="font-extrabold text-sm leading-tight whitespace-nowrap">سامانه کروکی</div>
@@ -8,8 +8,8 @@
       </div>
     </div>
 
-    <!-- استپر -->
-    <nav class="flex-1 flex items-center justify-center sm:justify-center overflow-x-auto min-w-0" aria-label="مراحل">
+    <!-- استپر: ستون وسط گرید همیشه دقیقاً وسط صفحه است -->
+    <nav class="flex items-center justify-center overflow-x-auto min-w-0 max-w-full" aria-label="مراحل">
       <div class="flex items-center min-w-max h-12 px-1">
         <template v-for="(s, i) in steps" :key="s.id">
           <button
@@ -49,7 +49,7 @@
     </nav>
 
     <!-- نشان اعتبار + پروفایل + گزارش : همیشه visible، در موبایل فقط آیکون -->
-    <div class="flex items-center gap-1.5 md:gap-2 text-[11px] text-[var(--text-muted)] flex-shrink-0">
+    <div class="flex items-center gap-1.5 md:gap-2 text-[11px] text-[var(--text-muted)] justify-self-end">
       <button
         class="relative flex items-center justify-center gap-1.5 w-9 h-9 md:w-auto md:px-2.5 md:h-8 rounded-lg border border-[var(--border)] bg-[var(--surface2)] hover:bg-[var(--surface3)] hover:border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text)] transition"
         title="گزارش سیستم"
