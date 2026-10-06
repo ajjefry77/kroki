@@ -216,6 +216,7 @@ import { loadMap } from "../utils/loadMapbox";
 import { kmlToGeoJSON, readKmlText } from "../utils/kml";
 import { registerDrawLayer, bringDrawingsToFront } from "../utils/layerOrder";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
+import { loadMapView, saveMapView } from "../utils/sessionPersist";
 
 const props = defineProps({
   pins: { type: Object, required: true },
@@ -714,6 +715,15 @@ async function initMapAsync() {
   }
 
   try {
+      let initCenter = [51.5, 35.5];
+      let initZoom = 5;
+      try {
+        const sv = loadMapView();
+        if (sv && isFinite(sv.lng) && isFinite(sv.lat) && isFinite(sv.zoom)) {
+          initCenter = [sv.lng, sv.lat];
+          initZoom = Math.min(20, Math.max(3, sv.zoom));
+        }
+      } catch (e) {}
       map = new mapboxgl.Map({
       container: mapContainerRef.value,
       style: {
@@ -738,8 +748,8 @@ async function initMapAsync() {
           },
         ],
       },
-      center: [51.5, 35.5],
-      zoom: 5,
+      center: initCenter,
+      zoom: initZoom,
       minZoom: 3,
       maxZoom: 20,
       pitch: 0,
@@ -760,6 +770,29 @@ async function initMapAsync() {
 
   map.on("load", () => {
     mapProxy.value = map;
+    // بازیابی موقعیت قبلی نقشه تا بعد رفرش کاربر پرت نشود
+    try {
+      const v = loadMapView();
+      if (v && isFinite(v.lng) && isFinite(v.lat) && isFinite(v.zoom)) {
+        map.setCenter([v.lng, v.lat]);
+        map.setZoom(v.zoom);
+      }
+    } catch (e) {}
+    // ذخیره خودکار موقعیت نقشه
+    let viewTimer = null;
+    const persistView = () => {
+      if (viewTimer) clearTimeout(viewTimer);
+      viewTimer = setTimeout(() => {
+        try {
+          const c = map.getCenter();
+          saveMapView({ lng: c.lng, lat: c.lat, zoom: map.getZoom() });
+        } catch (e) {}
+      }, 400);
+    };
+    try {
+      map.on("moveend", persistView);
+      map.on("zoomend", persistView);
+    } catch (e) {}
     // پن/زوم لمسی برای موبایل فعال می‌ماند؛ غیرفعال‌سازی انتخابی در syncPanState
     try {
       if (map.dragPan) map.dragPan.enable();
@@ -773,9 +806,16 @@ async function initMapAsync() {
     drawing.value = reactive(useDrawing(map, props.pins));
     for (const p of props.pins || []) {
       if (p.shape && p.shape.type && p.type === "draw") {
-        renderPinOnMap(map, p);
+        try {
+          renderPinOnMap(map, p);
+        } catch (e) {}
       }
     }
+    // پیش‌نویس ناقص (حتی ۱ نقطه) را بعد رفرش سر جایش برگردان
+    try {
+      const ok = drawing.value?.restoreDraftFromStorage?.();
+      if (ok) syncPanState();
+    } catch (e) {}
     hud.zoom = map.getZoom();
     map.on("mousemove", (e) => {
       hud.lng = e.lngLat?.lng ?? null;

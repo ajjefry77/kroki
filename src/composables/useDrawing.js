@@ -18,6 +18,7 @@ import {
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
 import { ensureVertexSquareImage, VERTEX_SQUARE_IMAGE } from "../utils/drawStyle";
 import { logger } from "../utils/logger";
+import { saveDraft, loadDraft, clearDraft } from "../utils/sessionPersist";
 
 // رنگ ترسیم: قرمز هنگام در حال ترسیم، سبز پس از پایان
 export const DRAFT_COLOR = "#ff0000";
@@ -1482,6 +1483,9 @@ export function useDrawing(map, pins) {
     measureActive.value = false;
     rectStart = null;
     map.getCanvas().style.cursor = "default";
+    try {
+      clearDraft();
+    } catch (e) {}
   };
 
   const handleSave = () => {
@@ -1539,6 +1543,9 @@ export function useDrawing(map, pins) {
     rectStart = null;
     cleanupHandlers();
     clearTempLayers();
+    try {
+      clearDraft();
+    } catch (e) {}
     renderNewPin(pin);
   };
 
@@ -1610,6 +1617,9 @@ export function useDrawing(map, pins) {
     measurePoints.length = 0;
     positions.length = 0;
     rectStart = null;
+    try {
+      clearDraft();
+    } catch (e) {}
     if (map.getSource(drawDataSourceId)) {
       map
         .getSource(drawDataSourceId)
@@ -1981,6 +1991,212 @@ export function useDrawing(map, pins) {
     return editingPin && pin && editingPin.id === pin.id;
   }
 
+  /* -------- ماندگاری پیش‌نویس در localStorage (ضد رفرش) -------- */
+  let draftSaveTimer = null;
+  function persistDraftNow() {
+    try {
+      // هنگام ویرایش ترسیم ذخیره‌شده، تغییرات مستقیم روی pins اعمال می‌شود
+      // و همان کافی است؛ ذخیره هم‌زمان به‌عنوان پیش‌نویس باعث نمایش تکراری بعد رفرش می‌شود
+      if (editingPin) {
+        clearDraft();
+        return;
+      }
+      const hasPositions = Array.isArray(positions) && positions.length > 0;
+      const hasShape =
+        shape.value && typeof shape.value === "object" && shape.value.type;
+      if (!hasPositions && !hasShape) {
+        clearDraft();
+        return;
+      }
+      // measure ابزار موقت است و نباید بازیابی شود
+      if (drawMode.value === "measure" || drawMode.value === "eraser") {
+        if (!hasShape) {
+          clearDraft();
+          return;
+        }
+      }
+      saveDraft({
+        drawMode: drawMode.value || "",
+        positions: JSON.parse(
+          JSON.stringify(toRaw(positions) || []),
+        ),
+        shape: shape.value ? toRaw(shape.value) : null,
+        formData: formData.value ? JSON.parse(JSON.stringify(toRaw(formData.value))) : null,
+        color: color.value || "#ff0000",
+        showForm: !!showForm.value,
+      });
+    } catch (e) {}
+  }
+  function schedulePersistDraft() {
+    if (draftSaveTimer) clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(persistDraftNow, 250);
+  }
+
+  // ذخیره خودکار هر تغییر پیش‌نویس (حتی ناقص: تک‌نقطه هم ذخیره می‌شود)
+  watch(
+    [drawMode, color, showForm],
+    () => schedulePersistDraft(),
+  );
+  watch(
+    positions,
+    () => schedulePersistDraft(),
+    { deep: true },
+  );
+  watch(
+    shape,
+    () => schedulePersistDraft(),
+    { deep: true },
+  );
+  watch(
+    formData,
+    () => schedulePersistDraft(),
+    { deep: true },
+  );
+  // فلاش نهایی قبل از رفرش تا آخرین کلیک گم نشود
+  try {
+    window.addEventListener("beforeunload", persistDraftNow);
+    window.addEventListener("pagehide", persistDraftNow);
+  } catch (e) {}
+
+  // بازسازی پیش‌نویس بعد از رفرش: لایه موقت + هندلرها + فرم
+  function restoreDraftFromStorage() {
+    let d = null;
+    try {
+      d = loadDraft();
+    } catch (e) {
+      return false;
+    }
+    if (!d) return false;
+    const mode = d.drawMode || d.shape?.type || "";
+    if (!mode) return false;
+    if (mode === "measure" || mode === "eraser" || mode === "") return false;
+    const savedPositions = Array.isArray(d.positions) ? d.positions : [];
+    const savedShape = d.shape || null;
+    if (!savedPositions.length && !savedShape) return false;
+
+    try {
+      cleanupHandlers();
+    } catch (e) {}
+    try {
+      clearTempLayers();
+    } catch (e) {}
+
+    try {
+      drawMode.value = mode;
+      color.value = d.color || "#ff0000";
+    } catch (e) {}
+    try {
+      const fd = d.formData || {};
+      formData.value = {
+        name: fd.name || "",
+        description: fd.description || "",
+        adjacentsEnabled: !!fd.adjacentsEnabled,
+        adjacents: Array.isArray(fd.adjacents) ? [...fd.adjacents] : [],
+      };
+    } catch (e) {}
+    try {
+      positions.length = 0;
+      savedPositions.forEach((p) => {
+        if (p && (p.lng !== undefined || p.lon !== undefined) && p.lat !== undefined) {
+          positions.push({ ...p });
+        }
+      });
+      shape.value = savedShape ? JSON.parse(JSON.stringify(savedShape)) : null;
+      // فرم نام فقط وقتی برمی‌گردد که شکل تمام‌شده باشد
+      showForm.value = !!(d.showForm && shape.value);
+      nameError.value = false;
+    } catch (e) {}
+
+    try {
+      // هندلرها و سورس موقت را مثل شروع ترسیم تازه می‌سازیم
+      startDrawing();
+    } catch (e) {}
+
+    try {
+      if (shape.value) {
+        const pts = (shape.value.positions || []).map((p) => ({
+          lng: p.lon ?? p.lng,
+          lat: p.lat,
+        }));
+        if (pts.length) {
+          if (shape.value.type === "polygon" || shape.value.type === "rectangle") {
+            updateTempSource(pts, true);
+            updatePolygonLabels(pts);
+          } else if (shape.value.type === "polyline") {
+            updateTempSource(pts, false);
+            updateLineLabels(pts);
+          } else if (shape.value.type === "multi_point") {
+            const src = map.getSource(ts.sourceId);
+            if (src) {
+              src.setData({
+                type: "FeatureCollection",
+                features: pts.map((p) => ({
+                  type: "Feature",
+                  geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+                  properties: {},
+                })),
+              });
+            }
+          }
+        }
+        syncAdjacents();
+        refreshAdjacencyLabels();
+        applyDisplayColor();
+        // رفتار finishDrawing: برای غیر پلی‌گان/خط هندلری باقی نمی‌ماند
+        if (shape.value.type !== "polygon" && shape.value.type !== "polyline") {
+          try {
+            cleanupHandlers();
+          } catch (e) {}
+          try {
+            if (map?.getCanvas?.()) map.getCanvas().style.cursor = "default";
+          } catch (e) {}
+        }
+      } else if (positions.length) {
+        if (drawMode.value === "polygon") {
+          updateTempSource([...positions], true);
+          updatePolygonLabels([...positions]);
+        } else if (drawMode.value === "rectangle") {
+          // اگر قبل رفرش فقط نقطه اول مستطیل زده شده بود، همان را ادامه بده
+          if (positions.length === 1) {
+            rectStart = { lng: positions[0].lng ?? positions[0].lon, lat: positions[0].lat };
+          } else if (positions.length >= 4) {
+            updateTempSource([...positions], true);
+            updatePolygonLabels([...positions]);
+          }
+          updateTempSource([...positions], true);
+          try {
+            updatePolygonLabels([...positions]);
+          } catch (e) {}
+        } else if (drawMode.value === "polyline") {
+          updateTempSource([...positions], false);
+          updateLineLabels([...positions]);
+        } else if (drawMode.value === "multi_point") {
+          const src = map.getSource(ts.sourceId);
+          if (src) {
+            src.setData({
+              type: "FeatureCollection",
+              features: positions.map((p) => ({
+                type: "Feature",
+                geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+                properties: { color: p.color || color.value },
+              })),
+            });
+          }
+        }
+        syncAdjacents();
+        applyDisplayColor();
+      } else {
+        return false;
+      }
+    } catch (e) {}
+    logger.info("draw", "بازیابی پیش‌نویس ترسیم پس از رفرش", {
+      mode,
+      points: positions.length || shape.value?.positions?.length || 0,
+      finished: !!shape.value,
+    });
+    return true;
+  }
+
   return {
     loading,
     drawMode,
@@ -2023,5 +2239,8 @@ export function useDrawing(map, pins) {
     draftEdgeNames,
     syncAdjacents,
     refreshAdjacencyLabels,
+    persistDraftNow,
+    restoreDraftFromStorage,
+    clearDraftStored: () => clearDraft(),
   };
 }
