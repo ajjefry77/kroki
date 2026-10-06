@@ -421,8 +421,8 @@
               <input v-model.number="referralForm.free_kroki_amount" type="number" min="1" class="input" dir="ltr" />
             </div>
             <div>
-              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">سقف استفاده</label>
-              <input v-model.number="referralForm.max_uses" type="number" min="1" class="input" dir="ltr" />
+              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">سقف استفاده (خالی = نامحدود)</label>
+              <input v-model="referralForm.max_uses" type="number" min="1" class="input" dir="ltr" placeholder="نامحدود" />
             </div>
             <div>
               <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">انقضا</label>
@@ -483,13 +483,14 @@
                     />
                   </td>
                   <td class="text-xs whitespace-nowrap" dir="ltr">
-                    {{ r.used_count }} /
+                    {{ r.used_count }} / {{ r.max_uses == null ? "نامحدود" : r.max_uses }}
                     <input
                       type="number"
                       min="1"
                       class="input !w-20 !py-1.5 !text-xs text-center inline-block"
                       dir="ltr"
-                      :value="referralEditDrafts[r.id]?.max_uses ?? r.max_uses"
+                      placeholder="نامحدود"
+                      :value="referralEditDrafts[r.id]?.max_uses ?? r.max_uses ?? ''"
                       @input="setReferralDraft(r.id, 'max_uses', $event.target.value)"
                     />
                   </td>
@@ -1032,7 +1033,7 @@ const roles = computed(() => auth.state.roles);
 const referrals = computed(() => auth.state.referrals);
 const personalReferralCodes = computed(() => auth.state.personalReferralCodes?.length ? auth.state.personalReferralCodes : auth.state.users.filter((u) => u.referralCode).map((u) => ({ id: u.id, username: u.username, full_name: u.name, phone: u.phone, code: u.referralCode, free_kroki_amount: Number(u.personalFreeKroki ?? 1) })));
 
-const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: 1, expires_at: "" });
+const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: "", expires_at: "" });
 const referralSaving = ref(false);
 const referralMsg = ref("");
 const referralMsgOk = ref(true);
@@ -1195,7 +1196,7 @@ async function createReferral() {
   if (res.success) {
     referralForm.code = "";
     referralForm.free_kroki_amount = 1;
-    referralForm.max_uses = 1;
+    referralForm.max_uses = "";
     referralForm.expires_at = "";
   }
 }
@@ -1247,7 +1248,12 @@ async function saveReferralEdit(r) {
   const patch = {};
   if (d.code !== undefined && String(d.code).trim() && String(d.code).trim().toUpperCase() !== r.code) patch.code = String(d.code).trim();
   if (d.free_kroki_amount !== undefined && d.free_kroki_amount !== "" && Number(d.free_kroki_amount) !== Number(r.free_kroki_amount)) patch.free_kroki_amount = Number(d.free_kroki_amount);
-  if (d.max_uses !== undefined && d.max_uses !== "" && Number(d.max_uses) !== Number(r.max_uses)) patch.max_uses = Number(d.max_uses);
+  // سقف خالی = نامحدود (چندبارمصرف)
+  if (d.max_uses !== undefined) {
+    const cur = r.max_uses == null ? "" : String(r.max_uses);
+    const nxt = String(d.max_uses ?? "").trim();
+    if (nxt !== cur) patch.max_uses = nxt === "" ? null : Number(nxt);
+  }
   if (d.expires_at !== undefined && (d.expires_at || "") !== (r.expires_at || "")) patch.expires_at = d.expires_at || "";
   if (!Object.keys(patch).length) {
     showToast("تغییری برای ذخیره وجود ندارد");

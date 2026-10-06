@@ -220,7 +220,7 @@ async function register(payload) {
   // نام کاربری فقط شماره تماس است
   const username = phone;
   const password = String(payload?.password || "");
-  const agentCode = faToEn(payload?.agentCode || "").trim();
+  const agentCode = faToEn(payload?.agentCode || "").trim().toUpperCase();
   if (name.length < 3) return { success: false, error: "نام و نام خانوادگی را کامل وارد کنید" };
   if (!/^09\d{9}$/.test(phone)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
   const pwErr = validatePassword(password);
@@ -595,13 +595,13 @@ async function deleteKroki(id) {
 /* ---------------- معرفی ---------------- */
 
 async function redeemReferral(code) {
-  const normalized = faToEn(code || "").trim();
+  const normalized = faToEn(code || "").trim().toUpperCase();
   if (!normalized) return { success: false, error: "کد معرف را وارد کنید" };
   try {
     const d = await ReferralsApi.redeem(normalized);
     await loadWallet();
     await loadMyReferrals();
-    return { success: true, granted: d?.granted, freeKroki: d?.free_kroki_count };
+    return { success: true, granted: d?.granted, already: d?.already === true, freeKroki: d?.free_kroki_count };
   } catch (e) {
     return { success: false, error: e.message || "خطا در اعمال کد معرف" };
   }
@@ -647,12 +647,15 @@ async function loadPersonalReferralCodes() {
 
 async function createReferral({ code, free_kroki_amount, max_uses, expires_at } = {}) {
   try {
+    // سقف خالی = نامحدود (چندبارمصرف)؛ فقط عدد معتبر ارسال می‌شود
+    const rawMax = String(max_uses ?? "").trim();
     const body = {
       code: String(code || "").trim(),
       free_kroki_amount: Number(free_kroki_amount) || 1,
-      max_uses: Number(max_uses) || 1,
+      max_uses: rawMax === "" ? null : Number(rawMax),
       expires_at: expires_at || "",
     };
+    if (body.max_uses != null && (!Number.isFinite(body.max_uses) || body.max_uses < 1)) body.max_uses = null;
     await ReferralsApi.create(body);
     await loadAllReferrals();
     return { success: true };

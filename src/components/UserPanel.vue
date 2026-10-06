@@ -694,7 +694,9 @@ async function redeem() {
   const res = await auth.redeemReferral(String(referralCode.value).trim());
   referralMsgOk.value = res.success;
   referralMsg.value = res.success
-    ? `کد معرف فعال شد؛ ${res.freeKroki ?? ""} عدد کروکی رایگان دریافت کردید.`
+    ? res.already
+      ? "این کد قبلاً برای شما فعال شده است؛ هدیه تکراری تعلق نمی‌گیرد."
+      : `کد معرف فعال شد؛ ${res.freeKroki ?? ""} عدد کروکی رایگان دریافت کردید.`
     : res.error;
   if (res.success) {
     referralCode.value = "";
