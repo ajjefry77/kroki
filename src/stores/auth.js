@@ -86,6 +86,7 @@ function normalizeUser(u) {
     id: u?.id,
     username: u?.username || u?.phone || "",
     phone: u?.phone || "",
+    nationalId: u?.national_id || "",
     name: u?.full_name || u?.name || u?.username || "",
     full_name: u?.full_name || "",
     city: u?.city || "",
@@ -891,10 +892,13 @@ async function toggleActive(userId) {
   }
 }
 
-async function editUser(userId, { name, password } = {}) {
+async function editUser(userId, { name, password, phone, nationalId, city } = {}) {
   const body = {};
   if (String(name || "").trim()) body.full_name = String(name).trim();
   if (String(password || "").trim()) body.password = String(password).trim();
+  if (phone !== undefined) body.phone = phone;
+  if (nationalId !== undefined) body.national_id = nationalId;
+  if (city !== undefined) body.city = city;
   if (!Object.keys(body).length) return { success: true };
   try {
     const d = await UsersApi.update(userId, body);
@@ -908,6 +912,16 @@ async function editUser(userId, { name, password } = {}) {
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message || "خطا در ویرایش کاربر" };
+  }
+}
+
+async function deleteUser(userId) {
+  try {
+    await UsersApi.remove(userId);
+    state.users = state.users.filter((x) => String(x.id) !== String(userId));
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در حذف کاربر" };
   }
 }
 
@@ -1274,6 +1288,7 @@ export const auth = {
   creditUser,
   toggleActive,
   editUser,
+  deleteUser,
   loadStats,
   loadAdminKrokis,
   loadAdminTransactions,
