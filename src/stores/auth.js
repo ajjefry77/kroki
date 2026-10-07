@@ -215,6 +215,39 @@ function cleanUsername(s) {
   return faToEn(s).trim();
 }
 
+/* ---------------- ورود با رمز یکبار مصرف (OTP) ---------------- */
+
+async function requestOtp(phone) {
+  const mobile = faToEn(phone || "").trim();
+  if (!/^09\d{9}$/.test(mobile)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
+  try {
+    const data = await AuthApi.requestOtp({ phone: mobile });
+    return { success: true, ttl: data?.ttl || 120, devCode: data?.devCode };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در ارسال کد تایید" };
+  }
+}
+
+async function verifyOtpLogin(phone, code, fullName) {
+  const mobile = faToEn(phone || "").trim();
+  const otp = faToEn(code || "").trim();
+  if (!/^09\d{9}$/.test(mobile)) return { success: false, error: "شماره موبایل معتبر وارد کنید" };
+  if (!otp) return { success: false, error: "کد تایید را وارد کنید" };
+  try {
+    const body = { phone: mobile, code: otp };
+    if (fullName && String(fullName).trim()) body.full_name = String(fullName).trim();
+    const data = await AuthApi.verifyOtp(body);
+    const { token, user } = data || {};
+    if (!token || !user) return { success: false, error: "پاسخ سرور نامعتبر است" };
+    applyAuth(token, user);
+    await refreshMe();
+    restoreFreshSession(token, user);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در تایید کد" };
+  }
+}
+
 async function register(payload) {
   const name = String(payload?.name || "").trim();
   const phone = faToEn(payload?.phone || payload?.username || "").trim();
@@ -1244,6 +1277,8 @@ export const auth = {
   isAgent,
   login,
   register,
+  requestOtp,
+  verifyOtpLogin,
   logout,
   refreshMe,
   walletOf,

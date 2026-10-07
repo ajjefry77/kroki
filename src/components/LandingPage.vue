@@ -15,10 +15,10 @@
         "
       >
         <div
-          class="mx-auto flex items-center justify-between gap-2 transition-all duration-500"
+          class="mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 transition-all duration-500"
           :class="scrolled ? 'max-w-3xl px-3 sm:px-4 h-[60px]' : 'max-w-7xl px-3 sm:px-5 h-16'"
         >
-          <div class="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+          <div class="flex items-center gap-2 sm:gap-3 min-w-0 justify-self-start col-start-1">
             <span class="logo-3d relative shrink-0">
               <img
                 src="/favicon.png"
@@ -46,7 +46,7 @@
             </div>
           </div>
           <nav
-            class="hidden md:flex items-center gap-5 text-sm text-[var(--text-muted)] flex-1 justify-center min-w-0"
+            class="hidden md:flex items-center gap-5 text-sm text-[var(--text-muted)] justify-center min-w-0 max-w-full col-start-2"
           >
             <a href="#features" class="nav-link">امکانات</a>
             <a href="#templates" class="nav-link">قالب‌ها</a>
@@ -62,7 +62,7 @@
               <i class="fas fa-user-tie ml-1"></i> درخواست نمایندگی
             </button>
           </nav>
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex items-center gap-2 justify-self-end col-start-3">
             <button
               v-if="!authed"
               class="btn btn-ghost h-9 !rounded-full transition-all duration-500 !px-3 sm:!px-5 text-[13px] sm:text-sm whitespace-nowrap"
