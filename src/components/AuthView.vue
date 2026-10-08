@@ -12,7 +12,7 @@
         <p class="mt-2 text-sm text-[var(--text-muted)]">
           {{
             mode === "register"
-              ? "حساب کاربری بسازید تا کروکی بسازید و کیف پول داشته باشید"
+              ? "حساب کاربری بسازید، ۵ کروکی رایگان هدیه بگیرید و کروکی بسازید"
               : loginMethod === "otp"
                 ? "با شماره همراه و کد پیامکی وارد شوید"
                 : "برای ورود نام کاربری و رمز عبور را وارد کنید"
@@ -378,7 +378,11 @@ async function submitOtp() {
   try {
     const result = await auth.verifyOtpLogin(otp.phone, code);
     if (result.success) {
-      showSuccess("ورود با موفقیت انجام شد؛ در حال انتقال...");
+      showSuccess(
+        result.isNew
+          ? "حساب شما ساخته شد؛ ۵ کروکی رایگان هدیه گرفتید. در حال انتقال..."
+          : "ورود با موفقیت انجام شد؛ در حال انتقال...",
+      );
       navigating.value = true;
       navTimer = setTimeout(() => {
         navTimer = 0;
@@ -453,7 +457,7 @@ async function submit() {
           `حساب شما ساخته شد و در حال ورود هستید، اما کد معرف اعمال نشد: ${result.referral.error}`,
         );
       } else {
-        showSuccess("ثبت‌نام با موفقیت انجام شد؛ در حال انتقال...");
+        showSuccess("ثبت‌نام با موفقیت انجام شد؛ ۵ کروکی رایگان هدیه گرفتید. در حال انتقال...");
       }
       navigating.value = true;
       // وقتی هشدار کد معرف هست، مکث بیشتری تا خوانده شود

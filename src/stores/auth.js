@@ -242,7 +242,7 @@ async function verifyOtpLogin(phone, code, fullName) {
     applyAuth(token, user);
     await refreshMe();
     restoreFreshSession(token, user);
-    return { success: true };
+    return { success: true, isNew: data?.isNew === true };
   } catch (e) {
     return { success: false, error: e.message || "خطا در تایید کد" };
   }
