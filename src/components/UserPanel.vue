@@ -49,7 +49,7 @@
             <i class="fas fa-hourglass-half text-[var(--warning)]"></i>
           </div>
           <div>
-            <div class="text-[11px] text-[var(--text-muted)]">شارژ در انتظار تأیید</div>
+            <div class="text-[11px] text-[var(--text-muted)]">پرداخت در انتظار</div>
             <div class="font-extrabold text-lg">{{ pending.length }} مورد</div>
           </div>
         </div>
@@ -80,24 +80,15 @@
             <i class="fas fa-money-bill-wave text-[var(--accent)]"></i> افزایش موجودی
           </div>
 
-          <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4 mb-4">
-            <div class="text-xs font-semibold text-[var(--text-muted)] mb-3 flex items-center gap-1.5">
-              <i class="fas fa-money-bill-transfer text-[var(--accent)]"></i>
-              مبلغ را به این کارت واریز کنید
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <div class="text-lg font-extrabold tracking-widest text-center" dir="ltr">{{ bankCard }}</div>
-                <div class="text-[11px] text-[var(--text-muted)] mt-1 text-center">{{ cardOwner }}</div>
-              </div>
-              <button class="btn btn-ghost btn-xs shrink-0" @click="copyCard">
-                <i class="fas mr-0.5" :class="copied ? 'fa-check' : 'fa-copy'"></i>
-                {{ copied ? "کپی شد" : "کپی" }}
-              </button>
-            </div>
+          <div class="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-glow)] p-4 mb-4 flex items-start gap-3">
+            <i class="fas fa-shield-halved text-[var(--accent)] mt-0.5"></i>
+            <p class="text-[11px] leading-5 text-[var(--text-muted)]">
+              شارژ کیف پول به‌صورت <strong class="text-[var(--accent-soft)]">آنلاین از طریق درگاه بانکی</strong> انجام می‌شود.
+              پس از پرداخت، مبلغ بلافاصله و خودکار به کیف پول شما افزوده می‌شود.
+            </p>
           </div>
 
-          <label class="block mb-1.5 text-xs font-medium">مبلغ (تومان)</label>
+          <label class="block mb-1.5 text-xs font-medium">مبلغ شارژ (تومان)</label>
           <div class="flex flex-wrap gap-1.5 mb-2">
             <button
               v-for="p in presets"
@@ -109,24 +100,15 @@
               {{ fmtMoney(p) }}
             </button>
           </div>
-          <input v-model.number="amount" type="number" min="1000" step="5000" class="input mb-4" dir="ltr" placeholder="مبلغ دلخواه" />
-
-          <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
-          <input v-model="paymentId" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="شناسه ۱۶ رقمی پیامک شده" maxlength="16" @input="formatPaymentId" />
-
-          <label class="block mb-1.5 text-xs font-medium">شماره کارت واریزکننده *</label>
-          <input v-model="card" type="text" class="input mb-4 text-center tracking-widest" dir="ltr" placeholder="شماره کارت مبدا شما" maxlength="16" @input="formatCard" />
-
-          <label class="block mb-1.5 text-xs font-medium">توضیحات (اختیاری)</label>
-          <input v-model="note" type="text" class="input mb-4" placeholder="کد پیگیری یا توضیحات" />
+          <input v-model.number="amount" type="number" min="1000" step="5000" class="input mb-4" dir="ltr" placeholder="مبلغ دلخواه (حداقل ۱٬۰۰۰ تومان)" />
 
           <button class="btn btn-primary w-full !py-3" :disabled="!validCharge || chargeSaving" @click="submitCharge">
             <i v-if="chargeSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
-            <i v-else class="fas fa-paper-plane ml-1"></i>
-            {{ chargeSaving ? "در حال ارسال..." : "ثبت درخواست شارژ" }}
+            <i v-else class="fas fa-credit-card ml-1"></i>
+            {{ chargeSaving ? "در حال اتصال به درگاه..." : "پرداخت آنلاین و شارژ کیف پول" }}
           </button>
           <p class="text-[11px] text-[var(--text-faint)] mt-3 leading-5 text-center">
-            پس از واریز، درخواست شما برای مدیر ارسال می‌شود و پس از تأیید بلافاصله به کیف پول شما افزوده می‌شود.
+            با زدن دکمه بالا به صفحه امن بانک هدایت می‌شوید و پس از پرداخت به‌صورت خودکار برمی‌گردید.
           </p>
 
           <Transition name="modal">
@@ -148,7 +130,7 @@
                 </div>
                 <div class="flex items-center justify-between gap-2 mt-1.5">
                   <span class="text-[10px] text-[var(--text-faint)]">{{ fmtDate(c.at) }}</span>
-                  <span class="text-[10px] text-[var(--text-faint)]" dir="ltr">{{ c.card || "—" }}</span>
+                  <span class="text-[10px] text-[var(--text-faint)]" dir="ltr">{{ c.transId ? "کد پیگیری: " + c.transId : (c.card || "پرداخت آنلاین") }}</span>
                 </div>
               </li>
             </ul>
@@ -517,52 +499,30 @@ const tabs = computed(() => {
 const myAgent = computed(() => auth.state.myAgent);
 const subordinates = computed(() => auth.state.subordinates);
 
-const bankCard = auth.WALLET_CARD;
-const cardOwner = auth.CARD_OWNER;
-const copied = ref(false);
 const presets = [50000, 100000, 200000, 500000, 1000000];
 
 const amount = ref(100000);
-const paymentId = ref("");
-const card = ref("");
-const note = ref("");
 const msg = ref("");
 const msgOk = ref(true);
 const chargeSaving = ref(false);
 
-const validCharge = computed(() => Number(amount.value) >= 1000 && String(paymentId.value).replace(/\D/g, "").length >= 8 && /^\d{16}$/.test(String(card.value).replace(/\D/g, "")));
+const validCharge = computed(() => Number(amount.value) >= 1000 && Number(amount.value) <= 1000000000);
 
 const myCharges = computed(() => auth.requestsOf(user.value?.id || "none").slice(0, 20));
-
-function formatPaymentId() {
-  paymentId.value = paymentId.value.replace(/[^\d]/g, "").slice(0, 16);
-}
-
-function formatCard() {
-  card.value = card.value.replace(/[^\d]/g, "").slice(0, 16);
-}
-
-async function copyCard() {
-  try {
-    await navigator.clipboard.writeText(bankCard);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1800);
-  } catch {}
-}
 
 async function submitCharge() {
   msg.value = "";
   msgOk.value = true;
   chargeSaving.value = true;
-  const res = await auth.requestCharge({ amount: amount.value, paymentId: paymentId.value, card: card.value, note: note.value });
+  // هدایت به درگاه: در صورت موفقیت صفحه عوض می‌شود، پس ریست لازم نیست
+  const res = await auth.requestCharge({ amount: amount.value });
   chargeSaving.value = false;
-  msgOk.value = res.success;
-  msg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
-  if (res.success) {
-    amount.value = 100000;
-    paymentId.value = "";
-    card.value = "";
-    note.value = "";
+  if (!res.success) {
+    msgOk.value = false;
+    msg.value = res.error;
+  } else {
+    msgOk.value = true;
+    msg.value = "در حال انتقال به درگاه پرداخت...";
   }
 }
 
@@ -599,9 +559,9 @@ function chargeStatusClass(s) {
   return "bg-[var(--danger-glow)] text-[var(--danger)]";
 }
 function chargeStatusLabel(s) {
-  if (s === "approved") return "تأیید شد";
-  if (s === "pending") return "در انتظار";
-  return "رد شده";
+  if (s === "approved") return "پرداخت موفق";
+  if (s === "pending") return "در انتظار پرداخت";
+  return "ناموفق / لغو شده";
 }
 
 function loadTx() {

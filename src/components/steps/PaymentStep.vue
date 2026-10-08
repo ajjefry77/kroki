@@ -151,39 +151,25 @@
                       </button>
                     </div>
 
-                    <div class="rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4 mb-4">
-                      <div class="text-xs font-semibold text-[var(--text-muted)] mb-2 flex items-center gap-1.5">
-                        <i class="fas fa-money-bill-transfer text-[var(--accent)]"></i>
-                        مبلغ را به این کارت واریز کنید
-                      </div>
-                      <div class="flex items-center justify-between gap-3">
-                        <div>
-                          <div class="text-lg font-extrabold tracking-widest text-center" dir="ltr">{{ bankCard }}</div>
-                          <div class="text-[11px] text-[var(--text-muted)] mt-1 text-center">{{ cardOwner }}</div>
-                        </div>
-                        <button class="btn btn-ghost btn-xs shrink-0" @click="copyCard">
-                          <i class="fas mr-0.5" :class="copied ? 'fa-check' : 'fa-copy'"></i>
-                          {{ copied ? "کپی شد" : "کپی" }}
-                        </button>
-                      </div>
+                    <div class="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-glow)] p-4 mb-4 flex items-start gap-3">
+                      <i class="fas fa-shield-halved text-[var(--accent)] mt-0.5"></i>
+                      <p class="text-[11px] leading-5 text-[var(--text-muted)]">
+                        شارژ به‌صورت <strong class="text-[var(--accent-soft)]">آنلاین از طریق درگاه بانکی</strong> انجام می‌شود
+                        و مبلغ بلافاصله به کیف پول شما اضافه می‌گردد.
+                      </p>
                     </div>
 
-                    <label class="block mb-1.5 text-xs font-medium">مبلغ (تومان)</label>
-                    <input v-model.number="charge.amount" type="number" min="1000" step="5000" class="input mb-3" dir="ltr" placeholder="مبلغ دلخواه" />
-
-                    <label class="block mb-1.5 text-xs font-medium">شناسه پرداخت *</label>
-                    <input v-model="charge.paymentId" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" maxlength="16" placeholder="شناسه ۱۶ رقمی پیامک شده" @input="formatPaymentId" />
-
-                    <label class="block mb-1.5 text-xs font-medium">شماره کارت واریزکننده *</label>
-                    <input v-model="charge.card" type="text" class="input mb-3 text-center tracking-widest" dir="ltr" placeholder="شماره کارت مبدا شما" @input="formatCard" />
+                    <label class="block mb-1.5 text-xs font-medium">مبلغ شارژ (تومان)</label>
+                    <input v-model.number="charge.amount" type="number" min="1000" step="5000" class="input mb-3" dir="ltr" placeholder="مبلغ دلخواه (حداقل ۱٬۰۰۰ تومان)" />
 
                     <button class="btn btn-primary w-full !py-2.5" :disabled="!chargeValid || chargeSaving" @click="submitCharge">
                       <i v-if="chargeSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
-                      <i v-else class="fas fa-paper-plane ml-1"></i>
-                      {{ chargeSaving ? "در حال ارسال..." : "ثبت درخواست شارژ" }}
+                      <i v-else class="fas fa-credit-card ml-1"></i>
+                      {{ chargeSaving ? "در حال اتصال به درگاه..." : "پرداخت آنلاین" }}
                     </button>
                     <p class="text-[11px] text-[var(--text-faint)] mt-3 leading-5 text-center">
-                      درخواست شما برای مدیر ارسال می‌شود. پس از تأیید، موجودی به صورت خودکار قابل مشاهده است.
+                      به صفحه امن بانک هدایت می‌شوید و پس از پرداخت به‌صورت خودکار برمی‌گردید.
+                      ترسیم‌های شما ذخیره است و از بین نمی‌رود.
                     </p>
 
                     <Transition name="modal">
@@ -255,8 +241,6 @@ const price = computed(() => KROKI_PRICE);
 const originalPrice = computed(() => KROKI_ORIGINAL_PRICE);
 // قیمت فعلا ثابت است و بر اساس شهر نیست
 const showDiscount = computed(() => true);
-const bankCard = auth.WALLET_CARD;
-const cardOwner = auth.CARD_OWNER;
 
 const processing = ref(false);
 const success = ref(false);
@@ -267,13 +251,12 @@ const chargeOpen = ref(false);
 const chargeSaving = ref(false);
 const chargeMsg = ref("");
 const chargeMsgOk = ref(true);
-const copied = ref(false);
 const payError = ref("");
 
 const isAdmin = computed(() => auth.isAdmin.value);
 const payMode = ref(isAdmin.value ? "admin" : "wallet");
 
-const charge = reactive({ amount: price.value, paymentId: "", card: "" });
+const charge = reactive({ amount: price.value });
 
 const freeKroki = computed(() => auth.freeOf());
 const wallet = computed(() => auth.walletOf());
@@ -281,7 +264,7 @@ const wallet = computed(() => auth.walletOf());
 const currentTemplate = computed(() => getTemplate(props.templateId));
 const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 
-const chargeValid = computed(() => Number(charge.amount) >= 1000 && String(charge.paymentId).replace(/\D/g, "").length >= 8 && /^\d{16}$/.test(String(charge.card).replace(/\D/g, "")));
+const chargeValid = computed(() => Number(charge.amount) >= 1000 && Number(charge.amount) <= 1000000000);
 
 function canPay(mode) {
   if (mode === "admin") return true;
@@ -293,34 +276,19 @@ function formatPrice(v) {
   return fmtMoney(v) + " تومان";
 }
 
-function formatPaymentId() {
-  charge.paymentId = charge.paymentId.replace(/[^\d]/g, "").slice(0, 16);
-}
-
-function formatCard() {
-  charge.card = charge.card.replace(/[^\d]/g, "").slice(0, 16);
-}
-
-async function copyCard() {
-  try {
-    await navigator.clipboard.writeText(bankCard);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1800);
-  } catch {}
-}
-
 async function submitCharge() {
   chargeMsg.value = "";
   chargeMsgOk.value = true;
   chargeSaving.value = true;
-  const res = await auth.requestCharge({ amount: charge.amount, paymentId: charge.paymentId, card: charge.card });
+  // در صورت موفقیت به درگاه بانک هدایت می‌شود (ترسیم‌ها در حافظه محلی ذخیره‌اند)
+  const res = await auth.requestCharge({ amount: charge.amount });
   chargeSaving.value = false;
-  chargeMsgOk.value = res.success;
-  chargeMsg.value = res.success ? "درخواست شارژ ثبت شد و در انتظار تأیید مدیر است." : res.error;
-  if (res.success) {
-    charge.paymentId = "";
-    charge.card = "";
-    charge.amount = price.value;
+  if (!res.success) {
+    chargeMsgOk.value = false;
+    chargeMsg.value = res.error;
+  } else {
+    chargeMsgOk.value = true;
+    chargeMsg.value = "در حال انتقال به درگاه پرداخت...";
   }
 }
 

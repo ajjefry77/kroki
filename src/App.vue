@@ -15,6 +15,8 @@
 
       <ExpertListPage v-else-if="page === 'experts'" key="experts" @home="goHome" @request="openExpertRequest" />
 
+      <PaymentResult v-else-if="page === 'payment-result'" key="payment-result" @home="goHome" @profile="openUserPanel" />
+
       <LandingPage
         v-else-if="step === 'landing'"
         key="landing"
@@ -168,6 +170,7 @@ const UserPanel = defineAsyncComponent(() => import("./components/UserPanel.vue"
 const AgencyRequestPage = defineAsyncComponent(() => import("./components/AgencyRequestPage.vue"));
 const ExpertRequestPage = defineAsyncComponent(() => import("./components/ExpertRequestPage.vue"));
 const ExpertListPage = defineAsyncComponent(() => import("./components/ExpertListPage.vue"));
+const PaymentResult = defineAsyncComponent(() => import("./components/PaymentResult.vue"));
 const DrawStep = defineAsyncComponent(() => import("./components/steps/DrawStep.vue"));
 const InfoStep = defineAsyncComponent(() => import("./components/steps/InfoStep.vue"));
 const PreviewStep = defineAsyncComponent(() => import("./components/steps/PreviewStep.vue"));
@@ -553,6 +556,7 @@ function currentHash() {
   if (page.value === "agency-request") return "#/agency-request";
   if (page.value === "expert-request") return "#/expert-request";
   if (page.value === "experts") return "#/experts";
+  if (page.value === "payment-result") return window.location.hash.startsWith("#/payment-result") ? window.location.hash : "#/payment-result";
   if (page.value === "auth") return "#/auth";
   if (step.value === "landing") return "#/";
   return "#/" + step.value;
@@ -578,6 +582,9 @@ function enforceFromHash() {
     openExpertRequest();
   } else if (h === "experts") {
     openExperts();
+  } else if (h === "payment-result" || h.startsWith("payment-result?")) {
+    // بازگشت از درگاه بانکی: نتیجه پرداخت آنلاین (کیف پول از قبل شارژ شده)
+    page.value = "payment-result";
   } else if (h === "auth") {
     if (auth.isAuthenticated.value) goHome();
     else page.value = "auth";

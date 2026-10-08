@@ -60,7 +60,7 @@
             <div class="font-extrabold text-2xl">{{ stats.krokis }}</div>
           </div>
           <div class="card !rounded-2xl p-4">
-            <div class="text-[11px] text-[var(--text-muted)] mb-1">شارژهای در انتظار</div>
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">پرداخت‌های در انتظار</div>
             <div class="font-extrabold text-2xl text-[var(--warning)]">{{ stats.pendingCharges }}</div>
           </div>
           <div class="card !rounded-2xl p-4">
@@ -86,7 +86,7 @@
                 <tr>
                   <th>کاربر</th>
                   <th>مبلغ</th>
-                  <th>شناسه پرداخت</th>
+                  <th>پیگیری / درگاه</th>
                   <th>تاریخ</th>
                   <th>وضعیت</th>
                   <th>عملیات</th>
@@ -94,7 +94,7 @@
               </thead>
               <tbody>
                 <tr v-if="pendingRequests.length === 0">
-                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">درخواست شارژ در انتظار وجود ندارد</td>
+                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">پرداخت آنلاینی در انتظار نیست</td>
                 </tr>
                 <tr v-for="r in pendingRequests" :key="r.id">
                   <td>
@@ -102,20 +102,24 @@
                     <div class="text-[10px] text-[var(--text-muted)]">{{ r.username }}</div>
                   </td>
                   <td class="font-extrabold" dir="ltr">{{ fmtMoney(r.amount) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></td>
-                  <td class="text-xs" dir="ltr">{{ r.paymentId }}</td>
+                  <td class="text-xs" dir="ltr">{{ r.transId || r.gatewayId || r.paymentId || "—" }}</td>
                   <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.at) }}</td>
                   <td>
-                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold bg-[var(--warning-glow)] text-[var(--warning)]">در انتظار</span>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold bg-[var(--warning-glow)] text-[var(--warning)]">در انتظار پرداخت</span>
                   </td>
                   <td>
                     <div class="flex items-center gap-1.5">
                       <button class="btn btn-secondary btn-xs" @click="showNote(r)"> جزئیات</button>
-                      <button class="btn btn-primary btn-xs" :disabled="busy" @click="approve(r)">
-                        <i class="fas fa-check ml-0.5"></i> تأیید
-                      </button>
-                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="reject(r)">
-                        <i class="fas fa-xmark ml-0.5"></i> رد
-                      </button>
+                      <!-- پرداخت آنلاین خودکار وریفای می‌شود؛ تایید دستی فقط برای رکوردهای دستی قدیمی -->
+                      <template v-if="r.paymentId && !r.gatewayId">
+                        <button class="btn btn-primary btn-xs" :disabled="busy" @click="approve(r)">
+                          <i class="fas fa-check ml-0.5"></i> تأیید
+                        </button>
+                        <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="reject(r)">
+                          <i class="fas fa-xmark ml-0.5"></i> رد
+                        </button>
+                      </template>
+                      <span v-else class="text-[10px] text-[var(--text-faint)]">خودکار (درگاه)</span>
                     </div>
                   </td>
                 </tr>
@@ -147,11 +151,11 @@
                     <div class="text-[10px] text-[var(--text-muted)]">{{ r.username }}</div>
                   </td>
                   <td class="font-bold" dir="ltr">{{ fmtMoney(r.amount) }}</td>
-                  <td class="text-xs" dir="ltr">{{ r.paymentId }}</td>
+                  <td class="text-xs" dir="ltr">{{ r.transId || r.gatewayId || r.paymentId || "—" }}</td>
                   <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.at) }}</td>
                   <td>
                     <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="r.status === 'approved' ? 'bg-[var(--success-glow)] text-[var(--success)]' : 'bg-[var(--danger-glow)] text-[var(--danger)]'">
-                      {{ r.status === "approved" ? "تأیید شد" : "رد شد" }}
+                      {{ r.status === "approved" ? "پرداخت موفق" : "ناموفق" }}
                     </span>
                   </td>
                 </tr>
@@ -864,11 +868,13 @@
             <dl class="space-y-2.5 text-xs">
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کاربر</dt><dd class="font-semibold">{{ detail.name || detail.username }} ({{ detail.username }})</dd></div>
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">مبلغ</dt><dd class="font-extrabold" dir="ltr">{{ fmtMoney(detail.amount) }} تومان</dd></div>
-              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">شناسه پرداخت</dt><dd class="font-mono" dir="ltr">{{ detail.paymentId }}</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کد پیگیری بانک</dt><dd class="font-mono" dir="ltr">{{ detail.transId || "—" }}</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">شناسه درگاه</dt><dd class="font-mono" dir="ltr">{{ detail.gatewayId || "—" }}</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کارت پرداخت‌کننده</dt><dd class="font-mono" dir="ltr">{{ detail.card || "—" }}</dd></div>
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">توضیحات</dt><dd>{{ detail.note || "—" }}</dd></div>
               <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">تاریخ درخواست</dt><dd>{{ fmtDate(detail.at) }}</dd></div>
             </dl>
-            <div class="flex gap-2 mt-5">
+            <div v-if="detail.paymentId && !detail.gatewayId" class="flex gap-2 mt-5">
               <button class="btn btn-primary flex-1" :disabled="busy" @click="approve(detail); detail = null">
                 <i class="fas fa-check ml-1"></i> تأیید و افزودن به کیف پول
               </button>
@@ -876,6 +882,7 @@
                 <i class="fas fa-xmark ml-1"></i> رد درخواست
               </button>
             </div>
+            <p v-else class="text-[11px] text-[var(--text-faint)] mt-5 text-center">پرداخت آنلاین به‌صورت خودکار وریفای و به کیف پول افزوده می‌شود.</p>
           </div>
         </div>
       </Transition>
@@ -1027,7 +1034,7 @@ const tabs = computed(() => [
   { id: "krokis", label: "کروکی‌ها", icon: "fa-drafting-compass", badge: null },
   { id: "transactions", label: "تراکنش‌ها", icon: "fa-clock-rotate-left", badge: null },
   { id: "roles", label: "نقش‌ها", icon: "fa-user-shield", badge: null },
-  { id: "referrals", label: "معرفی", icon: "fa-ticket", badge: null },
+  { id: "referrals", label: "طرح ها", icon: "fa-ticket", badge: null },
   { id: "agencyRequests", label: "درخواست نمایندگی", icon: "fa-user-clock", badge: pendingAgencyCount.value || null },
   { id: "expertRequests", label: "درخواست‌های همکاری", icon: "fa-handshake", badge: pendingExpertCount.value || null },
   { id: "experts", label: "کارشناسان", icon: "fa-user-tie", badge: null },

@@ -340,35 +340,53 @@ function mapCharge(r) {
     name: r.full_name || r.username || "",
     phone: r.phone || "",
     amount: Number(r.amount || 0),
-    card: r.card_number,
-    paymentId: r.payment_tracking_id,
+    // فیلدهای درگاه آنلاین (رکوردهای دستی قدیمی card/paymentId دارند)
+    card: r.card_num || r.card_number || "",
+    paymentId: r.payment_tracking_id || "",
+    transId: r.trans_id || "",
+    gatewayId: r.gateway_id || r.id_get || "",
     note: r.note,
     status: r.status,
     at: r.created_at,
-    decidedAt: r.decided_at,
+    decidedAt: r.decided_at || r.verified_at,
   };
 }
 
-async function requestCharge({ amount, card, paymentId, note } = {}) {
+/*
+ * شارژ آنلاین کیف پول از طریق درگاه BitPay.
+ * خروجی موفق: { success: true, paymentUrl } و مرورگر به بانک هدایت می‌شود؛
+ * بعد از پرداخت، بانک به صفحه نتیجه (#/payment-result) برمی‌گردد و
+ * کیف پول به‌صورت خودکار شارژ شده است.
+ */
+async function requestCharge({ amount, note } = {}) {
   const user = state.user;
   if (!user) return { success: false, error: "ابتدا وارد حساب شوید" };
-  const amt = Number(amount);
-  const cards = String(card || "").replace(/\D/g, "");
-  const pid = String(paymentId || "").trim();
+  const amt = Math.floor(Number(amount));
   if (!amt || amt < 1000) return { success: false, error: "حداقل مبلغ شارژ ۱٬۰۰۰ تومان است" };
-  if (!/^\d{16}$/.test(cards)) return { success: false, error: "شماره کارت باید ۱۶ رقم باشد" };
-  if (pid.length < 2) return { success: false, error: "شناسه پرداخت را وارد کنید" };
+  if (amt > 1000000000) return { success: false, error: "مبلغ بیش از حد مجاز است" };
   try {
-    await WalletApi.createCharge({
+    const d = await WalletApi.createOnlineCharge({
       amount: amt,
-      card_number: cards,
-      payment_tracking_id: pid,
       note: String(note || "").trim(),
     });
-    await loadMyCharges();
-    return { success: true };
+    const paymentUrl = d?.payment_url || "";
+    if (!paymentUrl) return { success: false, error: "لینک پرداخت از سرور دریافت نشد" };
+    await loadMyCharges().catch(() => {});
+    // هدایت به درگاه بانک (همان تب تا بعد از پرداخت برگردد)
+    window.location.href = paymentUrl;
+    return { success: true, paymentUrl, charge: d?.charge };
   } catch (e) {
-    return { success: false, error: e.message || "خطا در ثبت درخواست شارژ" };
+    return { success: false, error: e.message || "خطا در اتصال به درگاه پرداخت" };
+  }
+}
+
+/** وضعیت یک درخواست شارژ (بعد از بازگشت از بانک) */
+async function fetchCharge(id) {
+  try {
+    const d = await WalletApi.getCharge(id);
+    return { success: true, charge: d?.charge ? mapCharge(d.charge) : null, wallet: d?.wallet_balance };
+  } catch (e) {
+    return { success: false, error: e.message || "خطا در دریافت وضعیت پرداخت" };
   }
 }
 
@@ -1287,6 +1305,7 @@ export const auth = {
   txList,
   loadTransactions,
   requestCharge,
+  fetchCharge,
   loadMyCharges,
   loadAllCharges,
   pendingOf,
