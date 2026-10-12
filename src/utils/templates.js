@@ -1,0 +1,247 @@
+export const SKETCH_TEMPLATES = [
+  {
+    id: "technical",
+    name: "فنی مهندسی",
+    subtitle: "کروکی وضعیت موجود",
+    org: "نقشه‌برداری — وضعیت موجود",
+    tagline: "مناسب امور فنی، نظام مهندسی و اخذ جواز",
+    description:
+      "کروکی استاندارد مهندسی همراه با جدول مختصات UTM، مقیاس، شمال جغرافیایی و طول ضلع‌ها. قالب پیش‌فرض سامانه.",
+    frame: "technical",
+    titleBlock: "technical",
+    headerColor: "#7a1f1f",
+    polygonColor: "#7a1f1f",
+    centerColor: "#2563eb",
+    textColor: "#222",
+    vertexLabels: "numbers",
+    grid: false,
+    scaleBar: true,
+    northArrow: true,
+    coordinateTable: "html",
+    handDrawn: false,
+    colorful: false,
+  },
+  {
+    id: "sabt",
+    name: "ثبتی",
+    subtitle: "کروکی سازمان ثبت اسناد و املاک",
+    org: "سازمان ثبت اسناد و املاک کشور",
+    tagline: "مناسب جانمایی پلاک ثبتی و اسناد",
+    description:
+      "قالب رسمی ثبت‌اسناد با نام‌گذاری گوشه‌ها (A, B, C…) از شمال‌غربی، جدول مختصات UTM و شبکه مختصاتی زمینه.",
+    frame: "official",
+    titleBlock: "official",
+    headerColor: "#1d3a6e",
+    polygonColor: "#1d4ed8",
+    centerColor: "#b91c1c",
+    textColor: "#111",
+    vertexLabels: "letters",
+    grid: true,
+    scaleBar: true,
+    northArrow: true,
+    coordinateTable: "html",
+    handDrawn: false,
+    colorful: false,
+  },
+  {
+    id: "shahrdari",
+    name: "شهرداری (دولاین)",
+    subtitle: "نقشه یوتی‌ام دولاین",
+    org: "شهرداری — امور شهرسازی",
+    tagline: "مناسب پرونده جواز ساخت و طرح‌های شهرداری",
+    description:
+      "نقشه دولاین شهرداری با ترسیم وضع موجود، جدول مختصات گوشه‌ها با حروف لاتین و شبکه مختصات.",
+    frame: "official",
+    titleBlock: "official",
+    headerColor: "#0f5f3d",
+    polygonColor: "#0f5f3d",
+    centerColor: "#8a5a00",
+    textColor: "#111",
+    vertexLabels: "letters",
+    grid: true,
+    scaleBar: true,
+    northArrow: true,
+    coordinateTable: "html",
+    handDrawn: false,
+    colorful: false,
+  },
+  {
+    id: "bonyad",
+    name: "بنیاد مسکن",
+    subtitle: "کروکی بنیاد مسکن انقلاب اسلامی",
+    org: "بنیاد مسکن انقلاب اسلامی",
+    tagline: "مناسب املاک روستایی و مسکن",
+    description:
+      "قالب مصوب بنیاد مسکن با کتیبه رسمی سبز، مقیاس و مختصات گوشه‌های ملک.",
+    frame: "bonyad",
+    titleBlock: "official",
+    headerColor: "#166534",
+    polygonColor: "#166534",
+    centerColor: "#92400e",
+    textColor: "#111",
+    vertexLabels: "letters",
+    grid: false,
+    scaleBar: true,
+    northArrow: true,
+    coordinateTable: "html",
+    handDrawn: false,
+    colorful: false,
+  },
+  {
+    id: "color",
+    name: "رنگی ارائه",
+    subtitle: "کروکی رنگی گزارش‌گیری",
+    org: "گزارش و ارائه",
+    tagline: "مناسب ارائه به مشتری و گزارش",
+    description:
+      "نقشه رنگی با قاب دوجداره و پرکردن رنگی محدوده‌ها برای ارائه‌های شکیل و گزارش‌های مشتری.",
+    frame: "color",
+    titleBlock: "official",
+    headerColor: "#b45309",
+    polygonColor: "#c2410c",
+    centerColor: "#7c3aed",
+    textColor: "#111",
+    vertexLabels: "numbers",
+    grid: false,
+    scaleBar: true,
+    northArrow: true,
+    coordinateTable: "html",
+    handDrawn: false,
+    colorful: true,
+  },
+  {
+    id: "hand",
+    name: "دستی / بیمه",
+    subtitle: "کروکی توصیفی دستی",
+    org: "گزارش حادثه / بیمه",
+    tagline: "مناسب گزارش خسارت و حادثه",
+    description:
+      "کروکی ساده و توصیفی بدون جدول مختصات، مناسب گزارش حادثه، تصادف و پرونده‌های بیمه.",
+    frame: "hand",
+    titleBlock: "hand",
+    headerColor: "#334155",
+    polygonColor: "#334155",
+    centerColor: "#0f766e",
+    textColor: "#1f2937",
+    vertexLabels: "numbers",
+    grid: false,
+    scaleBar: false,
+    northArrow: true,
+    coordinateTable: "none",
+    handDrawn: true,
+    colorful: false,
+  },
+];
+
+let templatesProvider = null;
+
+export function setUserTemplatesProvider(fn) {
+  templatesProvider = typeof fn === "function" ? fn : null;
+}
+
+export function getTemplate(id) {
+  const builtin = SKETCH_TEMPLATES.find((t) => String(t.id) === String(id));
+  if (builtin) return builtin;
+  const custom = getUserTemplates().find((t) => String(t.id) === String(id));
+  return custom || SKETCH_TEMPLATES[0];
+}
+
+export function getUserTemplates() {
+  if (templatesProvider) return templatesProvider();
+  try {
+    const uid = localStorage.getItem("kroki_session");
+    if (!uid) return [];
+    const list = JSON.parse(localStorage.getItem("kroki_tpl_" + uid) || "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** API expects #RRGGBB; expand #RGB shorthand used in built-in templates. */
+export function normalizeHexColor(color, fallback = "#000000") {
+  const raw = String(color ?? "").trim();
+  const m3 = /^#([0-9a-fA-F]{3})$/.exec(raw);
+  if (m3) {
+    const [r, g, b] = m3[1].split("");
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase();
+  const fb = String(fallback).trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(fb)) return fb.toLowerCase();
+  return "#000000";
+}
+
+export function templateToApi(t) {
+  return {
+    name: String(t?.name || "قالب").trim(),
+    frame: t?.frame || "default",
+    title_block: t?.titleBlock || "default",
+    header_color: normalizeHexColor(t?.headerColor, "#1e3a5f"),
+    polygon_color: normalizeHexColor(t?.polygonColor, "#ff0000"),
+    center_color: normalizeHexColor(t?.centerColor, "#0000ff"),
+    text_color: normalizeHexColor(t?.textColor, "#000000"),
+    vertex_labels: t?.vertexLabels || "numbers",
+    grid: Boolean(t?.grid),
+    scale_bar: Boolean(t?.scaleBar),
+    north_arrow: Boolean(t?.northArrow),
+    coordinate_table: (t?.coordinateTable ?? "full") === "none" ? "none" : "full",
+  };
+}
+
+export function templateFromApi(row) {
+  if (!row) return null;
+  const frame = row.frame || "default";
+  const coordinateTable = row.coordinate_table === "none" ? "none" : "html";
+  // رنگ‌ها نرمال می‌شوند تا مقدار آلوده ذخیره‌شده در سرور نتواند CSS تزریق کند
+  return {
+    id: row.id,
+    name: row.name,
+    subtitle: row.name,
+    org: row.name,
+    description: "قالب شخصی ذخیره‌شده در سامانه",
+    frame,
+    titleBlock: row.title_block || "default",
+    headerColor: normalizeHexColor(row.header_color, "#1e3a5f"),
+    polygonColor: normalizeHexColor(row.polygon_color, "#ff0000"),
+    centerColor: normalizeHexColor(row.center_color, "#0000ff"),
+    textColor: normalizeHexColor(row.text_color, "#000000"),
+    vertexLabels: row.vertex_labels || "numbers",
+    grid: Boolean(row.grid),
+    scaleBar: Boolean(row.scale_bar),
+    northArrow: Boolean(row.north_arrow),
+    coordinateTable,
+    handDrawn: frame === "hand",
+    colorful: frame === "color",
+    user_id: row.user_id,
+  };
+}
+
+export function isBackendTemplateId(id) {
+  return /^\d+$/.test(String(id ?? ""));
+}
+
+export function customTemplateId() {
+  return "custom_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+export const TEMPLATE_ICONS = {
+  technical: "fa-drafting-compass",
+  sabt: "fa-landmark",
+  shahrdari: "fa-city",
+  bonyad: "fa-house",
+  color: "fa-palette",
+  hand: "fa-pen-ruler",
+};
+
+export const TEMPLATE_IDS = SKETCH_TEMPLATES.map((t) => t.id);
+
+export const VERTEX_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+export function vertexLabel(labelStyle, index, northWestIndex) {
+  if (labelStyle === "letters") {
+    const idx = (index - northWestIndex + 100) % 26;
+    return VERTEX_LETTERS[idx];
+  }
+  return String(index + 1);
+}

@@ -1,0 +1,1893 @@
+<template>
+  <div class="min-h-screen flex flex-col bg-[var(--bg)]">
+    <!-- سربرگ -->
+    <header class="sticky top-0 z-40 bg-[var(--surface)] border-b border-[var(--border)] backdrop-blur-md">
+      <div class="max-w-[1560px] mx-auto px-5 h-16 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <button class="lg:hidden btn btn-ghost btn-sm" @click="sidebarOpen = !sidebarOpen">
+            <i class="fas fa-bars text-lg"></i>
+          </button>
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-soft)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow-strong)]">
+            <i class="fas fa-shield-halved text-[#241a05] text-lg"></i>
+          </div>
+          <div>
+            <div class="font-extrabold text-sm leading-tight">پنل مدیریت</div>
+            <div class="text-[11px] text-[var(--text-muted)]">{{ user?.name }} — مدیر سیستم</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-ghost btn-sm" @click="$emit('home')">
+            <i class="fas fa-house ml-1"></i> صفحه اصلی
+          </button>
+          <button class="btn btn-ghost btn-sm" @click="logout">
+            <i class="fas fa-right-from-bracket ml-1"></i> خروج
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex-1 flex max-w-[1560px] w-full mx-auto">
+      <!-- سایدبار -->
+      <aside class="admin-sidebar" :class="{ open: sidebarOpen }">
+        <div class="sidebar-overlay lg:hidden" @click="sidebarOpen = false"></div>
+        <nav class="sidebar-nav">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="sidebar-item"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id; sidebarOpen = false"
+          >
+            <span class="sidebar-icon">
+              <i class="fas" :class="tab.icon"></i>
+            </span>
+            <span class="sidebar-label">{{ tab.label }}</span>
+            <span v-if="tab.badge" class="sidebar-badge">{{ tab.badge }}</span>
+          </button>
+        </nav>
+      </aside>
+
+      <!-- محتوا -->
+      <main class="flex-1 min-w-0 px-5 py-6">
+        <!-- آمار -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">کل کاربران</div>
+            <div class="font-extrabold text-2xl">{{ stats.users }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">کل کروکی‌ها</div>
+            <div class="font-extrabold text-2xl">{{ stats.krokis }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">پرداخت‌های در انتظار</div>
+            <div class="font-extrabold text-2xl text-[var(--warning)]">{{ stats.pendingCharges }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">درآمد</div>
+            <div class="font-extrabold text-xl text-[var(--success)]" dir="ltr">{{ fmtMoney(stats.revenue) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">کروکی‌های پرداختی</div>
+            <div class="font-extrabold text-2xl text-[var(--info)]">{{ stats.paid }}</div>
+          </div>
+          <div class="card !rounded-2xl p-4">
+            <div class="text-[11px] text-[var(--text-muted)] mb-1">مجموع موجودی کیف پول‌ها</div>
+            <div class="font-extrabold text-xl text-[var(--accent-soft)]" dir="ltr">{{ fmtMoney(stats.walletTotal) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></div>
+          </div>
+        </div>
+
+      <!-- درخواست‌های شارژ -->
+      <section v-if="activeTab === 'requests'">
+        <div class="card !rounded-2xl overflow-hidden mb-6">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>مبلغ</th>
+                  <th>پیگیری / درگاه</th>
+                  <th>تاریخ</th>
+                  <th>وضعیت</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="pendingRequests.length === 0">
+                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">پرداخت آنلاینی در انتظار نیست</td>
+                </tr>
+                <tr v-for="r in pendingRequests" :key="r.id">
+                  <td>
+                    <div class="text-xs font-semibold">{{ r.name || r.username }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)]">{{ r.username }}</div>
+                  </td>
+                  <td class="font-extrabold" dir="ltr">{{ fmtMoney(r.amount) }} <span class="text-[10px] text-[var(--text-muted)]">تومان</span></td>
+                  <td class="text-xs" dir="ltr">{{ r.transId || r.gatewayId || r.paymentId || "—" }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.at) }}</td>
+                  <td>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold bg-[var(--warning-glow)] text-[var(--warning)]">در انتظار پرداخت</span>
+                  </td>
+                  <td>
+                    <div class="flex items-center gap-1.5">
+                      <button class="btn btn-secondary btn-xs" @click="showNote(r)"> جزئیات</button>
+                      <!-- پرداخت آنلاین خودکار وریفای می‌شود؛ تایید دستی فقط برای رکوردهای دستی قدیمی -->
+                      <template v-if="r.paymentId && !r.gatewayId">
+                        <button class="btn btn-primary btn-xs" :disabled="busy" @click="approve(r)">
+                          <i class="fas fa-check ml-0.5"></i> تأیید
+                        </button>
+                        <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="reject(r)">
+                          <i class="fas fa-xmark ml-0.5"></i> رد
+                        </button>
+                      </template>
+                      <span v-else class="text-[10px] text-[var(--text-faint)]">خودکار (درگاه)</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3 class="font-bold text-sm mt-8 mb-3">تاریخچه تصمیم‌ها</h3>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>مبلغ</th>
+                  <th>شناسه</th>
+                  <th>تاریخ</th>
+                  <th>وضعیت</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="decidedRequests.length === 0">
+                  <td colspan="5" class="text-center text-[var(--text-faint)] py-8">هنوز تصمیمی ثبت نشده است</td>
+                </tr>
+                <tr v-for="r in decidedRequests" :key="r.id">
+                  <td>
+                    <div class="text-xs font-semibold">{{ r.name || r.username }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)]">{{ r.username }}</div>
+                  </td>
+                  <td class="font-bold" dir="ltr">{{ fmtMoney(r.amount) }}</td>
+                  <td class="text-xs" dir="ltr">{{ r.transId || r.gatewayId || r.paymentId || "—" }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.at) }}</td>
+                  <td>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="r.status === 'approved' ? 'bg-[var(--success-glow)] text-[var(--success)]' : 'bg-[var(--danger-glow)] text-[var(--danger)]'">
+                      {{ r.status === "approved" ? "پرداخت موفق" : "ناموفق" }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- مدیریت کاربران -->
+      <section v-else-if="activeTab === 'users'">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="relative flex-1 max-w-xs">
+            <i class="fas fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-faint)]"></i>
+            <input v-model="q" type="text" class="input !pr-9" placeholder="جستجوی نام کاربری یا نام" />
+          </div>
+          <span class="text-xs text-[var(--text-muted)]">{{ filteredUsers.length }} کاربر</span>
+        </div>
+
+        <div class="card !rounded-2xl overflow-hidden users-table">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>شهر</th>
+                  <th>نقش</th>
+                  <th>موجودی (تومان)</th>
+                  <th>کروکی رایگان</th>
+                  <th>کد معرف شخصی</th>
+                  <th>وضعیت</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="usersLoading">
+                  <td colspan="8" class="text-center text-[var(--text-faint)] py-10">
+                    <i class="fas fa-circle-notch fa-spin ml-1"></i> در حال دریافت کاربران...
+                  </td>
+                </tr>
+                <tr v-else-if="filteredUsers.length === 0">
+                  <td colspan="8" class="text-center text-[var(--text-faint)] py-10">کاربری یافت نشد</td>
+                </tr>
+                <tr v-for="u in filteredUsers" :key="u.id">
+                  <td>
+                    <div class="text-xs font-semibold">{{ u.name }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)]" dir="ltr">{{ u.username }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)]" dir="ltr">{{ u.phone }}</div>
+                  </td>
+                  <td class="text-xs">{{ u.city || "—" }}</td>
+                  <td>
+                    <div class="role-dropdown" :class="{ open: roleOpenId === u.id }">
+                      <button class="role-trigger" @click.stop="roleOpenId = roleOpenId === u.id ? null : u.id">
+                        <span class="role-dot" :class="u.role === 'admin' ? 'admin' : u.role === 'agent' ? 'agent' : 'user'"></span>
+                        <span class="role-text">{{ u.role === 'admin' ? 'مدیر' : u.role === 'agent' ? 'نماینده' : 'کاربر' }}</span>
+                        <i class="fas fa-chevron-down role-chevron"></i>
+                      </button>
+                      <Transition name="drop">
+                        <div v-if="roleOpenId === u.id" class="role-menu">
+                          <button class="role-option" :class="{ selected: u.role === 'user' }" @click="setRole(u, 'user'); roleOpenId = null">
+                            <span class="role-dot user"></span>
+                            کاربر
+                          </button>
+                          <button class="role-option" :class="{ selected: u.role === 'agent' }" @click="setRole(u, 'agent'); roleOpenId = null">
+                            <span class="role-dot agent"></span>
+                            نماینده
+                          </button>
+                          <button class="role-option" :class="{ selected: u.role === 'admin' }" @click="setRole(u, 'admin'); roleOpenId = null">
+                            <span class="role-dot admin"></span>
+                            مدیر
+                          </button>
+                        </div>
+                      </Transition>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="field-card wallet-field">
+                      <div class="field-icon-wrap wallet-icon">
+                        <i class="fas fa-wallet"></i>
+                      </div>
+                      <div class="field-content">
+                        <div class="field-value" dir="ltr">{{ fmtMoney(u.wallet) }}</div>
+                        <span class="field-unit">تومان</span>
+                      </div>
+                      <button class="field-action-btn wallet-action" @click="showAddWallet(u)" title="افزودن مبلغ (شارژ دستی)">
+                        <i class="fas fa-plus"></i>
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="field-card freekroki-field">
+                      <div class="field-icon-wrap freekroki-icon">
+                        <i class="fas fa-drafting-compass"></i>
+                      </div>
+                      <div class="field-content">
+                        <input :value="u.freeKroki" type="number" min="0" class="field-input" @change="onFree(u, $event)" />
+                        <span class="field-unit">عدد</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="flex items-center gap-1">
+                      <input
+                        type="text"
+                        class="input !w-24 !py-1.5 !text-xs text-center tracking-widest"
+                        dir="ltr"
+                        placeholder="—"
+                        :value="referralCodeDrafts[u.id] ?? u.referralCode ?? ''"
+                        @input="referralCodeDrafts[u.id] = $event.target.value"
+                        @keyup.enter="saveUserReferralCode(u)"
+                      />
+                      <button class="btn btn-secondary btn-xs" :disabled="busy" title="ثبت کد معرف برای این کاربر" @click="saveUserReferralCode(u)">
+                        <i class="fas fa-check text-xs"></i>
+                      </button>
+                      <button v-if="u.referralCode" class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" title="حذف کد معرف شخصی" @click="deleteUserReferralCode(u)">
+                        <i class="fas fa-trash text-xs"></i>
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    <button
+                      class="px-2 py-1 rounded-full text-[10px] font-semibold transition"
+                      :class="u.active ? 'bg-[var(--success-glow)] text-[var(--success)]' : 'bg-[var(--danger-glow)] text-[var(--danger)]'"
+                      :disabled="busy"
+                      @click="toggleActive(u)"
+                    >
+                      {{ u.active ? "فعال" : "غیرفعال" }}
+                    </button>
+                  </td>
+                  <td>
+                    <div class="flex items-center gap-1.5">
+                      <button class="btn btn-ghost btn-xs" @click="showEditUser(u)" title="ویرایش اطلاعات کاربر">
+                        <i class="fas fa-pen text-xs"></i>
+                      </button>
+                      <button
+                        class="btn btn-ghost btn-xs !text-[var(--danger)]"
+                        :disabled="deletingUserId === u.id || String(u.id) === String(auth.state.user?.id)"
+                        :title="String(u.id) === String(auth.state.user?.id) ? 'نمی‌توانید خودتان را حذف کنید' : 'حذف کاربر'"
+                        @click="removeUser(u)"
+                      >
+                        <i class="fas text-xs" :class="deletingUserId === u.id ? 'fa-circle-notch fa-spin' : 'fa-trash'"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- کروکی‌ها -->
+      <section v-else-if="activeTab === 'krokis'">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <button
+            v-for="s in statusFilters"
+            :key="s.value"
+            class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition"
+            :class="krokiStatus === s.value ? 'border-[var(--accent)] bg-[var(--accent-glow)] text-[var(--accent-soft)]' : 'border-[var(--border)] bg-[var(--surface2)] text-[var(--text-muted)]'"
+            @click="krokiStatus = s.value"
+          >
+            {{ s.label }}
+          </button>
+          <span class="text-xs text-[var(--text-muted)] mr-auto">{{ adminKrokis.length }} کروکی</span>
+        </div>
+
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کد پیگیری</th>
+                  <th>عنوان</th>
+                  <th>متقاضی</th>
+                  <th>مبلغ پرداختی</th>
+                  <th>تاریخ</th>
+                  <th>وضعیت</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="adminKrokis.length === 0">
+                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">کروکی‌ای یافت نشد</td>
+                </tr>
+                <tr v-for="k in adminKrokis" :key="k.id">
+                  <td class="text-xs font-bold text-[var(--accent-soft)]" dir="ltr">{{ k.tracking_code }}</td>
+                  <td class="text-xs font-semibold">{{ k.title }}</td>
+                  <td class="text-xs">{{ k.client_name }}</td>
+                  <td class="text-xs font-bold" dir="ltr">{{ fmtMoney(k.price_paid) }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(k.created_at) }}</td>
+                  <td>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="krokiStatusClass(k.status)">
+                      {{ krokiStatusLabel(k.status) }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- تراکنش‌ها -->
+      <section v-else-if="activeTab === 'transactions'">
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>عنوان</th>
+                  <th>مقدار</th>
+                  <th>وضعیت</th>
+                  <th>تاریخ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="adminTransactions.length === 0">
+                  <td colspan="5" class="text-center text-[var(--text-faint)] py-10">تراکنشی ثبت نشده است</td>
+                </tr>
+                <tr v-for="tx in adminTransactions" :key="tx.id">
+                  <td class="text-xs" dir="ltr">{{ tx.user_id }}</td>
+                  <td class="text-xs">{{ tx.typeLabel }}</td>
+                  <td class="text-xs font-bold" :class="txTypeColor(tx)" dir="ltr">{{ txSign(tx) }} {{ fmtMoney(tx.amount) }}</td>
+                  <td>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="txStatusClass(tx.status)">
+                      {{ txStatusLabel(tx.status) }}
+                    </span>
+                  </td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(tx.at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- نقش‌ها -->
+      <section v-else-if="activeTab === 'roles'">
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>شناسه</th>
+                  <th>نام نقش</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="roles.length === 0">
+                  <td colspan="2" class="text-center text-[var(--text-faint)] py-10">نقشی ثبت نشده است</td>
+                </tr>
+                <tr v-for="r in roles" :key="r.id">
+                  <td class="text-xs" dir="ltr">{{ r.id }}</td>
+                  <td class="text-xs font-semibold">{{ r.name }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- کدهای معرف -->
+      <section v-else-if="activeTab === 'referrals'">
+        <div class="card !rounded-2xl p-4 mb-4">
+          <div class="font-bold text-sm mb-3 flex items-center gap-2">
+            <i class="fas fa-ticket text-[var(--accent)]"></i> ساخت کد معرف جدید
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+            <div>
+              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">کد (خالی = تصادفی)</label>
+              <input v-model="referralForm.code" type="text" class="input" dir="ltr" placeholder="A1B2C3" />
+            </div>
+            <div>
+              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">کروکی رایگان</label>
+              <input v-model.number="referralForm.free_kroki_amount" type="number" min="1" class="input" dir="ltr" />
+            </div>
+            <div>
+              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">سقف استفاده (خالی = نامحدود)</label>
+              <input v-model="referralForm.max_uses" type="number" min="1" class="input" dir="ltr" placeholder="نامحدود" />
+            </div>
+            <div>
+              <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">انقضا</label>
+              <input v-model="referralForm.expires_at" type="text" class="input" dir="ltr" placeholder="خالی = بدون انقضا" />
+            </div>
+          </div>
+          <p class="text-[11px] text-[var(--text-muted)] leading-5 mb-3">
+            کدهای شخصی کاربران هم در جدول «کدهای شخصی کاربران» پایین همین صفحه می‌آیند و قابل ویرایش‌اند.
+          </p>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-primary btn-sm" :disabled="referralSaving" @click="createReferral">
+              <i v-if="referralSaving" class="fas fa-circle-notch fa-spin ml-1"></i>
+              <i v-else class="fas fa-plus ml-1"></i>
+              ساخت کد
+            </button>
+            <span v-if="referralMsg" class="text-xs" :class="referralMsgOk ? 'text-[var(--success)]' : 'text-[var(--danger)]'">{{ referralMsg }}</span>
+          </div>
+        </div>
+
+        <div class="font-bold text-sm mb-3 flex items-center gap-2">
+          <i class="fas fa-ticket text-[var(--accent)]"></i> کدهای عمومی
+        </div>
+        <div class="card !rounded-2xl overflow-hidden mb-6">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کد</th>
+                  <th>کروکی رایگان</th>
+                  <th>مصرف / سقف</th>
+                  <th>انقضا</th>
+                  <th>وضعیت</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="referrals.length === 0">
+                  <td colspan="6" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
+                </tr>
+                <tr v-for="r in referrals" :key="r.id">
+                  <td>
+                    <input
+                      type="text"
+                      class="input !w-32 !py-1.5 !text-xs text-center tracking-widest"
+                      dir="ltr"
+                      :value="referralEditDrafts[r.id]?.code ?? r.code"
+                      @input="setReferralDraft(r.id, 'code', $event.target.value)"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="1"
+                      class="input !w-20 !py-1.5 !text-xs text-center"
+                      dir="ltr"
+                      :value="referralEditDrafts[r.id]?.free_kroki_amount ?? r.free_kroki_amount"
+                      @input="setReferralDraft(r.id, 'free_kroki_amount', $event.target.value)"
+                    />
+                  </td>
+                  <td class="text-xs whitespace-nowrap" dir="ltr">
+                    {{ r.used_count }} / {{ r.max_uses == null ? "نامحدود" : r.max_uses }}
+                    <input
+                      type="number"
+                      min="1"
+                      class="input !w-20 !py-1.5 !text-xs text-center inline-block"
+                      dir="ltr"
+                      placeholder="نامحدود"
+                      :value="referralEditDrafts[r.id]?.max_uses ?? r.max_uses ?? ''"
+                      @input="setReferralDraft(r.id, 'max_uses', $event.target.value)"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      class="input !w-32 !py-1.5 !text-xs text-center"
+                      dir="ltr"
+                      placeholder="بدون انقضا"
+                      :value="referralEditDrafts[r.id]?.expires_at ?? r.expires_at ?? ''"
+                      @input="setReferralDraft(r.id, 'expires_at', $event.target.value)"
+                    />
+                  </td>
+                  <td>
+                    <button
+                      class="px-2 py-1 rounded-full text-[10px] font-semibold transition"
+                      :class="r.is_active ? 'bg-[var(--success-glow)] text-[var(--success)]' : 'bg-[var(--danger-glow)] text-[var(--danger)]'"
+                      :disabled="busy"
+                      @click="toggleReferral(r)"
+                    >
+                      {{ r.is_active ? "فعال" : "غیرفعال" }}
+                    </button>
+                  </td>
+                  <td>
+                    <div class="flex items-center gap-1">
+                      <button class="btn btn-secondary btn-xs" :disabled="busy" title="ذخیره ویرایش" @click="saveReferralEdit(r)">
+                        <i class="fas fa-floppy-disk text-xs"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="removeReferral(r)">
+                        <i class="fas fa-trash text-xs"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="font-bold text-sm mb-3 flex items-center gap-2">
+          <i class="fas fa-id-badge text-[var(--accent)]"></i> کدهای شخصی کاربران
+          <span class="text-[11px] text-[var(--text-muted)] font-semibold">({{ personalReferralCodes.length }})</span>
+        </div>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>کد معرف شخصی</th>
+                  <th>کروکی رایگان</th>
+                  <th>زیرمجموعه</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="personalReferralCodes.length === 0">
+                  <td colspan="5" class="text-center text-[var(--text-faint)] py-10">هنوز کد شخصی برای کاربران ثبت نشده است — از تب کاربران ستون «کد معرف شخصی» ثبت کنید</td>
+                </tr>
+                <tr v-for="p in personalReferralCodes" :key="p.id">
+                  <td>
+                    <div class="text-xs font-semibold">{{ p.full_name || p.name || p.username }}</div>
+                    <div class="text-[10px] text-[var(--text-muted)]" dir="ltr">{{ p.phone || p.username }}</div>
+                  </td>
+                  <td>
+                    <div class="flex items-center gap-1">
+                      <input
+                        type="text"
+                        class="input !w-32 !py-1.5 !text-xs text-center tracking-widest"
+                        dir="ltr"
+                        :value="personalCodeDrafts[p.id] ?? p.code ?? p.referral_code ?? ''"
+                        @input="personalCodeDrafts[p.id] = $event.target.value"
+                        @keyup.enter="savePersonalCode(p)"
+                      />
+                      <button class="btn btn-secondary btn-xs" :disabled="busy" title="ذخیره ویرایش کد شخصی" @click="savePersonalCode(p)">
+                        <i class="fas fa-check text-xs"></i>
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1000"
+                      class="input !w-20 !py-1.5 !text-xs text-center"
+                      dir="ltr"
+                      :value="personalFreeDrafts[p.id] ?? p.free_kroki_amount ?? 1"
+                      @input="personalFreeDrafts[p.id] = $event.target.value"
+                      @keyup.enter="savePersonalCode(p)"
+                    />
+                  </td>
+                  <td class="text-xs" dir="ltr">{{ p.subordinate_count ?? "—" }}</td>
+                  <td>
+                    <div class="flex items-center gap-1">
+                      <button class="btn btn-ghost btn-xs" title="رفتن به کاربر" @click="goToUser(p.id)">
+                        <i class="fas fa-user text-xs"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" title="حذف کد شخصی" @click="deletePersonalCode(p)">
+                        <i class="fas fa-trash text-xs"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- درخواست‌های نمایندگی -->
+      <section v-else-if="activeTab === 'agencyRequests'">
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>شهر</th>
+                  <th>تاریخ</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="agencyRequests.length === 0">
+                  <td colspan="4" class="text-center text-[var(--text-faint)] py-10">درخواست نمایندگی در انتظار وجود ندارد</td>
+                </tr>
+                <tr v-for="r in agencyRequests" :key="r.id">
+                  <td class="text-xs font-semibold">{{ r.full_name || r.username }}</td>
+                  <td class="text-xs">{{ r.city }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at) }}</td>
+                  <td>
+                    <div class="flex items-center gap-1.5">
+                      <button class="btn btn-primary btn-xs" :disabled="busy" @click="decideAgency(r, true)">
+                        <i class="fas fa-check ml-0.5"></i> تأیید
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="decideAgency(r, false)">
+                        <i class="fas fa-xmark ml-0.5"></i> رد
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- درخواست‌های همکاری (کارشناسان) -->
+      <section v-else-if="activeTab === 'expertRequests'">
+        <div class="card !rounded-2xl overflow-hidden mb-6">
+          <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50 font-bold text-sm flex items-center gap-2">
+            <i class="fas fa-handshake text-[var(--accent)]"></i> درخواست‌های در انتظار بررسی
+            <span class="text-[11px] text-[var(--text-muted)] font-semibold">({{ expertRequests.length }})</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کارشناس</th>
+                  <th>کد ملی</th>
+                  <th>تماس</th>
+                  <th>عنوان‌ها / تخصص‌ها</th>
+                  <th>مدارک</th>
+                  <th>تاریخ</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="expertRequests.length === 0">
+                  <td colspan="7" class="text-center text-[var(--text-faint)] py-10">درخواست همکاری در انتظار وجود ندارد</td>
+                </tr>
+                <tr v-for="r in expertRequests" :key="r.id">
+                  <td class="text-xs font-semibold">{{ r.fullName || r.name }}</td>
+                  <td class="text-xs" dir="ltr">{{ r.nationalId }}</td>
+                  <td class="text-xs" dir="ltr">{{ r.phone }}</td>
+                  <td class="text-xs">
+                    <div class="flex flex-wrap gap-1 max-w-[220px]">
+                      <span v-for="t in (r.titles || [])" :key="t" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-glow)] text-[var(--accent-soft)]">{{ t }}</span>
+                      <span v-for="s in (r.specialties || [])" :key="s" class="px-2 py-0.5 rounded-full text-[10px] bg-[var(--surface3)] text-[var(--text-muted)]">{{ s }}</span>
+                    </div>
+                  </td>
+                  <td class="text-xs">
+                    <div v-if="(r.documents || []).length === 0" class="text-[var(--text-faint)]">—</div>
+                    <div v-else class="flex flex-col gap-0.5 max-w-[200px]">
+                      <span v-for="(d, i) in r.documents" :key="i" class="truncate text-[10px] text-[var(--text-muted)]" dir="ltr" :title="d.name">
+                        <i class="fas fa-paperclip ml-1"></i>{{ d.name || ('مدرک ' + (i + 1)) }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at || r.at) }}</td>
+                  <td>
+                    <div class="flex items-center gap-1.5">
+                      <button class="btn btn-primary btn-xs" :disabled="busy" @click="decideExpert(r, true)">
+                        <i class="fas fa-check ml-0.5"></i> تأیید
+                      </button>
+                      <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="decideExpert(r, false)">
+                        <i class="fas fa-xmark ml-0.5"></i> رد
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3 class="font-bold text-sm mt-8 mb-3">تاریخچه تصمیم‌ها</h3>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>کارشناس</th>
+                  <th>عنوان‌ها</th>
+                  <th>تاریخ</th>
+                  <th>وضعیت</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="decidedExpertRequests.length === 0">
+                  <td colspan="4" class="text-center text-[var(--text-faint)] py-8">هنوز تصمیمی ثبت نشده است</td>
+                </tr>
+                <tr v-for="r in decidedExpertRequests" :key="r.id">
+                  <td class="text-xs font-semibold">{{ r.fullName || r.name }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ (r.titles || []).join('، ') }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at || r.at) }}</td>
+                  <td>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-semibold" :class="r.status === 'approved' ? 'bg-[var(--success-glow)] text-[var(--success)]' : 'bg-[var(--danger-glow)] text-[var(--danger)]'">
+                      {{ r.status === "approved" ? "تأیید شد" : "رد شد" }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- کارشناسان تأییدشده -->
+      <section v-else-if="activeTab === 'experts'">
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/50 font-bold text-sm flex items-center gap-2">
+            <i class="fas fa-user-tie text-[var(--accent)]"></i> کارشناسان تأییدشده (لیست عمومی)
+            <span class="text-[11px] text-[var(--text-muted)] font-semibold">({{ approvedExperts.length }})</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>نام</th>
+                  <th>تماس</th>
+                  <th>عنوان‌ها / تخصص‌ها</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="approvedExperts.length === 0">
+                  <td colspan="4" class="text-center text-[var(--text-faint)] py-10">هنوز کارشناسی تأیید نشده است</td>
+                </tr>
+                <tr v-for="e in approvedExperts" :key="e.id">
+                  <td class="text-xs font-semibold">{{ e.fullName || e.name }}</td>
+                  <td class="text-xs" dir="ltr">{{ e.phone }}</td>
+                  <td class="text-xs text-[var(--text-muted)]">{{ [...(e.titles || []), ...(e.specialties || [])].join('، ') || '—' }}</td>
+                  <td>
+                    <button class="btn btn-ghost btn-xs !text-[var(--danger)]" :disabled="busy" @click="removeExpertRow(e)">
+                      <i class="fas fa-trash text-xs ml-0.5"></i> حذف از لیست
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- نمایندگان (هرمی) -->
+      <section v-else-if="activeTab === 'agents'">
+        <div class="flex items-center gap-2 mb-4">
+          <input v-model="agentCityFilter" type="text" class="input !max-w-xs" placeholder="فیلتر بر اساس شهر" />
+        </div>
+        <div class="card !rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>نماینده</th>
+                  <th>شهر</th>
+                  <th>کد معرف</th>
+                  <th>تعداد زیرمجموعه</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="adminAgents.length === 0">
+                  <td colspan="5" class="text-center text-[var(--text-faint)] py-10">نماینده‌ای ثبت نشده است</td>
+                </tr>
+                <template v-for="a in adminAgents" :key="a.id">
+                  <tr class="cursor-pointer" @click="toggleAgent(a)">
+                    <td class="text-xs font-semibold">{{ a.full_name || a.name || a.username }}</td>
+                    <td class="text-xs">{{ a.city }}</td>
+                    <td class="text-xs font-bold tracking-widest" dir="ltr">{{ a.code }}</td>
+                    <td class="text-xs" dir="ltr">{{ a.subordinate_count ?? "—" }}</td>
+                    <td class="text-xs text-[var(--text-muted)]"><i class="fas" :class="openAgentId === a.id ? 'fa-chevron-up' : 'fa-chevron-down'"></i></td>
+                  </tr>
+                  <tr v-if="openAgentId === a.id">
+                    <td colspan="5" class="!p-0">
+                      <div class="p-4 bg-[var(--bg-elevated)]/50">
+                        <div v-if="!agentDetail || agentDetail.agentId !== a.id" class="text-xs text-[var(--text-faint)]">در حال دریافت...</div>
+                        <template v-else>
+                          <div class="font-bold text-sm mb-3">
+                            جمع تراکنش‌های زیرمجموعه‌ها:
+                            <span class="text-[var(--success)]" dir="ltr">{{ fmtMoney(agentDetail.total) }} تومان</span>
+                          </div>
+                          <div class="overflow-x-auto">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>کاربر</th>
+                                  <th>مبلغ</th>
+                                  <th>تاریخ</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr v-if="agentDetail.items.length === 0">
+                                  <td colspan="3" class="text-center text-[var(--text-faint)] py-6">تراکنشی ثبت نشده است</td>
+                                </tr>
+                                <tr v-for="tx in agentDetail.items" :key="tx.id">
+                                  <td class="text-xs">{{ tx.full_name || tx.username }}</td>
+                                  <td class="text-xs font-semibold" dir="ltr">{{ fmtMoney(tx.amount) }}</td>
+                                  <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(tx.created_at) }}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      </main>
+    </div>
+
+    <footer class="border-t border-[var(--border)] py-4 text-center text-[11px] text-[var(--text-faint)] bg-[var(--bg-elevated)]/60">
+      سامانه تولید کروکی نقشه — پنل مدیریتی
+    </footer>
+
+    <!-- جزئیات درخواست -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="detail" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="detail = null">
+          <div class="card !rounded-2xl max-w-md w-full modal">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-sm">جزئیات درخواست شارژ</h3>
+              <button class="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)]" @click="detail = null">
+                <i class="fas fa-xmark text-xs"></i>
+              </button>
+            </div>
+            <dl class="space-y-2.5 text-xs">
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کاربر</dt><dd class="font-semibold">{{ detail.name || detail.username }} ({{ detail.username }})</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">مبلغ</dt><dd class="font-extrabold" dir="ltr">{{ fmtMoney(detail.amount) }} تومان</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کد پیگیری بانک</dt><dd class="font-mono" dir="ltr">{{ detail.transId || "—" }}</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">شناسه درگاه</dt><dd class="font-mono" dir="ltr">{{ detail.gatewayId || "—" }}</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">کارت پرداخت‌کننده</dt><dd class="font-mono" dir="ltr">{{ detail.card || "—" }}</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">توضیحات</dt><dd>{{ detail.note || "—" }}</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-[var(--text-muted)]">تاریخ درخواست</dt><dd>{{ fmtDate(detail.at) }}</dd></div>
+            </dl>
+            <div v-if="detail.paymentId && !detail.gatewayId" class="flex gap-2 mt-5">
+              <button class="btn btn-primary flex-1" :disabled="busy" @click="approve(detail); detail = null">
+                <i class="fas fa-check ml-1"></i> تأیید و افزودن به کیف پول
+              </button>
+              <button class="btn btn-ghost flex-1 !text-[var(--danger)]" :disabled="busy" @click="reject(detail); detail = null">
+                <i class="fas fa-xmark ml-1"></i> رد درخواست
+              </button>
+            </div>
+            <p v-else class="text-[11px] text-[var(--text-faint)] mt-5 text-center">پرداخت آنلاین به‌صورت خودکار وریفای و به کیف پول افزوده می‌شود.</p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- مودال ویرایش کاربر -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="editModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="editModal = null">
+          <div class="card !rounded-2xl max-w-md w-full modal">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--info)] to-[var(--info-glow)] flex items-center justify-center">
+                  <i class="fas fa-user-pen text-white text-sm"></i>
+                </div>
+                <h3 class="font-bold text-sm">ویرایش کاربر</h3>
+              </div>
+              <button class="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)]" @click="editModal = null">
+                <i class="fas fa-xmark text-xs"></i>
+              </button>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">نام کاربر *</label>
+                <input v-model="editModal.name" type="text" class="input" placeholder="نام کامل" maxlength="120" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">شماره همراه</label>
+                  <input v-model="editModal.phone" type="text" inputmode="numeric" dir="ltr" class="input text-center" placeholder="09123456789" maxlength="11" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">کد ملی</label>
+                  <input v-model="editModal.nationalId" type="text" inputmode="numeric" dir="ltr" class="input text-center" placeholder="۱۰ رقمی" maxlength="10" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">شهر</label>
+                <input v-model="editModal.city" type="text" class="input" placeholder="شهر محل سکونت" maxlength="100" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">رمز عبور جدید</label>
+                <input v-model="editModal.password" type="password" class="input" placeholder="خالی = بدون تغییر" maxlength="72" autocomplete="new-password" />
+              </div>
+              <div v-if="editModal.error" class="text-xs text-[var(--danger)] bg-[var(--danger-glow)] px-3 py-2 rounded-lg">
+                {{ editModal.error }}
+              </div>
+            </div>
+            <div class="flex gap-2 mt-5">
+              <button class="btn btn-primary flex-1" :disabled="editModal.saving" @click="saveEditUser">
+                <i v-if="editModal.saving" class="fas fa-circle-notch fa-spin ml-1"></i>
+                <i v-else class="fas fa-check ml-1"></i>
+                {{ editModal.saving ? 'در حال ذخیره...' : 'ذخیره تغییرات' }}
+              </button>
+              <button class="btn btn-ghost flex-1" @click="editModal = null">انصراف</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- مودال شارژ دستی کیف پول -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="addWalletModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="addWalletModal = null">
+          <div class="card !rounded-2xl max-w-sm w-full modal">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--success)] to-[var(--success-glow)] flex items-center justify-center">
+                  <i class="fas fa-coins text-white text-sm"></i>
+                </div>
+                <h3 class="font-bold text-sm">شارژ دستی کیف پول</h3>
+              </div>
+              <button class="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)]" @click="addWalletModal = null">
+                <i class="fas fa-xmark text-xs"></i>
+              </button>
+            </div>
+            <p class="text-xs text-[var(--text-muted)] mb-4">
+              مبلغی که می‌خواهید به کیف پول <strong class="text-[var(--text)]">{{ addWalletModal.user.name }}</strong> اضافه شود:
+            </p>
+            <div class="relative">
+              <input v-model="addWalletModal.amount" type="number" min="0" step="10000" class="input !text-lg !font-bold !py-3 !pr-4 !pl-20" dir="ltr" placeholder="0" />
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--text-muted)]">تومان</span>
+            </div>
+            <p class="text-[10px] text-[var(--text-faint)] mt-2">
+              موجودی فعلی: <strong dir="ltr">{{ fmtMoney(addWalletModal.user.wallet) }}</strong> تومان
+            </p>
+            <div class="flex gap-2 mt-5">
+              <button class="btn btn-primary flex-1" :disabled="!addWalletModal.amount || Number(addWalletModal.amount) <= 0 || addWalletModal.saving" @click="confirmAddWallet">
+                <i v-if="addWalletModal.saving" class="fas fa-circle-notch fa-spin ml-1"></i>
+                <i v-else class="fas fa-plus ml-1"></i>
+                افزودن مبلغ
+              </button>
+              <button class="btn btn-ghost flex-1" @click="addWalletModal = null">انصراف</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- نوتیفیکیشن -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="toast" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.3)" @click.self="toast = null">
+          <div class="card !rounded-2xl max-w-xs w-full modal text-center">
+            <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" :class="toast.type === 'success' ? 'bg-[var(--success-glow)]' : 'bg-[var(--danger-glow)]'">
+              <i class="fas text-xl" :class="toast.type === 'success' ? 'fa-check text-[var(--success)]' : 'fa-xmark text-[var(--danger)]'"></i>
+            </div>
+            <p class="text-sm font-semibold mb-4">{{ toast.message }}</p>
+            <button class="btn btn-primary w-full" @click="toast = null">بستن</button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { auth, fmtMoney, fmtDate } from "../stores/auth";
+import { validatePassword, faToEn, isValidNationalCode } from "../utils/validators";
+
+defineEmits(["home"]);
+
+const user = computed(() => auth.state.user);
+const activeTab = ref("requests");
+const sidebarOpen = ref(false);
+const usersLoading = ref(false);
+const busy = ref(false);
+const q = ref("");
+const detail = ref(null);
+const editModal = ref(null);
+const addWalletModal = ref(null);
+const toast = ref(null);
+const roleOpenId = ref(null);
+
+const stats = computed(() => ({
+  users: auth.state.stats?.users ?? 0,
+  krokis: auth.state.stats?.krokis ?? 0,
+  paid: auth.state.stats?.paid ?? 0,
+  pendingCharges: auth.state.stats?.pendingCharges ?? 0,
+  revenue: auth.state.stats?.revenue ?? 0,
+  walletTotal: auth.state.stats?.walletTotal ?? 0,
+}));
+
+const tabs = computed(() => [
+  { id: "requests", label: "شارژها", icon: "fa-money-bill-wave", badge: stats.value.pendingCharges || null },
+  { id: "users", label: "کاربران", icon: "fa-users", badge: null },
+  { id: "krokis", label: "کروکی‌ها", icon: "fa-drafting-compass", badge: null },
+  { id: "transactions", label: "تراکنش‌ها", icon: "fa-clock-rotate-left", badge: null },
+  { id: "roles", label: "نقش‌ها", icon: "fa-user-shield", badge: null },
+  { id: "referrals", label: "طرح ها", icon: "fa-ticket", badge: null },
+  { id: "agencyRequests", label: "درخواست نمایندگی", icon: "fa-user-clock", badge: pendingAgencyCount.value || null },
+  { id: "expertRequests", label: "درخواست‌های همکاری", icon: "fa-handshake", badge: pendingExpertCount.value || null },
+  { id: "experts", label: "کارشناسان", icon: "fa-user-tie", badge: null },
+  { id: "agents", label: "نمایندگان", icon: "fa-sitemap", badge: null },
+]);
+
+const pendingRequests = computed(() => auth.state.requests.filter((r) => r.status === "pending"));
+const decidedRequests = computed(() => auth.state.requests.filter((r) => r.status !== "pending").slice(0, 40));
+const filteredUsers = computed(() => {
+  const needle = q.value.trim().toLowerCase();
+  if (!needle) return auth.state.users;
+  return auth.state.users.filter((u) => (u.name || "").toLowerCase().includes(needle) || (u.username || "").toLowerCase().includes(needle));
+});
+
+const statusFilters = [
+  { value: "", label: "همه" },
+  { value: "draft", label: "پیش‌نویس" },
+  { value: "paid", label: "پرداخت شده" },
+  { value: "issued", label: "صادر شده" },
+];
+const krokiStatus = ref("");
+const adminKrokis = computed(() => auth.state.adminKrokis);
+const adminTransactions = computed(() => auth.state.adminTransactions);
+const roles = computed(() => auth.state.roles);
+const referrals = computed(() => auth.state.referrals);
+const personalReferralCodes = computed(() => auth.state.personalReferralCodes?.length ? auth.state.personalReferralCodes : auth.state.users.filter((u) => u.referralCode).map((u) => ({ id: u.id, username: u.username, full_name: u.name, phone: u.phone, code: u.referralCode, free_kroki_amount: Number(u.personalFreeKroki ?? 1) })));
+
+const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: "", expires_at: "" });
+const referralSaving = ref(false);
+const referralMsg = ref("");
+const referralMsgOk = ref(true);
+const referralCodeDrafts = reactive({});
+const referralEditDrafts = reactive({});
+const personalCodeDrafts = reactive({});
+const personalFreeDrafts = reactive({});
+
+const agencyRequests = computed(() => auth.state.agencyRequests.filter((r) => r.status === "pending"));
+const pendingAgencyCount = computed(() => agencyRequests.value.length);
+
+// درخواست‌های همکاری کارشناسان
+const expertRequests = computed(() => (auth.state.expertRequests || []).filter((r) => r.status === "pending"));
+const decidedExpertRequests = computed(() => (auth.state.expertRequests || []).filter((r) => r.status !== "pending").slice(0, 40));
+const pendingExpertCount = computed(() => expertRequests.value.length);
+const approvedExperts = computed(() => auth.state.experts || []);
+
+const agentCityFilter = ref("");
+const adminAgents = computed(() => auth.state.adminAgents);
+const openAgentId = ref(null);
+const agentDetail = computed(() => auth.state.agentDetail);
+
+const tabLoaded = reactive({ krokis: false, transactions: false, roles: false, referrals: false, agencyRequests: false, agents: false, expertRequests: false, experts: false });
+
+async function decideAgency(r, approve) {
+  busy.value = true;
+  const res = await auth.decideAgencyRequest(r.id, approve);
+  busy.value = false;
+  if (!res.success) showToast(res.error || "خطا در ثبت تصمیم", "error");
+}
+
+async function decideExpert(r, approve) {
+  busy.value = true;
+  const res = await auth.decideExpertRequest(r.id, approve);
+  busy.value = false;
+  if (res.success) {
+    showToast(approve ? "کارشناس تأیید شد و به لیست کارشناسان اضافه شد." : "درخواست همکاری رد شد.");
+  } else {
+    showToast(res.error || "خطا در ثبت تصمیم", "error");
+  }
+}
+
+async function removeExpertRow(r) {
+  busy.value = true;
+  const res = await auth.removeExpert(r.id);
+  busy.value = false;
+  if (res.success) showToast("کارشناس از لیست عمومی حذف شد.");
+  else showToast(res.error || "خطا در حذف کارشناس", "error");
+}
+
+function toggleAgent(a) {
+  if (openAgentId.value === a.id) {
+    openAgentId.value = null;
+    return;
+  }
+  openAgentId.value = a.id;
+  auth.loadAgentDetail(a.id);
+}
+
+watch(agentCityFilter, (c) => auth.loadAdminAgents(c));
+
+function showToast(message, type = "success") {
+  toast.value = { message, type };
+}
+
+function showNote(r) {
+  detail.value = r;
+}
+
+async function approve(r) {
+  busy.value = true;
+  const res = await auth.approveRequest(r.id);
+  busy.value = false;
+  if (res.success) {
+    showToast("شارژ تأیید شد و به کیف پول کاربر افزوده شد.");
+  } else {
+    showToast(res.error || "خطا در تأیید شارژ", "error");
+  }
+}
+
+async function reject(r) {
+  busy.value = true;
+  const res = await auth.rejectRequest(r.id);
+  busy.value = false;
+  if (!res.success) showToast(res.error || "خطا در رد شارژ", "error");
+}
+
+async function setRole(u, role) {
+  const res = await auth.setRole(u.id, role);
+  if (!res.success) showToast(res.error || "خطا در تغییر نقش کاربر", "error");
+}
+
+async function onFree(u, e) {
+  const res = await auth.setFreeKroki(u.id, e.target.value);
+  if (!res.success) showToast(res.error || "خطا در تغییر کروکی رایگان", "error");
+}
+
+async function toggleActive(u) {
+  const res = await auth.toggleActive(u.id);
+  if (!res.success) showToast(res.error || "خطا در تغییر وضعیت کاربر", "error");
+}
+
+function showAddWallet(u) {
+  addWalletModal.value = { user: u, amount: "", saving: false };
+}
+
+async function confirmAddWallet() {
+  const m = addWalletModal.value;
+  const amt = Number(m.amount);
+  if (!amt || amt <= 0) return;
+  m.saving = true;
+  const res = await auth.creditUser(m.user.id, amt);
+  m.saving = false;
+  if (res.success) {
+    showToast(`مبلغ ${fmtMoney(amt)} تومان به کیف پول اضافه شد.`);
+    addWalletModal.value = null;
+  } else {
+    showToast(res.error || "خطا در افزودن مبلغ", "error");
+  }
+}
+
+function showEditUser(u) {
+  editModal.value = {
+    user: u,
+    name: u.name || "",
+    phone: u.phone || "",
+    nationalId: u.nationalId || "",
+    city: u.city || "",
+    password: "",
+    error: "",
+    saving: false,
+  };
+}
+
+async function saveEditUser() {
+  const m = editModal.value;
+  m.error = "";
+  const name = String(m.name || "").trim();
+  if (!name) {
+    m.error = "نام کاربر را وارد کنید.";
+    return;
+  }
+  const phone = faToEn(String(m.phone || "")).trim().replace(/[^\d]/g, "");
+  if (phone && !/^09\d{9}$/.test(phone)) {
+    m.error = "شماره همراه معتبر نیست (۱۱ رقم با 09).";
+    return;
+  }
+  const nationalId = faToEn(String(m.nationalId || "")).trim().replace(/[^\d]/g, "");
+  if (nationalId && !isValidNationalCode(nationalId)) {
+    m.error = "کد ملی معتبر نیست (۱۰ رقم).";
+    return;
+  }
+  // رمز جدید هم باید سیاست امنیتی را پاس کند (خالی = بدون تغییر)
+  if (String(m.password || "").trim()) {
+    const pwErr = validatePassword(m.password);
+    if (pwErr) {
+      m.error = pwErr;
+      return;
+    }
+  }
+  m.saving = true;
+  const payload = { name };
+  // خالی کردن موبایل مجاز نیست (فیلد اجباری و یکتاست)؛ فقط مقدار معتبر جدید ارسال می‌شود
+  if (phone && phone !== String(m.user.phone || "")) payload.phone = phone;
+  if (nationalId !== String(m.user.nationalId || "")) payload.nationalId = nationalId;
+  if (String(m.city || "").trim() !== String(m.user.city || "")) payload.city = String(m.city || "").trim();
+  if (String(m.password || "").trim()) payload.password = String(m.password).trim();
+  const res = await auth.editUser(m.user.id, payload);
+  m.saving = false;
+  if (res.success) {
+    showToast("اطلاعات کاربر با موفقیت به‌روزرسانی شد.");
+    editModal.value = null;
+  } else {
+    m.error = res.error || "خطا در ویرایش کاربر";
+  }
+}
+
+const deletingUserId = ref(null);
+
+async function removeUser(u) {
+  const label = `${u.name || u.username || ""}`.trim() || "این کاربر";
+  if (!confirm(`کاربر «${label}» برای همیشه حذف شود؟\nکروکی‌ها، تراکنش‌ها و قالب‌های او هم پاک می‌شود.`)) return;
+  deletingUserId.value = u.id;
+  try {
+    const res = await auth.deleteUser(u.id);
+    if (res.success) showToast(`کاربر «${label}» حذف شد.`);
+    else showToast(res.error || "خطا در حذف کاربر", "error");
+  } finally {
+    deletingUserId.value = null;
+  }
+}
+
+async function createReferral() {
+  referralMsg.value = "";
+  referralSaving.value = true;
+  const res = await auth.createReferral({
+    code: referralForm.code,
+    free_kroki_amount: referralForm.free_kroki_amount,
+    max_uses: referralForm.max_uses,
+    expires_at: referralForm.expires_at,
+  });
+  referralSaving.value = false;
+  referralMsgOk.value = res.success;
+  referralMsg.value = res.success ? "کد معرف ساخته شد." : res.error;
+  if (res.success) {
+    referralForm.code = "";
+    referralForm.free_kroki_amount = 1;
+    referralForm.max_uses = "";
+    referralForm.expires_at = "";
+  }
+}
+
+async function saveUserReferralCode(u) {
+  const draft = referralCodeDrafts[u.id] ?? u.referralCode ?? "";
+  if (!String(draft || "").trim()) {
+    showToast("کد معرف را وارد کنید", "error");
+    return;
+  }
+  busy.value = true;
+  const res = await auth.adminSetUserReferralCode(u.id, draft);
+  busy.value = false;
+  if (res.success) {
+    delete referralCodeDrafts[u.id];
+    showToast(`کد معرف ${u.name || u.username} ثبت شد: ${res.code}`);
+  } else {
+    showToast(res.error || "خطا در ثبت کد معرف کاربر", "error");
+  }
+}
+
+async function deleteUserReferralCode(u) {
+  if (!confirm(`کد شخصی «${u.referralCode}» حذف شود؟`)) return;
+  busy.value = true;
+  const res = await auth.adminDeleteUserReferralCode(u.id);
+  busy.value = false;
+  if (res.success) {
+    delete referralCodeDrafts[u.id];
+    showToast("کد شخصی حذف شد.");
+  } else {
+    showToast(res.error || "خطا در حذف کد شخصی", "error");
+  }
+}
+
+async function toggleReferral(r) {
+  busy.value = true;
+  const res = await auth.updateReferral(r.id, { is_active: !r.is_active });
+  busy.value = false;
+  if (!res.success) showToast(res.error || "خطا در تغییر وضعیت کد", "error");
+}
+
+function setReferralDraft(id, field, value) {
+  if (!referralEditDrafts[id]) referralEditDrafts[id] = {};
+  referralEditDrafts[id][field] = value;
+}
+
+async function saveReferralEdit(r) {
+  const d = referralEditDrafts[r.id] || {};
+  const patch = {};
+  if (d.code !== undefined && String(d.code).trim() && String(d.code).trim().toUpperCase() !== r.code) patch.code = String(d.code).trim();
+  if (d.free_kroki_amount !== undefined && d.free_kroki_amount !== "" && Number(d.free_kroki_amount) !== Number(r.free_kroki_amount)) patch.free_kroki_amount = Number(d.free_kroki_amount);
+  // سقف خالی = نامحدود (چندبارمصرف)
+  if (d.max_uses !== undefined) {
+    const cur = r.max_uses == null ? "" : String(r.max_uses);
+    const nxt = String(d.max_uses ?? "").trim();
+    if (nxt !== cur) patch.max_uses = nxt === "" ? null : Number(nxt);
+  }
+  if (d.expires_at !== undefined && (d.expires_at || "") !== (r.expires_at || "")) patch.expires_at = d.expires_at || "";
+  if (!Object.keys(patch).length) {
+    showToast("تغییری برای ذخیره وجود ندارد");
+    return;
+  }
+  busy.value = true;
+  const res = await auth.updateReferral(r.id, patch);
+  busy.value = false;
+  if (res.success) {
+    delete referralEditDrafts[r.id];
+    showToast("کد معرف ویرایش شد.");
+  } else {
+    showToast(res.error || "خطا در ویرایش کد", "error");
+  }
+}
+
+async function savePersonalCode(p) {
+  const draft = personalCodeDrafts[p.id] ?? p.code ?? "";
+  if (!String(draft || "").trim()) {
+    showToast("کد معرف را وارد کنید", "error");
+    return;
+  }
+  const freeDraft = personalFreeDrafts[p.id] ?? p.free_kroki_amount ?? 1;
+  busy.value = true;
+  const res = await auth.adminSetUserReferralCode(p.id, draft, freeDraft);
+  busy.value = false;
+  if (res.success) {
+    delete personalCodeDrafts[p.id];
+    delete personalFreeDrafts[p.id];
+    showToast(`کد معرف ${p.full_name || p.username} به‌روزرسانی شد: ${res.code}`);
+  } else {
+    showToast(res.error || "خطا در ویرایش کد شخصی", "error");
+  }
+}
+
+async function deletePersonalCode(p) {
+  if (!confirm(`کد شخصی «${p.code}» حذف شود؟ زیرمجموعه‌های قبلی حفظ می‌شوند.`)) return;
+  busy.value = true;
+  const res = await auth.adminDeleteUserReferralCode(p.id);
+  busy.value = false;
+  if (res.success) {
+    delete personalCodeDrafts[p.id];
+    delete personalFreeDrafts[p.id];
+    showToast("کد شخصی حذف شد.");
+  } else {
+    showToast(res.error || "خطا در حذف کد شخصی", "error");
+  }
+}
+
+function goToUser(id) {
+  const u = auth.state.users.find((x) => String(x.id) === String(id));
+  activeTab.value = "users";
+  if (u) q.value = u.username || "";
+}
+
+async function removeReferral(r) {
+  busy.value = true;
+  const res = await auth.deleteReferral(r.id);
+  busy.value = false;
+  if (res.success) showToast("کد معرف حذف شد.");
+  else showToast(res.error || "خطا در حذف کد", "error");
+}
+
+function txSign(tx) {
+  if (tx.status === "rejected") return "";
+  if (tx.type === "spend") return "−";
+  return "+";
+}
+function txTypeColor(tx) {
+  if (tx.type === "spend") return "text-[var(--danger)]";
+  if (tx.type === "free" || tx.type === "referral") return "text-[var(--info)]";
+  return "text-[var(--success)]";
+}
+function txStatusClass(s) {
+  if (s === "success" || s === "approved") return "bg-[var(--success-glow)] text-[var(--success)]";
+  if (s === "pending") return "bg-[var(--warning-glow)] text-[var(--warning)]";
+  if (s === "rejected") return "bg-[var(--danger-glow)] text-[var(--danger)]";
+  return "bg-[var(--surface3)] text-[var(--text-muted)]";
+}
+function txStatusLabel(s) {
+  if (s === "success" || s === "approved") return "موفق";
+  if (s === "pending") return "در انتظار";
+  if (s === "rejected") return "رد شده";
+  return s || "موفق";
+}
+
+function krokiStatusClass(s) {
+  if (s === "issued") return "bg-[var(--success-glow)] text-[var(--success)]";
+  if (s === "paid") return "bg-[var(--info-glow)] text-[var(--info)]";
+  return "bg-[var(--warning-glow)] text-[var(--warning)]";
+}
+function krokiStatusLabel(s) {
+  if (s === "issued") return "صادر شده";
+  if (s === "paid") return "پرداخت شده";
+  return "پیش‌نویس";
+}
+
+function logout() {
+  auth.logout();
+  location.reload();
+}
+
+watch(activeTab, (tab) => {
+  if (tab === "krokis" && !tabLoaded.krokis) {
+    tabLoaded.krokis = true;
+    auth.loadAdminKrokis("");
+  } else if (tab === "transactions" && !tabLoaded.transactions) {
+    tabLoaded.transactions = true;
+    auth.loadAdminTransactions();
+  } else if (tab === "roles" && !tabLoaded.roles) {
+    tabLoaded.roles = true;
+    auth.loadRoles();
+  } else if (tab === "referrals" && !tabLoaded.referrals) {
+    tabLoaded.referrals = true;
+    auth.loadAllReferrals();
+    auth.loadPersonalReferralCodes().catch(() => {});
+    if (!auth.state.users.length) auth.loadUsers().catch(() => {});
+  } else if (tab === "agencyRequests") {
+    tabLoaded.agencyRequests = true;
+    auth.loadAgencyRequests();
+  } else if (tab === "expertRequests") {
+    tabLoaded.expertRequests = true;
+    auth.loadExpertRequests();
+  } else if (tab === "experts") {
+    tabLoaded.experts = true;
+    auth.loadExperts();
+  } else if (tab === "agents" && !tabLoaded.agents) {
+    tabLoaded.agents = true;
+    auth.loadAdminAgents("");
+  }
+});
+
+watch(krokiStatus, (s) => auth.loadAdminKrokis(s));
+
+onMounted(() => {
+  const pending = auth.state.requests.filter((r) => r.status === "pending").length;
+  if (pending) document.title = "پنل مدیریت — " + pending + " شارژ در انتظار";
+  auth.loadStats();
+  auth.loadAllCharges();
+  usersLoading.value = true;
+  auth.loadUsers().finally(() => {
+    usersLoading.value = false;
+  });
+  document.addEventListener("click", closeRoleDropdown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeRoleDropdown);
+});
+
+function closeRoleDropdown() {
+  roleOpenId.value = null;
+}
+</script>
+
+<style scoped>
+/* جدول کاربران: فشرده تا بدون اسکرول افقی جا شود */
+.users-table th,
+.users-table td {
+  padding: 8px 10px;
+  font-size: 11px;
+}
+.users-table .field-card {
+  min-width: 148px;
+  gap: 4px;
+}
+.users-table .role-trigger {
+  white-space: nowrap;
+}
+.admin-sidebar {
+  position: relative;
+  flex-shrink: 0;
+  width: 240px;
+}
+
+@media (max-width: 1023px) {
+  .admin-sidebar {
+    position: fixed;
+    top: 64px;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: 260px;
+    transform: translateX(100%);
+    transition: transform 0.35s var(--ease-out);
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+.sidebar-overlay {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: 64px;
+    background: rgba(11, 21, 36, 0.3);
+    z-index: -1;
+  }
+}
+
+.sidebar-nav {
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+}
+
+@media (max-width: 1023px) {
+  .sidebar-nav {
+    height: 100%;
+    border-radius: 0;
+    border-left: none;
+    background: var(--bg);
+  }
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s var(--ease-out);
+  text-align: right;
+  user-select: none;
+}
+
+.sidebar-item:hover:not(.active) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.sidebar-item.active {
+  background: var(--accent);
+  color: #241a05;
+  box-shadow: 0 4px 16px var(--accent-glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.sidebar-item:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sidebar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: all 0.2s var(--ease-out);
+}
+
+.sidebar-item.active .sidebar-icon {
+  background: rgba(36, 26, 5, 0.15);
+}
+
+.sidebar-label {
+  flex: 1;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sidebar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--danger);
+  color: white;
+}
+
+.sidebar-item.active .sidebar-badge {
+  background: #241a05;
+  color: white;
+}
+
+/* فیلدهای زیبا */
+.role-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.role-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  transition: all 0.2s var(--ease-out);
+  min-width: 110px;
+}
+
+.role-trigger:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.role-dropdown.open .role-trigger {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.role-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.role-dot.admin {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow-strong);
+}
+
+.role-dot.user {
+  background: var(--info);
+  box-shadow: 0 0 6px var(--info-glow);
+}
+
+.role-dot.agent {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning-glow);
+}
+
+.role-text {
+  flex: 1;
+  text-align: right;
+}
+
+.role-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s var(--ease-out);
+}
+
+.role-dropdown.open .role-chevron {
+  transform: rotate(180deg);
+}
+
+.role-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.role-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: right;
+  transition: all 0.15s var(--ease-out);
+}
+
+.role-option:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.role-option.selected {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.role-option.selected .role-dot {
+  box-shadow: 0 0 8px var(--accent-glow-strong);
+}
+
+.drop-enter-active {
+  transition: all 0.2s var(--ease-out);
+}
+.drop-leave-active {
+  transition: all 0.15s ease-in;
+}
+.drop-enter-from {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
+}
+.drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
+}
+
+/* فیلدهای زیبا */
+.field-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: all 0.2s var(--ease-out);
+  min-width: 170px;
+}
+
+.field-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.field-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.wallet-icon {
+  background: linear-gradient(135deg, var(--success-glow), rgba(31, 161, 92, 0.05));
+  color: var(--success);
+}
+
+.freekroki-icon {
+  background: linear-gradient(135deg, var(--accent-glow), rgba(250, 108, 4, 0.05));
+  color: var(--accent);
+}
+
+.field-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-value {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.field-input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  transition: background 0.15s;
+}
+
+.field-input:hover {
+  background: var(--surface2);
+}
+
+.field-input:focus {
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.field-unit {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.field-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  flex-shrink: 0;
+  transition: all 0.2s var(--ease-out);
+}
+
+.wallet-action:hover {
+  background: var(--success-glow);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+/* انیمیشن بخش‌ها */
+section {
+  animation: fadeSlideIn 0.35s var(--ease-out);
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
