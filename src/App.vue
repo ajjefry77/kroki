@@ -7,7 +7,7 @@
 
       <AdminPanel v-else-if="page === 'admin'" key="admin" @home="goHome" />
 
-      <UserPanel v-else-if="page === 'userpanel'" key="userpanel" @home="goHome" @editDraft="openDraftForEdit" />
+      <UserPanel v-else-if="page === 'userpanel'" key="userpanel" :initial-tab="userPanelTab" @home="goHome" @editDraft="openDraftForEdit" />
 
       <AgencyRequestPage v-else-if="page === 'agency-request'" key="agency-request" @home="goHome" />
 
@@ -77,20 +77,12 @@
               key="preview"
               :gen="gen"
               :template-id="templateId"
-              @back="go('info')"
-              @pay="go('payment')"
-            />
-
-            <PaymentStep
-              v-else-if="step === 'payment' && gen"
-              key="payment"
-              :gen="gen"
               :pins="pins"
               :form="krokiForm"
-              :template-id="templateId"
               :editing-kroki-id="editingKrokiId"
-              @back="go('preview')"
+              @back="go('info')"
               @done="onPaymentDone"
+              @charge="openUserPanel('wallet')"
             />
 
             <DownloadStep
@@ -110,12 +102,12 @@
                 <div class="w-20 h-20 mx-auto rounded-full bg-[var(--success-glow)] border-2 border-[var(--success)] flex items-center justify-center mb-6">
                   <i class="fas fa-circle-check text-3xl text-[var(--success)]"></i>
                 </div>
-                <h2 class="text-xl font-extrabold mb-2">سفارش شما ثبت و پرداخت شد</h2>
+                <h2 class="text-xl font-extrabold mb-2">سفارش شما ثبت و صادر شد</h2>
                 <p v-if="trackingCode" class="text-sm text-[var(--text-muted)] mb-2">
                   کد پیگیری: <span class="font-bold text-[var(--accent-soft)]" dir="ltr">{{ trackingCode }}</span>
                 </p>
                 <p class="text-xs text-[var(--text-muted)] leading-6 mb-8">
-                  اطلاعات ترسیم پس از پرداخت از این دستگاه پاک شد.<br />
+                  اطلاعات ترسیم پس از صدور از این دستگاه پاک شد.<br />
                   برای دانلود مجدد کروکی به «کروکی‌های من» بروید.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -131,7 +123,7 @@
               </div>
             </div>
 
-            <div v-else-if="step === 'preview' || step === 'payment' || step === 'done'" key="gen-loading" class="flex-1 flex items-center justify-center">
+            <div v-else-if="step === 'preview' || step === 'done'" key="gen-loading" class="flex-1 flex items-center justify-center">
               <Loading :active="true" title="در حال آماده‌سازی..." message="لطفاً چند لحظه صبر کنید" />
             </div>
           </Transition>
@@ -174,14 +166,12 @@ const PaymentResult = defineAsyncComponent(() => import("./components/PaymentRes
 const DrawStep = defineAsyncComponent(() => import("./components/steps/DrawStep.vue"));
 const InfoStep = defineAsyncComponent(() => import("./components/steps/InfoStep.vue"));
 const PreviewStep = defineAsyncComponent(() => import("./components/steps/PreviewStep.vue"));
-const PaymentStep = defineAsyncComponent(() => import("./components/steps/PaymentStep.vue"));
 const DownloadStep = defineAsyncComponent(() => import("./components/steps/DownloadStep.vue"));
 
 const steps = [
   { id: "draw", label: "ترسیم نقشه" },
   { id: "info", label: "اطلاعات و قالب" },
   { id: "preview", label: "پیش‌نمایش" },
-  { id: "payment", label: "پرداخت" },
   { id: "done", label: "دانلود" },
 ];
 
@@ -194,13 +184,13 @@ const savedWizard = (() => {
     return null;
   }
 })();
-// پیش‌نمایش و پرداخت با snapshot قابلیت بازیابی دارند؛
-// مرحله done هم با کد پیگیری نگه داشته می‌شود (ترسیم‌ها بعد پرداخت پاک‌اند
+// پیش‌نمایش با snapshot قابلیت بازیابی دارد؛
+// مرحله done هم با کد پیگیری نگه داشته می‌شود (ترسیم‌ها بعد صدور پاک‌اند
 // و دانلود مجدد از «کروکی‌های من» انجام می‌شود)
-const _savedStep = savedWizard?.step;
+const _savedStep = savedWizard?.step === "payment" ? "preview" : savedWizard?.step;
 const _initialStep = (() => {
   if (_savedStep === "draw" || _savedStep === "info") return _savedStep;
-  if (_savedStep === "preview" || _savedStep === "payment") return _savedStep;
+  if (_savedStep === "preview") return _savedStep;
   if (_savedStep === "done") return "done";
   return "landing";
 })();
@@ -209,6 +199,7 @@ const reachedIndex = ref(
   _initialStep === "landing" ? 0 : Number(savedWizard?.reachedIndex) || 0,
 );
 const authReturn = ref("landing");
+const userPanelTab = ref("wallet");
 
 const pins = reactive([]);
 try {
@@ -405,8 +396,8 @@ watch(
 
 watch(step, (s) => {
   logger.info("step", "تغییر مرحله", { step: s });
-  // اگر وارد پیش‌نمایش/پرداخت شدیم ولی gen خالی است (مثلاً بعد رفرش)، برگردان
-  if (s === "preview" || s === "payment") {
+  // اگر وارد پیش‌نمایش شدیم ولی gen خالی است (مثلاً بعد رفرش)، برگردان
+  if (s === "preview") {
     ensureGen()
       .then(() => restoreGenIfNeeded())
       .catch(() => {});
@@ -427,8 +418,8 @@ function go(id) {
   }
   if (id !== "landing") ensureGen().catch(() => {});
   // نشانی خودکار (پیشنهاد map.ir در پیش‌نمایش) را به فرم اصلی برمی‌گردانیم
-  // تا در payload پرداخت/ثبت به سرور هم ارسال شود
-  if (id === "payment" && !krokiForm.address) {
+  // تا در payload ثبت/صدور به سرور هم ارسال شود
+  if ((id === "preview" || id === "done") && !krokiForm.address) {
     const auto = gen.value?.last?.form?.address || "";
     if (auto) krokiForm.address = auto;
   }
@@ -491,11 +482,12 @@ function openAdmin() {
   page.value = "admin";
 }
 
-function openUserPanel() {
+function openUserPanel(tab) {
   if (!auth.isAuthenticated.value) {
     openAuth("userpanel");
     return;
   }
+  if (tab) userPanelTab.value = tab;
   page.value = "userpanel";
 }
 
@@ -602,6 +594,17 @@ function enforceFromHash() {
       reachedIndex.value = Math.max(reachedIndex.value, krokiIds.indexOf(h));
       ensureGen().catch(() => {});
     }
+  } else if (h === "payment") {
+    // سازگاری با لینک‌های قدیمی مرحله پرداخت حذف‌شده
+    if (!auth.isAuthenticated.value) {
+      step.value = "landing";
+      page.value = "app";
+      openAuth("start");
+    } else {
+      page.value = "app";
+      step.value = "preview";
+      ensureGen().catch(() => {});
+    }
   }
   const norm = currentHash();
   if ((window.location.hash || "") !== norm) {
@@ -619,8 +622,8 @@ onMounted(() => {
   window.addEventListener("beforeunload", persistGen);
   window.addEventListener("pagehide", persistGen);
   auth.syncUser();
-  // اگر با رفرش مستقیم روی پیش‌نمایش/پرداخت آمدیم، gen را برگردان
-  if (step.value === "preview" || step.value === "payment") {
+  // اگر با رفرش مستقیم روی پیش‌نمایش آمدیم، gen را برگردان
+  if (step.value === "preview") {
     ensureGen()
       .then(() => restoreGenIfNeeded())
       .catch(() => {});

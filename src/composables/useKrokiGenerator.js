@@ -136,6 +136,38 @@ export function eligiblePinsOf(pins) {
   return flattenPins(pins).filter(isKrokiEligible);
 }
 
+/*
+ * برآورد مساحت چندضلعی‌ها (متر مربع) برای نمایش در مرحله اطلاعات.
+ * همان منطق computeGeometry: تصویر UTM + فرمول shoelace، فقط روی
+ * ترسیم‌های بسته (polygon)؛ چند ترسیم جمع می‌شود.
+ */
+export function estimateAreaM2(pins) {
+  try {
+    const polys = eligiblePinsOf(pins).filter(
+      (p) =>
+        p.shape?.type === "polygon" &&
+        Array.isArray(p.shape.positions) &&
+        p.shape.positions.length >= 3,
+    );
+    if (!polys.length) return 0;
+    const all = [];
+    for (const pin of polys) all.push(...pin.shape.positions);
+    if (!all.length) return 0;
+    const utm = toUTM(all);
+    let idx = 0;
+    let total = 0;
+    for (const pin of polys) {
+      const n = pin.shape.positions.length;
+      const slice = utm.slice(idx, idx + n);
+      idx += n;
+      if (slice.length >= 3) total += computeArea(slice);
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
 function toUTM(positions) {
   if (!positions.length) return [];
   const lonAvg =

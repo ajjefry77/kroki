@@ -479,13 +479,17 @@ import SavedKrokiViewer from "./SavedKrokiViewer.vue";
 
 const emit = defineEmits(["home", "editDraft"]);
 
+const props = defineProps({
+  initialTab: { type: String, default: "wallet" },
+});
+
 const user = computed(() => auth.state.user);
 const wallet = computed(() => auth.walletOf());
 const freeKroki = computed(() => auth.freeOf());
 const transactions = ref([]);
 const pending = computed(() => auth.pendingOf(user.value?.id || "none"));
 
-const activeTab = ref("wallet");
+const activeTab = ref(props.initialTab || "wallet");
 const tabs = computed(() => {
   const t = [
     { id: "wallet", label: "کیف پول", icon: "fa-wallet" },
@@ -754,12 +758,18 @@ function logout() {
   location.reload();
 }
 
+watch(
+  () => props.initialTab,
+  (tab) => {
+    if (tab) activeTab.value = tab;
+  },
+);
+
 watch(activeTab, (tab) => {
   if (tab === "wallet") {
     loadTx();
     auth.loadMyCharges();
-  } else if (tab === "templates") {
-    auth.loadTemplates();
+  } else if (tab === "templates") {    auth.loadTemplates();
   } else if (tab === "krokis") {
     auth.myKrokis();
   } else if (tab === "referrals") {

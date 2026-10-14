@@ -264,8 +264,12 @@
                 <dd class="font-bold">{{ areaPreview }}</dd>
               </div>
               <div class="flex items-center justify-between gap-2">
-                <dt class="text-[var(--text-muted)]">هزینه</dt>
-                <dd class="font-extrabold text-[var(--accent-soft)]" dir="ltr">
+                <dt class="text-[var(--text-muted)]">{{ isAdmin ? "هزینه" : freeKroki > 0 ? "اعتبار مصرفی" : "هزینه" }}</dt>
+                <dd v-if="isAdmin" class="font-extrabold text-[var(--accent-soft)]">رایگان (مدیر)</dd>
+                <dd v-else-if="freeKroki > 0" class="font-extrabold text-[var(--success)]">
+                  <i class="fas fa-gift ml-1"></i>{{ faNum(freeKroki) }} عدد کروکی رایگان
+                </dd>
+                <dd v-else class="font-extrabold text-[var(--accent-soft)]" dir="ltr">
                   <span v-if="showDiscount" class="font-medium text-[var(--text-faint)] line-through">{{ fmtMoney(originalPrice) }}</span>
                   {{ fmtMoney(price) }} <span class="text-[10px] font-medium text-[var(--text-muted)]">تومان</span>
                 </dd>
@@ -307,7 +311,7 @@
 import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS, vertexLabel, getUserTemplates } from "../../utils/templates";
 import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
-import { eligiblePinsOf, suggestAddressForPositions } from "../../composables/useKrokiGenerator";
+import { eligiblePinsOf, suggestAddressForPositions, estimateAreaM2 } from "../../composables/useKrokiGenerator";
 import { logger } from "../../utils/logger";
 import { auth, fmtMoney, KROKI_PRICE, KROKI_ORIGINAL_PRICE } from "../../stores/auth";
 
@@ -315,6 +319,9 @@ onMounted(() => {
   document.addEventListener("click", closeDrop);
   document.addEventListener("keydown", onEscapeDrop);
   void suggestAddress();
+  try {
+    auth.loadWallet();
+  } catch (e) {}
 });
 
 onBeforeUnmount(() => {
@@ -439,6 +446,14 @@ const originalPrice = computed(() => KROKI_ORIGINAL_PRICE);
 // قیمت فعلا ثابت است و بر اساس شهر نیست
 const showDiscount = computed(() => true);
 
+// اعتبار کاربر: اگر کروکی رایگان داشت تعداد آن، وگرنه مبلغ نمایش داده می‌شود
+const freeKroki = computed(() => auth.freeOf());
+const isAdmin = computed(() => auth.isAdmin.value);
+
+function faNum(v) {
+  return Number(v || 0).toLocaleString("fa-IR");
+}
+
 const missingList = computed(() => {
   const f = props.form;
   const miss = [];
@@ -464,8 +479,11 @@ const valid = computed(() => {
 const eligibleCount = computed(() => eligiblePinsOf(props.pins).length);
 
 const areaPreview = computed(() => {
-  const sel = eligiblePinsOf(props.pins).filter((p) => p.shape?.type === "polygon");
-  return sel.length ? "—" : "۰ متر مربع";
+  const a = estimateAreaM2(props.pins);
+  return (
+    Number(a || 0).toLocaleString("fa-IR", { maximumFractionDigits: 2 }) +
+    " متر مربع"
+  );
 });
 
 function select(id) {

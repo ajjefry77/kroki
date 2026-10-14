@@ -8,7 +8,7 @@
             <i class="fas fa-eye text-[var(--accent)]"></i>
             پیش‌نمایش کروکی
           </h2>
-          <p class="text-xs text-[var(--text-muted)] mt-1">بررسی نهایی پیش از پرداخت</p>
+          <p class="text-xs text-[var(--text-muted)] mt-1">بررسی نهایی پیش از دریافت کروکی</p>
         </div>
         <div class="flex items-center gap-2">
           <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--text-muted)]">
@@ -75,7 +75,7 @@
             </span>
             <span class="text-[10px] text-[var(--text-faint)] flex items-center gap-1">
               <i class="fas fa-lock"></i>
-              نسخه نهایی پس از پرداخت با کیفیت کامل
+              نسخه نهایی پس از صدور با کیفیت کامل
             </span>
           </div>
           <div class="relative select-none">
@@ -216,17 +216,53 @@
 
     <!-- نوار پیمایش -->
     <div class="sticky bottom-0 px-4 md:px-6 py-3 bg-[var(--bg)]/90 backdrop-blur-md border-t border-[var(--border)]">
-      <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
-        <button class="btn btn-ghost" @click="$emit('back')">
-          <i class="fas fa-arrow-right ml-1"></i>
-          ویرایش اطلاعات
-        </button>
-        <button class="btn btn-primary" :disabled="!gen.state.ready" @click="$emit('pay')">
-          ادامه به پرداخت
-          <i class="fas fa-arrow-left mr-1"></i>
-        </button>
+      <div class="max-w-6xl mx-auto flex flex-col gap-2">
+        <Transition name="modal">
+          <div v-if="consumeError" class="rounded-xl px-4 py-2.5 text-xs font-medium bg-[var(--danger-glow)] border border-[var(--danger)]/30 text-[var(--danger)]">
+            <i class="fas fa-circle-xmark ml-1"></i>{{ consumeError }}
+          </div>
+        </Transition>
+        <div class="flex items-center justify-between gap-3">
+          <button class="btn btn-ghost" :disabled="processing" @click="$emit('back')">
+            <i class="fas fa-arrow-right ml-1"></i>
+            ویرایش اطلاعات
+          </button>
+          <button class="btn btn-primary" :disabled="!gen.state.ready || processing" @click="confirmAndIssue">
+            <i v-if="processing" class="fas fa-circle-notch fa-spin ml-1"></i>
+            <i v-else class="fas fa-download ml-1"></i>
+            {{ processing ? "در حال صدور کروکی…" : confirmLabel }}
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- مودال کمبود موجودی -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="insufficientOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(11, 21, 36, 0.5)" @click.self="insufficientOpen = false">
+          <div class="card !rounded-2xl max-w-sm w-full text-center py-8">
+            <div class="w-16 h-16 mx-auto rounded-full bg-[var(--danger-glow)] border-2 border-[var(--danger)] flex items-center justify-center mb-4">
+              <i class="fas fa-wallet text-2xl text-[var(--danger)]"></i>
+            </div>
+            <h3 class="font-extrabold text-base mb-2">موجودی حساب شما کافی نیست</h3>
+            <p class="text-xs text-[var(--text-muted)] leading-6 mb-1">
+              هزینه صدور کروکی <strong class="text-[var(--accent-soft)]" dir="ltr">{{ formatPrice(price) }}</strong> است
+              و موجودی کیف پول شما <strong dir="ltr">{{ formatPrice(wallet) }}</strong> می‌باشد.
+            </p>
+            <p class="text-xs text-[var(--text-muted)] leading-6 mb-6">
+              کمبود <strong class="text-[var(--danger)]" dir="ltr">{{ formatPrice(price - wallet) }}</strong> — لطفاً حساب خود را شارژ کنید.
+            </p>
+            <div class="flex flex-col gap-2">
+              <button class="btn btn-primary w-full !py-3" @click="$emit('charge')">
+                <i class="fas fa-credit-card ml-2"></i>
+                شارژ حساب
+              </button>
+              <button class="btn btn-ghost w-full" @click="insufficientOpen = false">انصراف</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -235,13 +271,20 @@ import { ref, computed, onMounted, nextTick, watch } from "vue";
 import { getTemplate, vertexLabel } from "../../utils/templates";
 import { canvasSizeForPoints, findNorthWestIndex } from "../../utils/canvas";
 import { logger } from "../../utils/logger";
+import { auth, fmtMoney, KROKI_PRICE } from "../../stores/auth";
+import { eligiblePinsOf } from "../../composables/useKrokiGenerator";
+import { faToEn, isValidIranianMobile, isValidNationalCode } from "../../utils/validators";
 
 const props = defineProps({
   gen: { type: Object, required: true },
   templateId: { type: String, default: "technical" },
+  pins: { type: [Array, Object], default: () => [] },
+  form: { type: Object, default: () => ({}) },
+  // اگر در حال ادامه یک پیش‌نویسِ ذخیره‌شده در سرور باشیم
+  editingKrokiId: { type: [Number, String, null], default: null },
 });
 
-const emit = defineEmits(["back", "pay"]);
+const emit = defineEmits(["back", "done", "charge"]);
 
 const sketchCanvasRef = ref(null);
 const fallbackCanvasRef = ref(null);
@@ -251,6 +294,151 @@ const customizeOpen = ref(false);
 const previewDoc = ref("");
 
 const currentTemplate = computed(() => getTemplate(props.templateId));
+
+// ── اعتبار و صدور مستقیم (بدون صفحه پرداخت؛ اولویت با کروکی رایگان) ──
+const price = computed(() => KROKI_PRICE);
+const freeKroki = computed(() => auth.freeOf());
+const wallet = computed(() => auth.walletOf());
+const isAdmin = computed(() => auth.isAdmin.value);
+const processing = ref(false);
+const consumeError = ref("");
+const insufficientOpen = ref(false);
+
+const confirmLabel = computed(() => {
+  if (isAdmin.value) return "تأیید و دانلود کروکی";
+  return "دریافت و دانلود کروکی";
+});
+
+function formatPrice(v) {
+  return fmtMoney(v) + " تومان";
+}
+
+function geometryPoints() {
+  const geom = props.gen.buildGeometry(props.pins);
+  if (!geom || !geom.allPositions || geom.allPositions.length < 3) return null;
+  return geom.allPositions.map((p) => ({ lat: Number(p.lat), lon: Number(p.lon ?? p.lng) }));
+}
+
+function drawingData() {
+  try {
+    const flat = [];
+    const walk = (arr) => {
+      for (const p of arr || []) {
+        if (p && p.type === "group" && Array.isArray(p.children)) walk(p.children);
+        else if (p) flat.push(p);
+      }
+    };
+    walk(props.pins);
+    return flat
+      .filter((p) => p && p.shape && p.selected !== false)
+      .map((p) => {
+        try {
+          return JSON.parse(JSON.stringify(p, (k, v) => (k === "_sourceIds" ? undefined : v)));
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
+
+async function confirmAndIssue() {
+  if (processing.value) return;
+  consumeError.value = "";
+  if (!props.form?.client?.trim()) {
+    consumeError.value = "ابتدا نام متقاضی را در مرحله اطلاعات وارد کنید.";
+    return;
+  }
+  const phone = faToEn(props.form.clientPhone || "").trim();
+  if (phone && !isValidIranianMobile(phone)) {
+    consumeError.value = "شماره همراه متقاضی معتبر نیست (۱۱ رقم با 09).";
+    return;
+  }
+  const nationalId = faToEn(props.form.clientNationalId || "").trim();
+  if (nationalId && !isValidNationalCode(nationalId)) {
+    consumeError.value = "کد ملی متقاضی معتبر نیست.";
+    return;
+  }
+  // اولویت مصرف: کروکی رایگان، بعد موجودی کیف پول
+  const mode = freeKroki.value > 0 ? "free" : "wallet";
+  if (!isAdmin.value && mode === "wallet" && wallet.value < price.value) {
+    insufficientOpen.value = true;
+    return;
+  }
+  const pts = geometryPoints();
+  if (!pts) {
+    consumeError.value = "ترسیم معتبری ثبت نشده است؛ لطفاً به مرحله ترسیم برگردید.";
+    return;
+  }
+  processing.value = true;
+  try {
+    const payload = {
+      title: props.form.title || "پلان وضعیت موجود",
+      survey_date: props.form.date || "",
+      client_name: props.form.client,
+      client_phone: props.form.clientPhone || "",
+      client_national_id: props.form.clientNationalId || "",
+      surveyor: props.form.surveyor || "",
+      plaque: props.form.plaque || "",
+      address: props.form.address || props.gen.last?.form?.address || "",
+      city: props.form.city || "",
+      street_width: props.form.streetWidth || "",
+      initial_survey_type: props.form.initialSurveyType || "",
+      description: props.form.description || "",
+      logo_url: props.form.logo || "",
+      geometry_points: pts,
+      template_key: props.templateId || "technical",
+      drawing_data: drawingData(),
+      map_image: props.gen.state?.mapImage || "",
+      orientation: props.gen.state?.orientation || "portrait",
+      style_overrides: { ...(props.gen.state?.styleOverrides || {}) },
+      edge_texts: JSON.parse(JSON.stringify(props.gen.state?.edgeTexts || [])),
+    };
+    let id = props.editingKrokiId || null;
+    if (id) {
+      const updated = await auth.updateKroki(id, payload);
+      if (!updated.success) throw new Error(updated.error);
+      id = updated.kroki?.id || id;
+    } else {
+      const created = await auth.createKroki(payload, props.templateId);
+      if (!created.success) throw new Error(created.error);
+      id = created.kroki?.id;
+      if (!id) throw new Error("پاسخ سرور نامعتبر است");
+    }
+    let kroki;
+    if (isAdmin.value) {
+      const issued = await auth.issueKroki(id);
+      if (!issued.success) throw new Error(issued.error);
+      kroki = issued.kroki;
+    } else {
+      const paid = await auth.payKroki(id, mode);
+      if (!paid.success) throw new Error(paid.error);
+      const issued = await auth.issueKroki(id);
+      if (!issued.success) throw new Error(issued.error);
+      kroki = issued.kroki;
+    }
+    logger.info("kroki", "صدور مستقیم کروکی از پیش‌نمایش", {
+      id,
+      mode: isAdmin.value ? "admin" : mode,
+      code: kroki?.tracking_code,
+    });
+    await auth.myKrokis().catch(() => {});
+    emit("done", { trackingCode: kroki?.tracking_code || "", kroki });
+  } catch (e) {
+    const msg = e?.message || "خطا در صدور کروکی";
+    logger.error("kroki", "خطا در صدور مستقیم کروکی", msg);
+    if (/موجودی|سهمیه/.test(msg) && !isAdmin.value) {
+      insufficientOpen.value = true;
+    } else {
+      consumeError.value = msg;
+    }
+    if (/وارد|نشست/.test(msg)) window.location.reload();
+  } finally {
+    processing.value = false;
+  }
+}
 
 // ── مجاورت‌ها در پیش‌نمایش ──
 // ترسیم‌های KML مودال «ترسیم جدید» (تنها جای قبلی ورود مجاورت) را ندیده‌اند و
@@ -422,7 +610,15 @@ onMounted(async () => {
     await document.fonts?.ready;
   } catch (e) {}
   updatePreview();
-  logger.info("step", "مشاهده پیش‌نمایش کروکی", { template: props.templateId });
+  try {
+    await auth.loadWallet();
+  } catch (e) {}
+  try {
+    const n = eligiblePinsOf(props.pins || props.gen.last?.pins || []).length;
+    logger.info("step", "مشاهده پیش‌نمایش کروکی", { template: props.templateId, shapes: n, free: auth.freeOf(), wallet: auth.walletOf() });
+  } catch (e) {
+    logger.info("step", "مشاهده پیش‌نمایش کروکی", { template: props.templateId });
+  }
 });
 
 watch(
