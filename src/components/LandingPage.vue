@@ -41,7 +41,7 @@
                 class="text-[11px] text-[var(--text-muted)] whitespace-nowrap transition-all duration-500"
                 :class="scrolled ? 'opacity-0 h-0' : 'opacity-100'"
               >
-                تولید حرفه‌ای کروکی نقشه ملک
+                سیستم اطلاعات جغرافیایی(ساج)
               </div>
             </div>
           </div>
