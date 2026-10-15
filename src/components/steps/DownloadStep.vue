@@ -137,8 +137,8 @@
         </button>
       </div>
 
-      <!-- دانلود — ردیف دوم: KML و DXF -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 max-w-lg mx-auto">
+      <!-- دانلود — ردیف دوم: KML و DXF و CSV -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <button class="download-card" @click="downloadKml">
           <div
             class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-300/40 flex items-center justify-center mb-3"
@@ -170,6 +170,23 @@
             class="text-xs font-semibold text-orange-600 flex items-center gap-1"
           >
             <i class="fas fa-download"></i> دانلود DXF
+          </span>
+        </button>
+
+        <button class="download-card" @click="downloadCsv">
+          <div
+            class="w-12 h-12 rounded-xl bg-sky-50 border border-sky-300/40 flex items-center justify-center mb-3"
+          >
+            <i class="fas fa-table text-lg text-sky-600"></i>
+          </div>
+          <div class="font-bold text-sm mb-1">مختصات نقاط (CSV)</div>
+          <div class="text-[11px] text-[var(--text-muted)] mb-3">
+            شماره نقاط + مختصات UTM
+          </div>
+          <span
+            class="text-xs font-semibold text-sky-600 flex items-center gap-1"
+          >
+            <i class="fas fa-download"></i> دانلود CSV
           </span>
         </button>
       </div>
@@ -290,6 +307,11 @@ function downloadKml() {
 function downloadDxf() {
   props.gen.exportDxf();
   logger.info("download", "دانلود خروجی DXF");
+}
+
+function downloadCsv() {
+  props.gen.exportCsv();
+  logger.info("download", "دانلود مختصات نقاط CSV");
 }
 </script>
 

@@ -161,3 +161,32 @@ export function downloadText(text, filename, mime = "text/plain") {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+// ساخت متن CSV مختصات نقاط کروکی با شماره نقاط
+// ستون‌ها: شماره (ردیف سراسری)، نام نقطه (لیبل روی کروکی)، X، Y، زون، عرض، طول
+// خروجی با BOM برای باز شدن درست در Excel همراه است.
+export function buildPointsCsv(utmPoints, opts = {}) {
+  const pts = Array.isArray(utmPoints) ? utmPoints : [];
+  const labelOf = typeof opts.labelOf === "function" ? opts.labelOf : (_, i) => String(i + 1);
+  const lines = [];
+  lines.push("No,Label,X_Easting,Y_Northing,Zone,Latitude,Longitude");
+  pts.forEach((p, i) => {
+    if (!p) return;
+    const x = Number(p.x);
+    const y = Number(p.y);
+    const lat = Number(p.lat);
+    const lon = Number(p.lon ?? p.lng);
+    const zone = p.zone ?? opts.zone ?? "";
+    const cells = [
+      String(i + 1),
+      String(labelOf(p, i)).replace(/,/g, " "),
+      Number.isFinite(x) ? x.toFixed(2) : "",
+      Number.isFinite(y) ? y.toFixed(2) : "",
+      String(zone).replace(/,/g, " "),
+      Number.isFinite(lat) ? lat.toFixed(8) : "",
+      Number.isFinite(lon) ? lon.toFixed(8) : "",
+    ];
+    lines.push(cells.join(","));
+  });
+  return "﻿" + lines.join("\r\n") + "\r\n";
+}

@@ -100,6 +100,9 @@
               <button class="btn btn-secondary btn-sm" @click="dlDxf">
                 <i class="fas fa-draw-polygon ml-1"></i> DXF
               </button>
+              <button class="btn btn-secondary btn-sm" @click="dlCsv">
+                <i class="fas fa-table ml-1"></i> CSV نقاط
+              </button>
               <button v-if="isDraft" class="btn btn-primary btn-sm" @click="$emit('editDrawing', full)">
                 <i class="fas fa-pen ml-1"></i> ویرایش ترسیم
               </button>
@@ -481,6 +484,11 @@ function dlKml() {
 function dlDxf() {
   try {
     gen.exportDxf();
+  } catch (e) {}
+}
+function dlCsv() {
+  try {
+    gen.exportCsv();
   } catch (e) {}
 }
 

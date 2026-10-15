@@ -290,7 +290,20 @@ function safeImgSrc(s) {
   if (typeof s !== "string" || !s) return "";
   if (/^data:image\/(png|jpeg|gif|webp);base64,/i.test(s)) return s;
   if (/^(https?:|blob:)/i.test(s)) return s;
+  // لوگوی پیش‌فرض قالب‌ها (فایل داخل public مثل /bargh-logo.svg)
+  if (/^\/[\w\-./]+\.(png|jpe?g|gif|webp|svg)$/i.test(s)) return s;
   return "";
+}
+
+/*
+ * لوگوی موثر سربرگ: اول لوگوی آپلودشده کاربر، بعد لوگوی پیش‌فرض قالب
+ * (مثلاً لوگوی شرکت برق برای قالب برق). خروجی برای چاپ امن‌سازی می‌شود.
+ */
+function effectiveLogoSrc(form, t) {
+  const custom = typeof form?.logo === "string" ? form.logo.trim() : "";
+  if (custom) return safeImgSrc(custom);
+  const def = typeof t?.defaultLogo === "string" ? t.defaultLogo.trim() : "";
+  return safeImgSrc(def);
 }
 
 function truncateText(ctx, text, maxWidth) {
@@ -553,7 +566,12 @@ export function useKrokiGenerator() {
     }
     last.form = { ...form };
     last.pins = pins;
-    loadLogoImage(last.form.logo);
+    try {
+      const t0 = template();
+      loadLogoImage(effectiveLogoSrc(last.form, t0) || last.form.logo);
+    } catch (e) {
+      loadLogoImage(last.form.logo);
+    }
     state.generating = true;
     try {
       const { allPositions, metas } = geom;
@@ -825,6 +843,53 @@ export function useKrokiGenerator() {
   }
   // ------------------------------------
 
+  // ─────────────── CSV Export (مختصات نقاط با شماره) ───────────────
+  function exportCsv() {
+    const pts = state.utmPoints;
+    if (!pts || !pts.length) return;
+    const t = template();
+    let nw = 0;
+    try {
+      nw = findNorthWestIndex(pts);
+    } catch (e) {
+      nw = 0;
+    }
+    const style = t.vertexLabels || "numbers";
+    const lines = ["No,Label,X_Easting,Y_Northing,Zone,Latitude,Longitude"];
+    pts.forEach((p, i) => {
+      if (!p) return;
+      const x = Number(p.x);
+      const y = Number(p.y);
+      const lat = Number(p.lat);
+      const lon = Number(p.lon ?? p.lng);
+      let label = String(i + 1);
+      try {
+        label = String(vertexLabel(style, i, nw));
+      } catch (e) {}
+      const cells = [
+        String(i + 1),
+        String(label).replace(/,/g, " "),
+        Number.isFinite(x) ? x.toFixed(2) : "",
+        Number.isFinite(y) ? y.toFixed(2) : "",
+        String(p.zone ?? state.utmZone ?? "").replace(/,/g, " "),
+        Number.isFinite(lat) ? lat.toFixed(8) : "",
+        Number.isFinite(lon) ? lon.toFixed(8) : "",
+      ];
+      lines.push(cells.join(","));
+    });
+    const csv = "﻿" + lines.join("\r\n") + "\r\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = makeExportFilename("mapiq_points", 1) + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  // ------------------------------------
+
   function drawFrame(ctx, W, H, t) {
     ctx.save();
     const f = t.frame;
@@ -836,6 +901,19 @@ export function useKrokiGenerator() {
       ctx.lineWidth = 1;
       ctx.strokeRect(18, 18, W - 36, H - 36);
       ctx.fillStyle = t.headerColor;
+      ctx.fillRect(10, 10, 42, 5);
+      ctx.fillRect(W - 52, 10, 42, 5);
+      ctx.fillRect(10, H - 15, 42, 5);
+      ctx.fillRect(W - 52, H - 15, 42, 5);
+    } else if (f === "bargh") {
+      // قاب اختصاصی شرکت برق: کادر مشکی دولایه + زبانه‌های زرد در گوشه‌ها
+      ctx.strokeStyle = "#161616";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(10, 10, W - 20, H - 20);
+      ctx.strokeStyle = "rgba(22, 22, 22, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(18, 18, W - 36, H - 36);
+      ctx.fillStyle = "#f5c518";
       ctx.fillRect(10, 10, 42, 5);
       ctx.fillRect(W - 52, 10, 42, 5);
       ctx.fillRect(10, H - 15, 42, 5);
@@ -872,7 +950,7 @@ export function useKrokiGenerator() {
     if (t.titleBlock !== "official") return;
     const k = FS || 1;
     const h = Math.round(46 * k);
-    const hasLogo = !!logoImageCache?.img && !!form.logo;
+    const hasLogo = !!logoImageCache?.img && !!effectiveLogoSrc(form, t);
     const textW = hasLogo ? W - Math.round(132 * k) : W - Math.round(24 * k);
     ctx.fillStyle = t.headerColor;
     ctx.fillRect(0, 0, W, h);
@@ -1094,6 +1172,12 @@ export function useKrokiGenerator() {
   function renderSketch(canvas) {
     if (!canvas) return;
     const t = template();
+    // اگر لوگوی موثر (مثلاً لوگوی پیش‌فرض قالب برق) هنوز در حافظه نیست،
+    // بارگذاری را شروع کن تا رندر بعدی آن را بکشد (رندر فعلی بدون لوگو می‌ماند)
+    try {
+      const wantLogo = effectiveLogoSrc(last.form, t) || "";
+      if (wantLogo && logoImageCache.src !== wantLogo) loadLogoImage(wantLogo);
+    } catch (e) {}
     const W = canvas.width;
     const H = canvas.height;
     const ctx = canvas.getContext("2d");
@@ -1525,7 +1609,7 @@ export function useKrokiGenerator() {
     const headBlock = `
     <div class="head" style="border-bottom-color:${t.headerColor}">
       <div class="head-logo-title">
-        ${safeImgSrc(last.form.logo) ? `<img class="head-logo" src="${safeImgSrc(last.form.logo)}" alt="" />` : ""}
+        ${effectiveLogoSrc(last.form, t) ? `<img class="head-logo" src="${effectiveLogoSrc(last.form, t)}" alt="" />` : ""}
         <div class="head-title">${escapeHtml(last.form.title) || "کروکی وضعیت موجود"}</div>
       </div>
       <div class="head-sub">قالب: ${escapeHtml(t.name)} — تاریخ برداشت: ${escapeHtml(last.form.date)}</div>
@@ -2021,7 +2105,8 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
     eligiblePinsOf,
     isKrokiEligible,
     exportKml,
-    exportDxf, // توابع جدید اضافه شدند
+    exportDxf,
+    exportCsv,
   };
 }
 

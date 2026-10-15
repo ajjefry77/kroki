@@ -137,6 +137,7 @@
             <div class="flex items-center gap-4">
               <div class="w-16 h-16 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface2)] flex items-center justify-center overflow-hidden">
                 <img v-if="form.logo" :src="form.logo" class="w-full h-full object-contain" alt="لوگو" />
+                <img v-else-if="currentTemplate?.defaultLogo" :src="currentTemplate.defaultLogo" class="w-full h-full object-contain opacity-80" alt="لوگوی پیش‌فرض قالب" />
                 <i v-else class="fas fa-image text-xl text-[var(--text-faint)]"></i>
               </div>
               <div class="flex flex-col gap-1.5 min-w-0">
@@ -152,6 +153,13 @@
                 </div>
                 <span class="text-[10px] text-[var(--text-faint)] leading-4">
                   در سربرگ کروکی و هدر خروجی PDF قرار می‌گیرد. PNG با پس‌زمینه شفاف توصیه می‌شود.
+                </span>
+                <span
+                  v-if="!form.logo && currentTemplate?.defaultLogo"
+                  class="text-[10px] text-[var(--info)] leading-4"
+                >
+                  <i class="fas fa-circle-info ml-1"></i>
+                  برای قالب «{{ currentTemplate.name }}» لوگوی پیش‌فرض شرکت به‌صورت خودکار استفاده می‌شود؛ برای تغییر، لوگوی خود را بارگذاری کنید.
                 </span>
               </div>
             </div>
