@@ -137,9 +137,9 @@
         </button>
       </div>
 
-      <!-- دانلود — ردیف دوم: KML و DXF و CSV -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <button class="download-card" @click="downloadKml">
+      <!-- دانلود — ردیف دوم: KML و KMZ و DXF -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <!-- <button class="download-card" @click="downloadKml">
           <div
             class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-300/40 flex items-center justify-center mb-3"
           >
@@ -153,6 +153,27 @@
             class="text-xs font-semibold text-emerald-600 flex items-center gap-1"
           >
             <i class="fas fa-download"></i> دانلود KML
+          </span>
+        </button> -->
+
+        <button class="download-card" @click="downloadKmz" :disabled="kmzBusy">
+          <div
+            class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-300/40 flex items-center justify-center mb-3"
+          >
+            <i
+              :class="kmzBusy ? 'fas fa-circle-notch fa-spin' : 'fas fa-file-archive'"
+              class="text-lg text-emerald-600"
+            ></i>
+          </div>
+          <div class="font-bold text-sm mb-1">خروجی KMZ (پوشه‌بندی)</div>
+          <div class="text-[11px] text-[var(--text-muted)] mb-3">
+            KML + تصاویر + CSV + مشخصات
+          </div>
+          <span
+            class="text-xs font-semibold text-emerald-600 flex items-center gap-1"
+          >
+            <i :class="kmzBusy ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
+            {{ kmzBusy ? "در حال ساخت..." : "دانلود KMZ" }}
           </span>
         </button>
 
@@ -190,6 +211,28 @@
           </span>
         </button>
       </div>
+
+      <!-- ردیف سوم: CSV و توضیحات -->
+      <!-- <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <button class="download-card" @click="downloadCsv">
+          <div
+            class="w-12 h-12 rounded-xl bg-sky-50 border border-sky-300/40 flex items-center justify-center mb-3"
+          >
+            <i class="fas fa-table text-lg text-sky-600"></i>
+          </div>
+          <div class="font-bold text-sm mb-1">مختصات نقاط (CSV)</div>
+          <div class="text-[11px] text-[var(--text-muted)] mb-3">
+            شماره نقاط + مختصات UTM
+          </div>
+          <span
+            class="text-xs font-semibold text-sky-600 flex items-center gap-1"
+          >
+            <i class="fas fa-download"></i> دانلود CSV
+          </span>
+        </button>
+
+        
+      </div> -->
 
       <!-- کانواس مخفی -->
       <canvas
@@ -251,6 +294,7 @@ const hiddenCanvasRef = ref(null);
 const canvasW = ref(700);
 const canvasH = ref(700);
 const currentTemplate = getTemplate(props.templateId);
+const kmzBusy = ref(false);
 
 function sizeCanvas() {
   const size = canvasSizeForPoints(props.gen.state.utmPoints);
@@ -302,6 +346,19 @@ function downloadPdf() {
 function downloadKml() {
   props.gen.exportKml();
   logger.info("download", "دانلود خروجی KML");
+}
+
+async function downloadKmz() {
+  if (kmzBusy.value) return;
+  kmzBusy.value = true;
+  try {
+    await props.gen.exportKmz(hiddenCanvasRef.value);
+    logger.info("download", "دانلود خروجی KMZ با پوشه‌بندی");
+  } catch (e) {
+    logger.error("download", "خطا در ساخت KMZ", { error: e?.message });
+  } finally {
+    kmzBusy.value = false;
+  }
 }
 
 function downloadDxf() {

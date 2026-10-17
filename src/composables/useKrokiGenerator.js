@@ -6,6 +6,12 @@ import { computeCanvasSize, findNorthWestIndex } from "../utils/canvas";
 import { loadMapbox } from "../utils/loadMapbox";
 import { getTodayJalali, makeExportFilename } from "../utils/jalali";
 import { logger } from "../utils/logger";
+import {
+  buildKmz,
+  buildDocKml,
+  buildInfoText,
+  dataUrlToBytes,
+} from "../utils/kmz";
 
 export { getTodayJalali };
 
@@ -730,6 +736,137 @@ export function useKrokiGenerator() {
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ─────────────── KMZ Export (ZIP با پوشه‌بندی داخلی) ───────────────
+  // ساخت فایل KMZ با ساختار زیر:
+  //   doc.kml                — فایل اصلی KML با پوشه‌های ترسیمات و نقاط + Ground Overlay
+  //   images/sketch.png      — تصویر کروکی (canvas)
+  //   images/map.png         — تصویر ماهواره‌ای محدوده (در صورت وجود)
+  //   data/points.csv        — مختصات UTM نقاط
+  //   data/info.txt          — مشخصات متنی کروکی
+  //
+  // نکته: canvas باید از بیرون پاس داده شود (مانند exportKml/PDF) تا
+  // تصویر کروکی به‌روز باشد. اگر canvas پاس داده نشد، فقط بخش‌های متنی و نقشه
+  // در KMZ قرار می‌گیرند.
+  async function exportKmz(canvas) {
+    const metas = state.selectedShapesMeta;
+    const pts = state.utmPoints;
+    if (!pts.length || !metas.length) return;
+
+    const t = template();
+    const form = last.form || {};
+
+    // ۱) تصویر کروکی از روی canvas (در صورت پاس داده شدن)
+    let sketchBytes = null;
+    if (canvas) {
+      try {
+        // رندر تازه روی canvas پنهان
+        renderSketch(canvas);
+      } catch (e) {}
+      try {
+        const dataUrl = canvas.toDataURL("image/png");
+        sketchBytes = dataUrlToBytes(dataUrl);
+      } catch (e) {
+        sketchBytes = null;
+      }
+    }
+
+    // ۲) تصویر ماهواره‌ای نقشه (اگر در state موجود است)
+    let mapBytes = null;
+    if (state.mapImage) {
+      mapBytes = dataUrlToBytes(state.mapImage);
+    }
+
+    // ۳) محاسبه مرز جغرافیایی برای Ground Overlay تصویر ماهواره
+    let bounds = null;
+    if (mapBytes) {
+      let north = -Infinity, south = Infinity, east = -Infinity, west = Infinity;
+      for (const p of pts) {
+        if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) continue;
+        if (p.lat > north) north = p.lat;
+        if (p.lat < south) south = p.lat;
+        if (p.lon > east) east = p.lon;
+        if (p.lon < west) west = p.lon;
+      }
+      if (Number.isFinite(north)) {
+        bounds = { north, south, east, west };
+      }
+    }
+
+    // ۴) ساخت doc.kml با ارجاع به فایل‌های کناری
+    const docKml = buildDocKml({
+      metas,
+      utmPoints: pts,
+      form,
+      areaM2: state.areaM2,
+      mapImagePath: mapBytes && bounds ? "images/map.png" : null,
+      bounds,
+    });
+
+    // ۵) ساخت CSV نقاط (مشابه exportCsv اما بدون دانلود، فقط محتوا)
+    const nwIdx = (() => {
+      try {
+        return findNorthWestIndex(pts);
+      } catch (e) {
+        return 0;
+      }
+    })();
+    const style = t.vertexLabels || "numbers";
+    const csvLines = ["No,Label,X_Easting,Y_Northing,Zone,Latitude,Longitude"];
+    pts.forEach((p, i) => {
+      if (!p) return;
+      const x = Number(p.x);
+      const y = Number(p.y);
+      const lat = Number(p.lat);
+      const lon = Number(p.lon ?? p.lng);
+      let label = String(i + 1);
+      try {
+        label = String(vertexLabel(style, i, nwIdx));
+      } catch (e) {}
+      const cells = [
+        String(i + 1),
+        String(label).replace(/,/g, " "),
+        Number.isFinite(x) ? x.toFixed(2) : "",
+        Number.isFinite(y) ? y.toFixed(2) : "",
+        String(p.zone ?? state.utmZone ?? "").replace(/,/g, " "),
+        Number.isFinite(lat) ? lat.toFixed(8) : "",
+        Number.isFinite(lon) ? lon.toFixed(8) : "",
+      ];
+      csvLines.push(cells.join(","));
+    });
+    const csvContent = "\uFEFF" + csvLines.join("\r\n") + "\r\n";
+
+    // ۶) ساخت info.txt با مشخصات کروکی
+    const infoContent = buildInfoText({
+      form,
+      areaM2: state.areaM2,
+      utmPoints: pts,
+      utmZone: state.utmZone,
+      templateName: t.name,
+      trackingCode: form.trackingCode || "",
+    });
+
+    // ۷) ساخت لیست فایل‌ها با مسیرهای پوشه‌بندی‌شده
+    const files = [];
+    files.push({ path: "doc.kml", content: docKml });
+    if (sketchBytes) {
+      files.push({ path: "images/sketch.png", content: sketchBytes });
+    }
+    if (mapBytes) {
+      files.push({ path: "images/map.png", content: mapBytes });
+    }
+    files.push({ path: "data/points.csv", content: csvContent });
+    files.push({ path: "data/info.txt", content: infoContent });
+
+    // ۸) ساخت و دانلود KMZ
+    const filename = makeExportFilename("mapiq", 1) + ".kmz";
+    await buildKmz({ files, filename });
+    logger.info("export", "خروجی KMZ با پوشه‌بندی ساخته شد", {
+      files: files.length,
+      hasMap: !!mapBytes,
+      hasSketch: !!sketchBytes,
+    });
   }
 
   // ─────────────── DXF Export (R12 / AC1009 — سازگار با همه اتوکدها) ───────────────
@@ -2105,6 +2242,7 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
     eligiblePinsOf,
     isKrokiEligible,
     exportKml,
+    exportKmz,
     exportDxf,
     exportCsv,
   };

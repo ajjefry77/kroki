@@ -97,6 +97,10 @@
               <button class="btn btn-secondary btn-sm" @click="dlKml">
                 <i class="fas fa-globe ml-1"></i> KML
               </button>
+              <button class="btn btn-secondary btn-sm" @click="dlKmz" :disabled="kmzBusy">
+                <i :class="kmzBusy ? 'fas fa-circle-notch fa-spin' : 'fas fa-file-archive'" class="ml-1"></i>
+                {{ kmzBusy ? "در حال ساخت..." : "KMZ" }}
+              </button>
               <button class="btn btn-secondary btn-sm" @click="dlDxf">
                 <i class="fas fa-draw-polygon ml-1"></i> DXF
               </button>
@@ -214,6 +218,7 @@ const canvasH = ref(700);
 const saving = ref(false);
 const saveMsg = ref("");
 const saveOk = ref(true);
+const kmzBusy = ref(false);
 
 let gen = null;
 let pinsArr = [];
@@ -480,6 +485,16 @@ function dlKml() {
   try {
     gen.exportKml();
   } catch (e) {}
+}
+async function dlKmz() {
+  if (kmzBusy.value) return;
+  kmzBusy.value = true;
+  try {
+    await gen.exportKmz(sketchRef.value);
+  } catch (e) {
+  } finally {
+    kmzBusy.value = false;
+  }
 }
 function dlDxf() {
   try {

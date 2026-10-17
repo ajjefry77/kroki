@@ -671,10 +671,10 @@
           <div class="text-xs text-[var(--accent-soft)] font-semibold mb-2">
             مراحل کار
           </div>
-          <h2 class="text-2xl md:text-4xl font-extrabold">در ۵ گام ساده</h2>
+          <h2 class="text-2xl md:text-4xl font-extrabold">در ۴ گام ساده</h2>
         </div>
         <div
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
           style="perspective: 1000px"
         >
           <div
@@ -817,15 +817,17 @@ const steps = [
     desc: "مرز ملک را روی نقشه هوایی رسم کنید یا فایل KML بارگذاری کنید.",
   },
   {
-    title: "ثبت اطلاعات",
+    title: "اطلاعات و قالب",
     desc: "مشخصات ملک، متقاضی و قالب کروکی را وارد کنید.",
   },
   {
     title: "پیش‌نمایش",
-    desc: "خروجی نهایی را بررسی و ویرایش مجاورت‌ها را انجام دهید.",
+    desc: "خروجی نهایی را بررسی و پس از پرداخت امن، کروکی صادر شود.",
   },
-  { title: "پرداخت", desc: "به‌صورت امن و آنی هزینه سرویس را پرداخت کنید." },
-  { title: "دانلود", desc: "فایل کروکی را در قالب PNG یا PDF دانلود کنید." },
+  {
+    title: "دانلود",
+    desc: "فایل کروکی را در قالب PNG یا PDF دانلود کنید.",
+  },
 ];
 
 const templates = SKETCH_TEMPLATES.map((t) => ({
