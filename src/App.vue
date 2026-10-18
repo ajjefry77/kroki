@@ -151,7 +151,7 @@ import {
 } from "./utils/sessionPersist";
 import { normalizeSingleSelection } from "./utils/pins";
 
-import LandingPage from "./components/LandingPage.vue";
+const LandingPage = defineAsyncComponent(() => import("./components/LandingPage.vue"));
 import Loading from "./components/Loading.vue";
 
 const WizardHeader = defineAsyncComponent(() => import("./components/WizardHeader.vue"));

@@ -9,11 +9,14 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 2000,
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: {
           "mapbox": ["mapbox-gl"],
           "vendor": ["vue"],
+          "axios": ["axios"],
+          "proj4": ["proj4"],
         },
       },
     },
