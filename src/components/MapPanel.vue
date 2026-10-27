@@ -1,6 +1,31 @@
 <template>
   <div class="relative w-full h-full min-h-[inherit] overflow-hidden bg-[var(--bg-elevated)]">
     <div ref="mapContainerRef" class="absolute inset-0 w-full h-full" style="touch-action:none"></div>
+    <div
+      v-if="manualCsvSelection"
+      class="absolute bottom-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[700] flex flex-col gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)]/95 p-3 shadow-xl backdrop-blur sm:min-w-[380px]"
+      dir="rtl"
+      @click.stop
+    >
+      <div class="text-xs font-semibold text-center">
+        نقاط مرزی را به‌ترتیب روی نقشه انتخاب کنید
+        <span class="text-[var(--accent)]">({{ manualCsvSelection.selected.length }} انتخاب از {{ manualCsvSelection.points.length }})</span>
+      </div>
+      <div class="flex items-center justify-center gap-2">
+        <button class="btn btn-ghost btn-xs" :disabled="!manualCsvSelection.selected.length" @click="undoManualCsvPoint">
+          <i class="fas fa-rotate-right ml-1"></i> بازگشت
+        </button>
+        <button class="btn btn-ghost btn-xs" @click="cancelManualCsvSelection">
+          انصراف
+        </button>
+        <button class="btn btn-primary btn-xs" :disabled="manualCsvSelection.selected.length < 3" @click="completeManualCsvSelection">
+          <i class="fas fa-check ml-1"></i> ثبت پلی‌گان
+        </button>
+      </div>
+      <p class="text-[10px] text-[var(--text-muted)] text-center leading-4">
+        نقاط انتخاب‌شده شماره‌گذاری می‌شوند؛ سایر نقاط پس از ثبت پلی‌گان حذف خواهند شد.
+      </p>
+    </div>
 
     <!-- هشدار عدم پشتیبانی WebGL -->
     <div v-if="initError" class="absolute inset-0 z-50 flex items-center justify-center bg-[var(--bg)]">
@@ -223,7 +248,7 @@ const props = defineProps({
   pins: { type: Object, required: true },
 });
 
-const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin", "csvFile", "removePin"]);
+const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin", "csvFile", "removePin", "manualCsvSelectionComplete"]);
 
 const mapContainerRef = ref(null);
 const kmlInput = ref(null);
@@ -243,6 +268,7 @@ const mapProxy = ref(null);
 const searchOpen = ref(false);
 const drawing = ref(null);
 const nameInputRef = ref(null);
+const manualCsvSelection = ref(null);
 
 const hud = reactive({ lng: null, lat: null, zoom: 5 });
 
@@ -353,6 +379,175 @@ function setCsvLoading(on) {
   if (!csvOverlayOn) return;
   csvOverlayOn = false;
   loading.value = false;
+}
+
+function updateManualCsvSource() {
+  const session = manualCsvSelection.value;
+  const source = session && map?.getSource(session.sourceId);
+  if (!source) return;
+
+  const selectedOrder = new Map(session.selected.map((pointIndex, order) => [pointIndex, order + 1]));
+  const features = session.points.map((point, pointIndex) => ({
+    type: "Feature",
+    geometry: {
+      type: "Point",
+      coordinates: [Number(point.lon), Number(point.lat)],
+    },
+    properties: {
+      pointIndex,
+      selectedOrder: selectedOrder.get(pointIndex) || 0,
+    },
+  }));
+  const selectedCoordinates = session.selected.map((pointIndex) => {
+    const point = session.points[pointIndex];
+    return [Number(point.lon), Number(point.lat)];
+  });
+  if (selectedCoordinates.length >= 2) {
+    features.push({
+      type: "Feature",
+      geometry: { type: "LineString", coordinates: selectedCoordinates },
+      properties: {},
+    });
+  }
+  if (selectedCoordinates.length >= 3) {
+    features.push({
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [[...selectedCoordinates, selectedCoordinates[0]]],
+      },
+      properties: {},
+    });
+  }
+  source.setData({ type: "FeatureCollection", features });
+}
+
+function removeManualCsvSelection() {
+  const session = manualCsvSelection.value;
+  if (!session) return;
+  if (map) {
+    map.off("click", session.pointLayerId, session.clickHandler);
+    map.off("mouseenter", session.pointLayerId, session.mouseEnterHandler);
+    map.off("mouseleave", session.pointLayerId, session.mouseLeaveHandler);
+    map.on("click", onMapClick);
+    map.getCanvas().style.cursor = "";
+    for (const layerId of session.layerIds) {
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+    }
+    if (map.getSource(session.sourceId)) map.removeSource(session.sourceId);
+  }
+  manualCsvSelection.value = null;
+}
+
+function startManualCsvSelection({ points, name, invalidRows }) {
+  if (!map || !map.isStyleLoaded() || !Array.isArray(points) || points.length <= 50) return false;
+  removeManualCsvSelection();
+
+  const sourceId = `csv-boundary-${Date.now()}`;
+  const fillLayerId = `${sourceId}-fill`;
+  const lineLayerId = `${sourceId}-line`;
+  const pointLayerId = `${sourceId}-points`;
+  const labelLayerId = `${sourceId}-labels`;
+  const bounds = new mapboxgl.LngLatBounds();
+  for (const point of points) bounds.extend([Number(point.lon), Number(point.lat)]);
+
+  map.addSource(sourceId, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  map.addLayer({
+    id: fillLayerId,
+    type: "fill",
+    source: sourceId,
+    filter: ["==", ["geometry-type"], "Polygon"],
+    paint: { "fill-color": "#22c55e", "fill-opacity": 0.18 },
+  });
+  map.addLayer({
+    id: lineLayerId,
+    type: "line",
+    source: sourceId,
+    filter: ["==", ["geometry-type"], "LineString"],
+    paint: { "line-color": "#22c55e", "line-width": 3 },
+  });
+  map.addLayer({
+    id: pointLayerId,
+    type: "circle",
+    source: sourceId,
+    filter: ["==", ["geometry-type"], "Point"],
+    paint: {
+      "circle-radius": 8,
+      "circle-color": ["case", [">", ["get", "selectedOrder"], 0], "#22c55e", "#f59e0b"],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 2,
+    },
+  });
+  map.addLayer({
+    id: labelLayerId,
+    type: "symbol",
+    source: sourceId,
+    filter: ["all", ["==", ["geometry-type"], "Point"], [">", ["get", "selectedOrder"], 0]],
+    layout: {
+      "text-field": ["to-string", ["get", "selectedOrder"]],
+      "text-font": ["Open Sans Regular"],
+      "text-size": 11,
+      "text-allow-overlap": true,
+    },
+    paint: { "text-color": "#ffffff", "text-halo-color": "#166534", "text-halo-width": 1 },
+  });
+
+  const session = {
+    points,
+    name,
+    invalidRows,
+    selected: [],
+    sourceId,
+    pointLayerId,
+    layerIds: [fillLayerId, lineLayerId, pointLayerId, labelLayerId],
+    clickHandler: null,
+    mouseEnterHandler: () => { map.getCanvas().style.cursor = "pointer"; },
+    mouseLeaveHandler: () => { map.getCanvas().style.cursor = ""; },
+  };
+  session.clickHandler = (event) => {
+    const feature = event.features?.find((candidate) => {
+      const index = Number(candidate.properties?.pointIndex);
+      return Number.isInteger(index) && index >= 0 && !session.selected.includes(index);
+    });
+    const pointIndex = Number(feature?.properties?.pointIndex);
+    if (!Number.isInteger(pointIndex) || pointIndex < 0) return;
+    session.selected.push(pointIndex);
+    updateManualCsvSource();
+  };
+  manualCsvSelection.value = session;
+  map.off("click", onMapClick);
+  map.on("click", pointLayerId, session.clickHandler);
+  map.on("mouseenter", pointLayerId, session.mouseEnterHandler);
+  map.on("mouseleave", pointLayerId, session.mouseLeaveHandler);
+  updateManualCsvSource();
+  if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 70, maxZoom: 17, duration: 800 });
+  return true;
+}
+
+function undoManualCsvPoint() {
+  const session = manualCsvSelection.value;
+  if (!session?.selected.length) return;
+  session.selected.pop();
+  updateManualCsvSource();
+}
+
+function cancelManualCsvSelection() {
+  removeManualCsvSelection();
+}
+
+function completeManualCsvSelection() {
+  const session = manualCsvSelection.value;
+  if (!session || session.selected.length < 3) return;
+  const payload = {
+    points: session.selected.map((pointIndex) => session.points[pointIndex]),
+    name: session.name,
+    invalidRows: session.invalidRows,
+  };
+  removeManualCsvSelection();
+  emit("manualCsvSelectionComplete", payload);
 }
 
 function yieldToUI() {
@@ -872,6 +1067,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  removeManualCsvSelection();
   teardownCustomPan();
   try { resizeObserver && resizeObserver.disconnect(); } catch (e) {}
   try {
@@ -886,5 +1082,5 @@ onUnmounted(() => {
   }
 });
 
-defineExpose({ map: () => map, drawing: () => drawing.value, setCsvLoading });
+defineExpose({ map: () => map, drawing: () => drawing.value, setCsvLoading, startManualCsvSelection });
 </script>

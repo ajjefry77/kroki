@@ -3,7 +3,7 @@
     <main class="min-h-0 flex flex-col lg:flex-row lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden">
       <!-- نقشه : در موبایل ارتفاع ثابت تا WebGL دیده شود؛ در دسکتاپ flex -->
       <section class="relative w-full shrink-0 h-[58svh] min-h-[340px] max-h-[68svh] lg:h-auto lg:max-h-none lg:flex-1 lg:min-h-0 lg:shrink border-b lg:border-b-0 border-[var(--border)]">
-        <MapPanel ref="mapPanelRef" :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" @csvFile="onCsvFile" />
+        <MapPanel ref="mapPanelRef" :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" @csvFile="onCsvFile" @manualCsvSelectionComplete="onManualCsvSelectionComplete" />
       </section>
 
       <!-- پنل کناری واحد با تب‌ها -->
@@ -62,6 +62,7 @@
             :map="mapRef"
             @select="activePinId = $event"
             @created="onShapeCreated"
+            @manualCsvSelection="onManualCsvSelection"
           />
 
           <!-- تب ترسیم‌ها -->
@@ -238,6 +239,24 @@ function onMapReady(payload) {
   mapRef.value = payload?.map || null;
   drawingRef.value = payload?.drawing || null;
   emit("mapReady", payload);
+}
+
+function onManualCsvSelection(payload) {
+  if (drawingRef.value?.drawMode) {
+    alert("برای انتخاب مرز CSV، ابتدا ترسیم فعال را تمام یا لغو کنید.");
+    return;
+  }
+  const started = mapPanelRef.value?.startManualCsvSelection?.(payload);
+  if (!started) {
+    alert("انتخاب نقاط روی نقشه در حال حاضر امکان‌پذیر نیست. لطفاً دوباره تلاش کنید.");
+  }
+}
+
+function onManualCsvSelectionComplete(payload) {
+  pointsTableRef.value?.createCsvShape?.({
+    ...payload,
+    shapeType: "polygon",
+  });
 }
 
 function findPin(id) {

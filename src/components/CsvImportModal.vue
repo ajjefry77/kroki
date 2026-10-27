@@ -34,9 +34,9 @@
               </div>
               <div>
                 <label class="block mb-1 font-medium">Items</label>
-                <select v-model="shapeType" class="input !py-1.5 !text-xs w-full" dir="ltr">
+                <select v-model="shapeType" :disabled="stats.valid > MAX_CSV_POINTS" class="input !py-1.5 !text-xs w-full disabled:opacity-60" dir="ltr">
                   <option value="polygon">Polygon (پلی‌گان بسته)</option>
-                  <option value="polyline">Polyline (خط)</option>
+                  <option value="polyline" :disabled="stats.valid > MAX_CSV_POINTS">Polyline (خط)</option>
                 </select>
               </div>
             </div>
@@ -175,6 +175,9 @@
                 </table>
               </div>
             </div>
+            <p v-if="stats.valid > MAX_CSV_POINTS" class="mt-3 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 p-2 text-[11px] leading-5 text-[var(--text)]" dir="rtl">
+              این فایل {{ stats.valid }} نقطه معتبر دارد. پس از تایید، نقاط روی نقشه نمایش داده می‌شوند؛ گوشه‌های مرز را به‌ترتیب انتخاب کنید تا فقط همان نقاط به‌عنوان پلی‌گان ذخیره شوند.
+            </p>
 
             <div
               v-if="stats.total"
@@ -195,7 +198,7 @@
             <button type="button" class="btn btn-ghost" @click="close">انصراف</button>
             <button type="button" class="btn btn-primary" :disabled="!canConfirm" @click="confirm">
               <i class="fas fa-check ml-1"></i>
-              تایید و ایجاد ({{ stats.valid }})
+              {{ stats.valid > MAX_CSV_POINTS ? `نمایش نقاط روی نقشه (${stats.valid})` : `تایید و ایجاد (${stats.valid})` }}
             </button>
           </div>
         </div>
@@ -233,7 +236,7 @@ const cols = reactive({
   zone: 0,
 });
 
-const MAX_CSV_POINTS = 20;
+const MAX_CSV_POINTS = 50;
 
 const shapeType = ref("polygon");
 const shapeName = ref("");
@@ -504,11 +507,6 @@ function loadFromText(text, filename = "") {
 
   shapeName.value = filename.replace(/\.(csv|txt)$/i, "") || "";
   shapeType.value = stats.value.valid >= 3 ? "polygon" : "polyline";
-  // سقف ۲۰ نقطه: فایل‌های پرنقطه پذیرفته نمی‌شوند
-  if (stats.value.valid > MAX_CSV_POINTS) {
-    errorMsg.value = `فایل بیشتر از ${MAX_CSV_POINTS} نقطه دارد (معتبر: ${stats.value.valid}). فقط تا ${MAX_CSV_POINTS} نقطه مجاز است.`;
-    return false;
-  }
   dialog.value = true;
   logger.info("draw", "باز شدن پنل Import CSV", { file: filename });
   return true;
@@ -537,10 +535,6 @@ function confirm() {
     return;
   }
   const { points, invalidRows } = collectPoints();
-  if (points.length > MAX_CSV_POINTS) {
-    errorMsg.value = `فایل بیشتر از ${MAX_CSV_POINTS} نقطه دارد (معتبر: ${points.length}). فقط تا ${MAX_CSV_POINTS} نقطه مجاز است.`;
-    return;
-  }
   if (points.length < min) {
     errorMsg.value = shapeType.value === "polygon"
       ? `برای پلی‌گان حداقل ۳ نقطه معتبر لازم است. (معتبر: ${points.length})`
@@ -553,6 +547,7 @@ function confirm() {
     shapeType: shapeType.value,
     name: shapeName.value.trim(),
     filename: fileName.value,
+    manualSelection: points.length > MAX_CSV_POINTS,
   });
   dialog.value = false;
 }

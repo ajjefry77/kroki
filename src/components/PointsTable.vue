@@ -245,7 +245,7 @@
           </div>
           <p class="text-[9px] text-[var(--text-faint)] leading-4">
             پس از انتخاب فایل، پنل «انتخاب ستون‌ها» باز می‌شود؛ Lat/Lon یا UTM و در صورت نیاز فیلدهای GPS (HRMS، PDOP و …) را مشخص کنید.
-            حداکثر ۲۰ نقطه در هر فایل پذیرفته می‌شود.
+            برای فایل‌های بیش از ۵۰ نقطه، گوشه‌های پلی‌گان را روی نقشه انتخاب کنید.
           </p>
 
           <button class="btn btn-primary btn-xs w-full" :disabled="!canCreate" @click="createShape">
@@ -287,7 +287,7 @@ const props = defineProps({
   map: { type: Object, default: null },
 });
 
-const emit = defineEmits(["select", "created"]);
+const emit = defineEmits(["select", "created", "manualCsvSelection"]);
 
 function flatten(list) {
   const out = [];
@@ -495,13 +495,23 @@ async function importCsvFile(file, onDone) {
   return true;
 }
 
-defineExpose({ importCsvFile });
-
 function onCsvImportCancel() {
   csvLoading.value = false;
 }
 
-function onCsvImportConfirm({ points, shapeType, name, invalidRows }) {
+function onCsvImportConfirm(payload) {
+  const { points, shapeType, name, invalidRows, manualSelection } = payload;
+  if (manualSelection) {
+    if (invalidRows?.length) {
+      logger.warn("draw", "ردیف‌های نامعتبر CSV نادیده گرفته شد", { count: invalidRows.length });
+    }
+    emit("manualCsvSelection", { points, name, invalidRows });
+    return;
+  }
+  createCsvShape(payload);
+}
+
+function createCsvShape({ points, shapeType = "polygon", name, invalidRows = [] }) {
   const positions = points.map((r) => ({
     lat: Number(r.lat),
     lon: Number(r.lon),
@@ -542,6 +552,8 @@ function onCsvImportConfirm({ points, shapeType, name, invalidRows }) {
     points: positions.length,
   });
 }
+
+defineExpose({ importCsvFile, createCsvShape });
 
 /* -------- ویرایش نقاط ترسیم در حال انجام -------- */
 const draftRows = computed(() => {
