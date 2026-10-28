@@ -142,6 +142,71 @@ export function clearWizard() {
 }
 
 // ---------- map viewport ----------
+function parseCoordinatePair(value) {
+  if (!value || typeof value !== "string") return null;
+  const parts = value.split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n));
+  if (parts.length < 2) return null;
+  return { lng: parts[0], lat: parts[1] };
+}
+
+function parseSharedUrlParams() {
+  const params = new URLSearchParams(window.location.search || "");
+  const hash = window.location.hash || "";
+  if (hash.includes("?")) {
+    const query = hash.slice(hash.indexOf("?") + 1);
+    const hashParams = new URLSearchParams(query);
+    for (const [key, value] of hashParams.entries()) {
+      if (!params.has(key)) params.set(key, value);
+    }
+  }
+  return params;
+}
+
+export function readSharedMapState() {
+  const params = parseSharedUrlParams();
+  const lat = Number(params.get("lat"));
+  const lng = Number(params.get("lng") ?? params.get("lon"));
+  const zoom = Number(params.get("zoom") ?? params.get("z"));
+  const point = parseCoordinatePair(params.get("point"));
+  const polygonRaw = params.get("polygon");
+  const polygon = polygonRaw ? polygonRaw.split(";").map(parseCoordinatePair).filter(Boolean) : [];
+  return {
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null,
+    zoom: Number.isFinite(zoom) ? zoom : null,
+    point,
+    polygon,
+    tool: params.get("tool") || "",
+  };
+}
+
+export function syncSharedMapState(state = {}) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  const hash = url.hash || "#/";
+  const hashSplit = hash.indexOf("?");
+  const hashBase = hashSplit >= 0 ? hash.slice(0, hashSplit) : hash;
+  const hashParams = new URLSearchParams(hashSplit >= 0 ? hash.slice(hashSplit + 1) : "");
+  for (const key of ["lat", "lng", "lon", "zoom", "z", "point", "polygon", "tool"]) {
+    hashParams.delete(key);
+  }
+  if (state.lat != null && Number.isFinite(state.lat)) hashParams.set("lat", Number(state.lat).toFixed(6));
+  if (state.lng != null && Number.isFinite(state.lng)) hashParams.set("lng", Number(state.lng).toFixed(6));
+  if (state.zoom != null && Number.isFinite(state.zoom)) hashParams.set("zoom", Number(state.zoom).toFixed(2));
+  if (state.point && Number.isFinite(state.point.lng) && Number.isFinite(state.point.lat)) {
+    hashParams.set("point", `${Number(state.point.lng).toFixed(6)},${Number(state.point.lat).toFixed(6)}`);
+  }
+  if (Array.isArray(state.polygon) && state.polygon.length) {
+    hashParams.set("polygon", state.polygon.map((p) => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`).join(";"));
+  }
+  if (state.tool) hashParams.set("tool", state.tool);
+  url.hash = `${hashBase}${hashParams.toString() ? `?${hashParams.toString()}` : ""}`;
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  if ((window.location.pathname + window.location.search + window.location.hash) !== next) {
+    window.history.replaceState({}, "", next);
+  }
+}
+
 export function loadMapView() {
   const v = safeGet(VIEW_KEY);
   if (!v || typeof v !== "object") return null;

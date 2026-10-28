@@ -217,7 +217,7 @@ import { kmlToGeoJSON, readKmlText } from "../utils/kml";
 import { registerDrawLayer, bringDrawingsToFront } from "../utils/layerOrder";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
 import { selectOnlyPin, flattenPins, setPinVisibleOnMap } from "../utils/pins";
-import { loadMapView, saveMapView } from "../utils/sessionPersist";
+import { loadMapView, saveMapView, readSharedMapState, syncSharedMapState } from "../utils/sessionPersist";
 
 const props = defineProps({
   pins: { type: Object, required: true },
@@ -291,6 +291,79 @@ watch(
     } catch (e) {}
   },
 );
+
+function resolveInitialMapView() {
+  const shared = readSharedMapState();
+  const sv = loadMapView();
+  const hasShared = Number.isFinite(shared.lng) && Number.isFinite(shared.lat) && Number.isFinite(shared.zoom);
+  if (Array.isArray(shared.polygon) && shared.polygon.length >= 3) {
+    const lngs = shared.polygon.map((p) => p.lng);
+    const lats = shared.polygon.map((p) => p.lat);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    return {
+      center: [(minLng + maxLng) / 2, (minLat + maxLat) / 2],
+      zoom: 14,
+    };
+  }
+  if (shared.point && !(hasShared)) {
+    return { center: [shared.point.lng, shared.point.lat], zoom: 15 };
+  }
+  if (hasShared) return { center: [shared.lng, shared.lat], zoom: Math.min(20, Math.max(3, shared.zoom)) };
+  if (sv && isFinite(sv.lng) && isFinite(sv.lat) && isFinite(sv.zoom)) {
+    return { center: [sv.lng, sv.lat], zoom: Math.min(20, Math.max(3, sv.zoom)) };
+  }
+  return { center: [51.5, 35.5], zoom: 5 };
+}
+
+function restoreSharedDrawingFromUrl() {
+  if (!map || !drawing.value) return;
+  const shared = readSharedMapState();
+  const polygon = Array.isArray(shared.polygon) ? shared.polygon : [];
+  const hasPoint = !!shared.point && Number.isFinite(shared.point.lng) && Number.isFinite(shared.point.lat);
+  const hasPolygon = polygon.length >= 3;
+  if (!hasPoint && !hasPolygon) return;
+
+  const pin = {
+    id: "shared-link-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+    name: "ترسیم ارسال‌شده",
+    date: new Date(),
+    save: -1,
+    type: "draw",
+    selected: true,
+    shape: {
+      type: hasPoint ? "point" : "polygon",
+      positions: hasPoint
+        ? [{ lon: shared.point.lng, lat: shared.point.lat, color: "#ff0000" }]
+        : polygon.map((p) => ({ lon: p.lng, lat: p.lat, color: "#ff0000" })),
+      lon: hasPoint ? shared.point.lng : undefined,
+      lat: hasPoint ? shared.point.lat : undefined,
+      color: "#ff0000",
+      outlineColor: "#ff0000",
+      opacity: 0.7,
+      width: 3,
+      show: true,
+    },
+  };
+
+  props.pins.push(pin);
+  renderPinOnMap(map, pin);
+  selectOnlyPin(props.pins, pin.id, map);
+
+  if (hasPoint) {
+    map.setCenter([shared.point.lng, shared.point.lat]);
+    map.setZoom(Math.max(map.getZoom(), 16));
+  } else if (hasPolygon) {
+    const lngs = polygon.map((p) => p.lng);
+    const lats = polygon.map((p) => p.lat);
+    map.fitBounds(
+      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { padding: 60, maxZoom: 19.5, duration: 700 },
+    );
+  }
+}
 
 function addGeoJSONSourceAndLayers(sourceId, geojson, pin) {
   map.addSource(sourceId, { type: "geojson", data: geojson });
@@ -728,15 +801,9 @@ async function initMapAsync() {
   }
 
   try {
-      let initCenter = [51.5, 35.5];
-      let initZoom = 5;
-      try {
-        const sv = loadMapView();
-        if (sv && isFinite(sv.lng) && isFinite(sv.lat) && isFinite(sv.zoom)) {
-          initCenter = [sv.lng, sv.lat];
-          initZoom = Math.min(20, Math.max(3, sv.zoom));
-        }
-      } catch (e) {}
+      const initialView = resolveInitialMapView();
+      const initCenter = initialView.center;
+      const initZoom = initialView.zoom;
       map = new mapboxgl.Map({
       container: mapContainerRef.value,
       style: {
@@ -799,6 +866,7 @@ async function initMapAsync() {
         try {
           const c = map.getCenter();
           saveMapView({ lng: c.lng, lat: c.lat, zoom: map.getZoom() });
+          syncSharedMapState({ lng: c.lng, lat: c.lat, zoom: map.getZoom() });
         } catch (e) {}
       }, 400);
     };
@@ -817,6 +885,7 @@ async function initMapAsync() {
     // بعد از لود کامل، یک resize تا کاشی‌ها در ارتفاع موبایل درست بچینند
     requestAnimationFrame(() => { try { map.resize(); } catch (e) {} });
     drawing.value = reactive(useDrawing(map, props.pins));
+    restoreSharedDrawingFromUrl();
     for (const p of props.pins || []) {
       if (p.shape && p.shape.type && p.type === "draw") {
         try {

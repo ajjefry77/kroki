@@ -543,15 +543,18 @@ watch(
 let lastHash = "";
 
 function currentHash() {
-  if (page.value === "admin") return "#/admin";
-  if (page.value === "userpanel") return "#/userpanel";
-  if (page.value === "agency-request") return "#/agency-request";
-  if (page.value === "expert-request") return "#/expert-request";
-  if (page.value === "experts") return "#/experts";
-  if (page.value === "payment-result") return window.location.hash.startsWith("#/payment-result") ? window.location.hash : "#/payment-result";
-  if (page.value === "auth") return "#/auth";
-  if (step.value === "landing") return "#/";
-  return "#/" + step.value;
+  const hash = window.location.hash || "";
+  const queryIndex = hash.indexOf("?");
+  const query = queryIndex >= 0 ? hash.slice(queryIndex) : "";
+  if (page.value === "admin") return "#/admin" + query;
+  if (page.value === "userpanel") return "#/userpanel" + query;
+  if (page.value === "agency-request") return "#/agency-request" + query;
+  if (page.value === "expert-request") return "#/expert-request" + query;
+  if (page.value === "experts") return "#/experts" + query;
+  if (page.value === "payment-result") return window.location.hash.startsWith("#/payment-result") ? window.location.hash : "#/payment-result" + query;
+  if (page.value === "auth") return "#/auth" + query;
+  if (step.value === "landing") return "#/" + query;
+  return "#/" + step.value + query;
 }
 
 function syncHash() {
@@ -563,7 +566,8 @@ function syncHash() {
 
 function enforceFromHash() {
   lastHash = window.location.hash || "";
-  const h = lastHash.replace(/^#\/?/, "");
+  const rawHash = lastHash.split("?")[0];
+  const h = rawHash.replace(/^#\/?/, "");
   if (h === "admin") {
     openAdmin();
   } else if (h === "userpanel") {
