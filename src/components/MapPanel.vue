@@ -321,7 +321,8 @@ watch(
 function resolveInitialMapView() {
   const shared = readSharedMapState();
   const sv = loadMapView();
-  const hasShared = Number.isFinite(shared.lng) && Number.isFinite(shared.lat) && Number.isFinite(shared.zoom);
+  const hasSharedCenter = Number.isFinite(shared.lng) && Number.isFinite(shared.lat);
+  const hasSharedZoom = Number.isFinite(shared.zoom);
   if (Array.isArray(shared.polygon) && shared.polygon.length >= 3) {
     const lngs = shared.polygon.map((p) => p.lng);
     const lats = shared.polygon.map((p) => p.lat);
@@ -334,14 +335,25 @@ function resolveInitialMapView() {
       zoom: 14,
     };
   }
-  if (shared.point && !(hasShared)) {
+  if (shared.point && !hasSharedCenter) {
     return { center: [shared.point.lng, shared.point.lat], zoom: 15 };
   }
-  if (hasShared) return { center: [shared.lng, shared.lat], zoom: Math.min(20, Math.max(3, shared.zoom)) };
+  if (hasSharedCenter) {
+    const zoom = hasSharedZoom ? Math.min(20, Math.max(3, shared.zoom)) : 5;
+    return { center: [shared.lng, shared.lat], zoom };
+  }
   if (sv && isFinite(sv.lng) && isFinite(sv.lat) && isFinite(sv.zoom)) {
     return { center: [sv.lng, sv.lat], zoom: Math.min(20, Math.max(3, sv.zoom)) };
   }
   return { center: [51.5, 35.5], zoom: 5 };
+}
+
+function hasSharedMapState(shared = readSharedMapState()) {
+  const hasCenter = Number.isFinite(shared.lng) && Number.isFinite(shared.lat);
+  const hasPoint = shared.point && Number.isFinite(shared.point.lng) && Number.isFinite(shared.point.lat);
+  const hasPolygon = Array.isArray(shared.polygon) && shared.polygon.length >= 3;
+
+  return hasCenter || hasPoint || hasPolygon;
 }
 
 function restoreSharedDrawingFromUrl() {
@@ -351,6 +363,7 @@ function restoreSharedDrawingFromUrl() {
   const hasPoint = !!shared.point && Number.isFinite(shared.point.lng) && Number.isFinite(shared.point.lat);
   const hasPolygon = polygon.length >= 3;
   if (!hasPoint && !hasPolygon) return;
+  const restorePolygon = hasPolygon;
 
   const pin = {
     id: "shared-link-" + Date.now() + "-" + Math.random().toString(16).slice(2),
@@ -360,12 +373,12 @@ function restoreSharedDrawingFromUrl() {
     type: "draw",
     selected: true,
     shape: {
-      type: hasPoint ? "point" : "polygon",
-      positions: hasPoint
-        ? [{ lon: shared.point.lng, lat: shared.point.lat, color: "#ff0000" }]
-        : polygon.map((p) => ({ lon: p.lng, lat: p.lat, color: "#ff0000" })),
-      lon: hasPoint ? shared.point.lng : undefined,
-      lat: hasPoint ? shared.point.lat : undefined,
+      type: restorePolygon ? "polygon" : "point",
+      positions: restorePolygon
+        ? polygon.map((p) => ({ lon: p.lng, lat: p.lat, color: "#ff0000" }))
+        : [{ lon: shared.point.lng, lat: shared.point.lat, color: "#ff0000" }],
+      lon: restorePolygon ? undefined : shared.point.lng,
+      lat: restorePolygon ? undefined : shared.point.lat,
       color: "#ff0000",
       outlineColor: "#ff0000",
       opacity: 0.7,
@@ -378,16 +391,16 @@ function restoreSharedDrawingFromUrl() {
   renderPinOnMap(map, pin);
   selectOnlyPin(props.pins, pin.id, map);
 
-  if (hasPoint) {
-    map.setCenter([shared.point.lng, shared.point.lat]);
-    map.setZoom(Math.max(map.getZoom(), 16));
-  } else if (hasPolygon) {
+  if (restorePolygon) {
     const lngs = polygon.map((p) => p.lng);
     const lats = polygon.map((p) => p.lat);
     map.fitBounds(
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
       { padding: 60, maxZoom: 19.5, duration: 700 },
     );
+  } else {
+    map.setCenter([shared.point.lng, shared.point.lat]);
+    map.setZoom(Math.max(map.getZoom(), 16));
   }
 }
 
@@ -1093,14 +1106,19 @@ async function initMapAsync() {
 
   map.on("load", () => {
     mapProxy.value = map;
-    // بازیابی موقعیت قبلی نقشه تا بعد رفرش کاربر پرت نشود
-    try {
-      const v = loadMapView();
-      if (v && isFinite(v.lng) && isFinite(v.lat) && isFinite(v.zoom)) {
-        map.setCenter([v.lng, v.lat]);
-        map.setZoom(v.zoom);
+    const sharedMapState = readSharedMapState();
+    const hasSharedState = hasSharedMapState(sharedMapState);
+    if (!hasSharedState) {
+      // بازیابی موقعیت قبلی نقشه فقط وقتی لینک، موقعیت اشتراکی ندارد.
+      try {
+        const v = loadMapView();
+        if (v && isFinite(v.lng) && isFinite(v.lat) && isFinite(v.zoom)) {
+          map.setCenter([v.lng, v.lat]);
+          map.setZoom(v.zoom);
+        }
+      } catch (e) {
       }
-    } catch (e) {}
+    }
     // ذخیره خودکار موقعیت نقشه
     let viewTimer = null;
     const persistView = () => {
@@ -1144,11 +1162,13 @@ async function initMapAsync() {
         }
       }
     } catch (e) {}
-    // پیش‌نویس ناقص (حتی ۱ نقطه) را بعد رفرش سر جایش برگردان
-    try {
-      const ok = drawing.value?.restoreDraftFromStorage?.();
-      if (ok) syncPanState();
-    } catch (e) {}
+    // لینک اشتراکی جایگزین پیش‌نویس محلی می‌شود؛ بدون لینک، پیش‌نویس حفظ می‌شود.
+    if (!hasSharedState) {
+      try {
+        const ok = drawing.value?.restoreDraftFromStorage?.();
+        if (ok) syncPanState();
+      } catch (e) {}
+    }
     hud.zoom = map.getZoom();
     map.on("mousemove", (e) => {
       hud.lng = e.lngLat?.lng ?? null;
