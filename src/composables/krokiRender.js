@@ -392,11 +392,19 @@ export function createRenderFunctions(state, last, template) {
         W,
       );
 
+    const tableIndices = Array.isArray(state.outputTableIndices) && state.outputTableIndices.length
+      ? state.outputTableIndices
+      : pts.map((_, index) => index);
+    const selectedPoints = tableIndices.map((index) => pts[index]).filter(Boolean);
+    const selectedLabelIndexes = new Map(
+      tableIndices.map((pointIndex, labelIndex) => [pointIndex, labelIndex]),
+    );
     let nwIndex = 0;
-    for (let i = 1; i < cpts.length; i++) {
+    for (let i = 1; i < selectedPoints.length; i++) {
       if (
-        cpts[i].y < cpts[nwIndex].y ||
-        (cpts[i].y === cpts[nwIndex].y && cpts[i].x < cpts[nwIndex].x)
+        selectedPoints[i].y > selectedPoints[nwIndex].y ||
+        (selectedPoints[i].y === selectedPoints[nwIndex].y &&
+          selectedPoints[i].x < selectedPoints[nwIndex].x)
       ) {
         nwIndex = i;
       }
@@ -527,7 +535,9 @@ export function createRenderFunctions(state, last, template) {
       const startIdx = meta.startIdx;
       const vRadius = (t.vertexRadius ?? 4) * FS;
       slice.forEach((p, i) => {
-        // نقطه گوشه: دایره توپر با حاشیه سفید تا روی خطوط مرتب دیده شود
+        const labelIndex = selectedLabelIndexes.get(startIdx + i);
+        if (labelIndex === undefined) return;
+
         ctx.beginPath();
         ctx.arc(p.x, p.y, vRadius, 0, Math.PI * 2);
         ctx.fillStyle = t.polygonColor;
@@ -540,7 +550,7 @@ export function createRenderFunctions(state, last, template) {
         const toCx = p.x - scx,
           toCy = p.y - scy;
         const dlen = Math.sqrt(toCx * toCx + toCy * toCy) || 1;
-        const label = String(vertexLabel(t.vertexLabels, startIdx + i, nwIndex));
+        const label = String(vertexLabel(t.vertexLabels, labelIndex, nwIndex));
         ctx.font = `800 ${fVertex}px Vazirmatn, Tahoma, sans-serif`;
         const tw = ctx.measureText(label).width;
         const padX = Math.round(5 * FS);

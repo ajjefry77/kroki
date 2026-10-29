@@ -44,7 +44,9 @@ export function useKrokiGenerator() {
     errorMsg: "",
     mapImage: "",
     utmPoints: [],
+    outputTableIndices: [],
     areaM2: 0,
+    tableEdges: [],
     utmZone: null,
     centerUtm: null,
     shapeCentroids: [],
@@ -82,25 +84,75 @@ export function useKrokiGenerator() {
     const allPositions = [];
     const metas = [];
     for (const pin of selected) {
-      const positions = (pin.shape.positions || []).filter(
-        (p, i, arr) =>
-          !(
-            pin.shape.type === "polygon" &&
-            i === arr.length - 1 &&
-            arr.length > 1 &&
-            p.lon === arr[0].lon &&
-            p.lat === arr[0].lat
-          ),
-      );
+      const indexedPositions = (pin.shape.positions || [])
+        .map((position, index) => ({ position, index }))
+        .filter(
+          ({ position, index }, _, arr) =>
+            !(
+              pin.shape.type === "polygon" &&
+              index === arr[arr.length - 1]?.index &&
+              arr.length > 1 &&
+              position.lon === arr[0].position.lon &&
+              position.lat === arr[0].position.lat
+            ),
+        );
+      const positions = indexedPositions.map(({ position }) => position);
       if (!positions || positions.length < 2) continue;
       const startIdx = allPositions.length;
       allPositions.push(...positions);
+      const localIndexByPositionIndex = new Map(
+        indexedPositions.map(({ index }, localIndex) => [index, localIndex]),
+      );
+      const tablePositionIndices = Array.isArray(pin.shape.tablePositionIndices)
+        ? pin.shape.tablePositionIndices
+        : indexedPositions.map(({ index }) => index);
+      const selectedLocalIndices = tablePositionIndices
+        .map((index) => localIndexByPositionIndex.get(index))
+        .filter(Number.isInteger);
+      const tableIndices = selectedLocalIndices.map((index) => startIdx + index);
+      const adjacencyCount = pin.shape.type === "polygon"
+        ? selectedLocalIndices.length
+        : Math.max(selectedLocalIndices.length - 1, 0);
+      const tableEdges = Array.from({ length: adjacencyCount }, (_, edgeIndex) => {
+        const fromLocalIndex = selectedLocalIndices[edgeIndex];
+        const toLocalIndex = selectedLocalIndices[
+          (edgeIndex + 1) % selectedLocalIndices.length
+        ];
+        const fromOriginalIndex = indexedPositions[fromLocalIndex]?.index;
+        const toOriginalIndex = indexedPositions[toLocalIndex]?.index;
+        const sourcePositionsCount = indexedPositions.length;
+        let adjacencyIndex = -1;
+        if (pin.shape.type === "polygon") {
+          if (toLocalIndex === (fromLocalIndex + 1) % sourcePositionsCount) {
+            adjacencyIndex = fromOriginalIndex;
+          } else if (fromLocalIndex === (toLocalIndex + 1) % sourcePositionsCount) {
+            adjacencyIndex = toOriginalIndex;
+          }
+        } else if (toLocalIndex === fromLocalIndex + 1) {
+          adjacencyIndex = fromOriginalIndex;
+        } else if (fromLocalIndex === toLocalIndex + 1) {
+          adjacencyIndex = toOriginalIndex;
+        }
+        return {
+          startIndex: startIdx + fromLocalIndex,
+          endIndex: startIdx + toLocalIndex,
+          shapeIndex: metas.length,
+          sourceAdjacencyIndex: adjacencyIndex,
+          text: Array.isArray(pin.shape.tablePositionIndices)
+            ? String(pin.shape.tableAdjacents?.[edgeIndex] ?? "")
+            : adjacencyIndex >= 0
+              ? String(pin.shape.adjacents?.[adjacencyIndex] ?? "")
+              : "",
+        };
+      });
       metas.push({
         type: pin.shape.type,
         isClosed: pin.shape.type === "polygon",
         startIdx,
         count: positions.length,
         pinId: pin.id,
+        tableIndices,
+        tableEdges,
       });
     }
     if (allPositions.length < 2) return null;
@@ -243,6 +295,8 @@ export function useKrokiGenerator() {
       const { allPositions, metas } = geom;
       const utm = toUTM(allPositions);
       state.utmPoints = utm;
+      state.outputTableIndices = metas.flatMap((meta) => meta.tableIndices);
+      state.tableEdges = metas.flatMap((meta) => meta.tableEdges);
       state.utmZone = utm[0]?.zone ?? null;
       state.selectedShapesMeta = metas;
       let totalArea = 0;
@@ -335,19 +389,23 @@ export function useKrokiGenerator() {
       const firstAddress = centroidResults.find((c) => c.address)?.address;
       if (firstAddress && !last.form.address) last.form.address = firstAddress;
       // مجاورت‌ها از روی ترسیم (مودال «ترسیم جدید») خوانده می‌شوند، نه از پیش‌نمایش
-      const selectedById = new Map((geom.selected || []).map((p) => [p.id, p]));
       state.edgeTexts = metas.map((meta) => {
         const n = meta.isClosed ? meta.count : Math.max(meta.count - 1, 0);
         const arr = Array(n).fill("");
-        try {
-          const pin = (meta.pinId && selectedById.get(meta.pinId)) || geom.selected?.[metas.indexOf(meta)];
-          const saved = pin?.shape?.adjacents;
-          if (Array.isArray(saved)) {
-            for (let i = 0; i < Math.min(n, saved.length); i++) {
-              arr[i] = String(saved[i] ?? "");
-            }
-          }
-        } catch (e) {}
+        const selectedEdgeTexts = new Map(
+          meta.tableEdges.map((edge) => [
+            `${Math.min(edge.startIndex, edge.endIndex)}:${Math.max(edge.startIndex, edge.endIndex)}`,
+            edge.text,
+          ]),
+        );
+        for (let i = 0; i < n; i++) {
+          const startIndex = meta.startIdx + i;
+          const endIndex = meta.startIdx + (
+            meta.isClosed ? (i + 1) % meta.count : i + 1
+          );
+          const key = `${Math.min(startIndex, endIndex)}:${Math.max(startIndex, endIndex)}`;
+          arr[i] = selectedEdgeTexts.get(key) || "";
+        }
         return arr;
       });
       state.ready = true;
@@ -431,11 +489,15 @@ export function useKrokiGenerator() {
   function buildPrintHtml() {
     const t = template();
     // جدول نقاط: ستون Y قبل از X (جای X و Y عوض شده) + زون با پسوند N
-    const rows = state.utmPoints
-      .map(
-        (p, i) =>
-          `<tr><td>${i + 1}</td><td>${p.y.toFixed(2)}</td><td>${p.x.toFixed(2)}</td><td> ${zoneLabel(p.zone ?? state.utmZone ?? "")}</td></tr>`,
-      )
+    const tableIndices = Array.isArray(state.outputTableIndices) && state.outputTableIndices.length
+      ? state.outputTableIndices
+      : state.utmPoints.map((_, index) => index);
+    const rows = tableIndices
+      .map((pointIndex, rowIndex) => {
+        const p = state.utmPoints[pointIndex];
+        if (!p) return "";
+        return `<tr><td>${rowIndex + 1}</td><td>${p.y.toFixed(2)}</td><td>${p.x.toFixed(2)}</td><td> ${zoneLabel(p.zone ?? state.utmZone ?? "")}</td></tr>`;
+      })
       .join("");
 
     const centerRow = state.centerUtm
@@ -494,66 +556,52 @@ export function useKrokiGenerator() {
       : "";
 
     // جدول مجاورت‌ها: به‌جای ستون «ترسیم»، ستون «طول» (طول هر ضلع به متر)
-    const edgeLenOf = (s, e) => {
-      try {
-        const pts = state.utmPoints || [];
-        const meta = (state.selectedShapesMeta || [])[s];
-        let a, b;
-        if (meta && meta.count >= 2) {
-          const aIdx = meta.startIdx + e;
-          let bIdx;
-          if (meta.isClosed) bIdx = meta.startIdx + ((e + 1) % meta.count);
-          else bIdx = meta.startIdx + e + 1;
-          a = pts[aIdx];
-          b = pts[bIdx];
-        } else {
-          a = pts[e];
-          b = pts[e + 1];
-        }
-        if (!a || !b) return "—";
-        const dx = Number(b.x) - Number(a.x);
-        const dy = Number(b.y) - Number(a.y);
-        if (!isFinite(dx) || !isFinite(dy)) return "—";
-        return Math.sqrt(dx * dx + dy * dy).toFixed(2);
-      } catch {
-        return "—";
-      }
-    };
+    const tableEdges = state.tableEdges?.length
+      ? state.tableEdges
+      : (state.selectedShapesMeta || []).flatMap((meta, shapeIndex) => {
+          const count = meta.isClosed ? meta.count : Math.max(meta.count - 1, 0);
+          return Array.from({ length: count }, (_, edgeIndex) => ({
+            startIndex: meta.startIdx + edgeIndex,
+            endIndex: meta.startIdx + (
+              meta.isClosed ? (edgeIndex + 1) % meta.count : edgeIndex + 1
+            ),
+            shapeIndex,
+            text: state.edgeTexts?.[shapeIndex]?.[edgeIndex] || "",
+          }));
+        });
     const hasEdges =
       (state.utmPoints || []).length >= 2 &&
-      (state.edgeTexts || []).length > 0;
+      tableEdges.length > 0;
     const edgeTable = hasEdges
       ? `<div class="block-title">مجاورت‌ها</div>
       <table class="utm-table">
         <thead><tr><th>ضلع</th><th>طول (متر)</th><th>مجاورت</th></tr></thead>
         <tbody>
           ${(() => {
-            const _nw = findNorthWestIndex(state.utmPoints);
-            const _lbl = (gi) =>
-              String(vertexLabel(t.vertexLabels, gi, _nw));
-            return state.edgeTexts
-              .map((texts, s) => {
-                const meta = state.selectedShapesMeta[s];
-                const multi = state.edgeTexts.length > 1;
-                return texts
-                  .map((txt, e) => {
-                    let edgeName = `${e + 1}`;
-                    if (meta && meta.count >= 2) {
-                      const a = _lbl(meta.startIdx + e);
-                      const nb = meta.isClosed
-                        ? _lbl(meta.startIdx + ((e + 1) % meta.count))
-                        : e + 1 < meta.count
-                          ? _lbl(meta.startIdx + e + 1)
-                          : null;
-                      if (nb) edgeName = `${a}-${nb}`;
-                      if (multi) edgeName += ` (ترسیم ${s + 1})`;
-                    } else if (multi) {
-                      edgeName += ` (ترسیم ${s + 1})`;
-                    }
-                    const len = edgeLenOf(s, e);
-                    return `<tr><td>${edgeName}</td><td>${len}</td><td>${escapeHtml(txt) || "—"}</td></tr>`;
-                  })
-                  .join("");
+            const tablePoints = tableIndices.map(
+              (pointIndex) => state.utmPoints[pointIndex],
+            ).filter(Boolean);
+            const northWestIndex = findNorthWestIndex(tablePoints);
+            const tablePointLabels = new Map(
+              tableIndices.map((pointIndex, rowIndex) => [
+                pointIndex,
+                String(vertexLabel(t.vertexLabels, rowIndex, northWestIndex)),
+              ]),
+            );
+            return tableEdges
+              .map((edge, edgeIndex) => {
+                const a = state.utmPoints[edge.startIndex];
+                const b = state.utmPoints[edge.endIndex];
+                const dx = Number(b?.x) - Number(a?.x);
+                const dy = Number(b?.y) - Number(a?.y);
+                const length = Number.isFinite(dx) && Number.isFinite(dy)
+                  ? Math.sqrt(dx * dx + dy * dy).toFixed(2)
+                  : "—";
+                const shapeCount = state.selectedShapesMeta.length;
+                let edgeName = `${tablePointLabels.get(edge.startIndex) || edgeIndex + 1}-${tablePointLabels.get(edge.endIndex) || edgeIndex + 2}`;
+                if (shapeCount > 1) edgeName += ` (ترسیم ${edge.shapeIndex + 1})`;
+                if (!a || !b) edgeName = `${edgeIndex + 1}`;
+                return `<tr><td>${edgeName}</td><td>${length}</td><td>${escapeHtml(edge.text) || "—"}</td></tr>`;
               })
               .join("");
           })()}

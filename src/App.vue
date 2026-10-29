@@ -249,7 +249,9 @@ function persistGen() {
     saveGenSnapshot({
       state: {
         utmPoints: g.state.utmPoints,
+        outputTableIndices: g.state.outputTableIndices,
         areaM2: g.state.areaM2,
+        tableEdges: g.state.tableEdges,
         utmZone: g.state.utmZone,
         centerUtm: g.state.centerUtm,
         shapeCentroids: g.state.shapeCentroids,
@@ -296,7 +298,9 @@ async function restoreGenIfNeeded() {
       try {
         Object.assign(g.state, {
           utmPoints: snap.state.utmPoints || [],
+          outputTableIndices: snap.state.outputTableIndices || [],
           areaM2: snap.state.areaM2 || 0,
+          tableEdges: snap.state.tableEdges || [],
           utmZone: snap.state.utmZone ?? null,
           centerUtm: snap.state.centerUtm || null,
           shapeCentroids: snap.state.shapeCentroids || [],

@@ -8,7 +8,7 @@ import { makeExportFilename } from "../utils/jalali";
 import { logger } from "../utils/logger";
 import { vertexLabel } from "../utils/templates";
 import { findNorthWestIndex } from "../utils/canvas";
-import { escapeHtml } from "./krokiGeometry";
+import { escapeHtml, flattenPins } from "./krokiGeometry";
 
 /*
  * توابع خروجی (KML / KMZ / DXF / CSV).
@@ -60,6 +60,7 @@ export function createExportFunctions(state, last, template, renderSketch) {
   //   images/sketch.png      — تصویر کروکی (canvas)
   //   images/map.png         — تصویر ماهواره‌ای محدوده (در صورت وجود)
   //   data/points.csv        — مختصات UTM نقاط
+  //   data/source-points.csv — تمام نقاط فایل‌های KML/KMZ ورودی
   //   data/info.txt          — مشخصات متنی کروکی
   //
   // نکته: canvas باید از بیرون پاس داده شود (مانند exportKml/PDF) تا
@@ -152,6 +153,27 @@ export function createExportFunctions(state, last, template, renderSketch) {
       csvLines.push(cells.join(","));
     });
     const csvContent = "﻿" + csvLines.join("\r\n") + "\r\n";
+    const sourcePins = flattenPins(last.pins || []).filter(
+      (pin) =>
+        pin.shape?.sourceKmlImportId &&
+        Array.isArray(pin.shape.positions),
+    );
+    const sourceCsvRows = ["Source,Shape,Point,Latitude,Longitude"];
+    for (const pin of sourcePins) {
+      pin.shape.positions.forEach((point, index) => {
+        const cells = [
+          pin.shape.sourceKmlFileName || "",
+          pin.name || "",
+          String(index + 1),
+          Number.isFinite(Number(point.lat)) ? Number(point.lat).toFixed(8) : "",
+          Number.isFinite(Number(point.lon)) ? Number(point.lon).toFixed(8) : "",
+        ].map((value) => `"${String(value).replace(/"/g, '""')}"`);
+        sourceCsvRows.push(cells.join(","));
+      });
+    }
+    const sourceCsvContent = sourceCsvRows.length > 1
+      ? "﻿" + sourceCsvRows.join("\r\n") + "\r\n"
+      : "";
 
     // ۶) ساخت info.txt با مشخصات کروکی
     const infoContent = buildInfoText({
@@ -173,6 +195,9 @@ export function createExportFunctions(state, last, template, renderSketch) {
       files.push({ path: "images/map.png", content: mapBytes });
     }
     files.push({ path: "data/points.csv", content: csvContent });
+    if (sourceCsvContent) {
+      files.push({ path: "data/source-points.csv", content: sourceCsvContent });
+    }
     files.push({ path: "data/info.txt", content: infoContent });
 
     // ۸) ساخت و دانلود KMZ
