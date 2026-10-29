@@ -3,7 +3,7 @@
     <main class="min-h-0 flex flex-col lg:flex-row lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden">
       <!-- نقشه : در موبایل ارتفاع ثابت تا WebGL دیده شود؛ در دسکتاپ flex -->
       <section class="relative w-full shrink-0 h-[58svh] min-h-[340px] max-h-[68svh] lg:h-auto lg:max-h-none lg:flex-1 lg:min-h-0 lg:shrink border-b lg:border-b-0 border-[var(--border)]">
-        <MapPanel ref="mapPanelRef" :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" @csvFile="onCsvFile" @manualCsvSelectionComplete="onManualCsvSelectionComplete" />
+        <MapPanel ref="mapPanelRef" :pins="pins" @mapReady="onMapReady" @openKroki="$emit('openKroki')" @editPin="onEditPin" @csvFile="onCsvFile" @manualCsvSelectionComplete="onManualCsvSelectionComplete" @manualKmlSelectionComplete="onManualKmlSelectionComplete" />
       </section>
 
       <!-- پنل کناری واحد با تب‌ها -->
@@ -257,6 +257,27 @@ function onManualCsvSelectionComplete(payload) {
     ...payload,
     shapeType: "polygon",
   });
+}
+
+function onManualKmlSelectionComplete({ points, targetPinIds }) {
+  const selectedByPin = new Map();
+  for (const point of points || []) {
+    if (!point?.pinId || !Number.isInteger(point.positionIndex)) continue;
+    const indices = selectedByPin.get(point.pinId) || [];
+    indices.push(point.positionIndex);
+    selectedByPin.set(point.pinId, indices);
+  }
+  for (const pinId of targetPinIds || []) {
+    const pin = findPin(pinId);
+    if (pin?.shape) {
+      pin.shape.tablePositionIndices = selectedByPin.get(pinId) || [];
+    }
+  }
+  const firstPinId = selectedByPin.keys().next().value;
+  if (firstPinId) {
+    activePinId.value = firstPinId;
+    activeTab.value = "points";
+  }
 }
 
 function findPin(id) {

@@ -186,7 +186,9 @@ export function saveGenSnapshot(snap) {
   const base = {
     state: {
       utmPoints: st.utmPoints || [],
+      outputTableIndices: st.outputTableIndices || [],
       areaM2: st.areaM2 || 0,
+      tableEdges: st.tableEdges || [],
       utmZone: st.utmZone ?? null,
       centerUtm: st.centerUtm || null,
       shapeCentroids: st.shapeCentroids || [],

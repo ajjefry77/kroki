@@ -161,6 +161,34 @@
           </table>
         </div>
 
+        <div
+          v-if="Array.isArray(activePin.shape.tablePositionIndices) && selectedAdjacencyRows.length"
+          class="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface2)] p-2"
+        >
+          <div class="text-[11px] font-semibold mb-2">
+            مجاورت نقاط انتخاب‌شده
+            <span class="text-[10px] font-normal text-[var(--text-muted)]">({{ selectedAdjacencyRows.length }} ضلع)</span>
+          </div>
+          <div class="max-h-[180px] overflow-y-auto space-y-1.5">
+            <label
+              v-for="(edge, edgeIndex) in selectedAdjacencyRows"
+              :key="`${edge.fromIndex}-${edge.toIndex}-${edgeIndex}`"
+              class="flex items-center gap-1.5"
+            >
+              <span class="shrink-0 text-[10px] font-semibold text-[var(--text-muted)] min-w-[3.2rem] text-center bg-[var(--surface)] border border-[var(--border)] rounded px-1 py-1">
+                ضلع {{ edge.fromIndex + 1 }}-{{ edge.toIndex + 1 }}
+              </span>
+              <input
+                type="text"
+                class="input !py-1 !text-[11px] flex-1 min-w-0"
+                :value="activePin.shape.tableAdjacents?.[edgeIndex] || ''"
+                :placeholder="`مجاورت ضلع ${edge.fromIndex + 1}-${edge.toIndex + 1}`"
+                @input="updateSelectedAdjacency(edgeIndex, $event.target.value)"
+              />
+            </label>
+          </div>
+        </div>
+
         <button class="btn btn-ghost btn-xs w-full mt-2" @click="addActiveOnMap">
           <i class="fas ml-1" :class="isPlacing ? 'fa-ban' : 'fa-plus'"></i>
           {{ isPlacing ? "لغو افزودن نقطه" : "افزودن نقطه با کلیک روی نقشه" }}
@@ -334,9 +362,41 @@ const pointRows = computed(() => {
   const s = activePin.value?.shape;
   if (!s) return [];
   if (s.type === "point") return [{ lat: s.lat, lon: s.lon, ...utmFieldsOf(s) }];
-  if (Array.isArray(s.positions)) return s.positions.map((p) => ({ lat: p.lat, lon: p.lon, ...utmFieldsOf(p) }));
+  if (Array.isArray(s.positions)) {
+    const indices = Array.isArray(s.tablePositionIndices)
+      ? s.tablePositionIndices
+      : s.positions.map((_, index) => index);
+    return indices
+      .filter((index) => Number.isInteger(index) && s.positions[index])
+      .map((positionIndex) => ({
+        positionIndex,
+        lat: s.positions[positionIndex].lat,
+        lon: s.positions[positionIndex].lon,
+        ...utmFieldsOf(s.positions[positionIndex]),
+      }));
+  }
   return [];
 });
+
+const selectedAdjacencyRows = computed(() => {
+  const pin = activePin.value;
+  const rows = pointRows.value;
+  if (!pin || !Array.isArray(pin.shape.tablePositionIndices) || rows.length < 2) {
+    return [];
+  }
+  const edgeCount = pin.shape.type === "polygon" ? rows.length : rows.length - 1;
+  return Array.from({ length: edgeCount }, (_, index) => ({
+    fromIndex: index,
+    toIndex: (index + 1) % rows.length,
+  }));
+});
+
+function updateSelectedAdjacency(index, value) {
+  const shape = activePin.value?.shape;
+  if (!shape || !Array.isArray(shape.tablePositionIndices)) return;
+  if (!Array.isArray(shape.tableAdjacents)) shape.tableAdjacents = [];
+  shape.tableAdjacents[index] = value;
+}
 
 function updatePoint(i, key, value) {
   const s = activePin.value?.shape;
@@ -349,9 +409,9 @@ function updatePoint(i, key, value) {
     if (s.type === "point") {
       s.lat = ll.lat;
       s.lon = ll.lon;
-    } else if (Array.isArray(s.positions) && s.positions[i]) {
-      s.positions[i].lat = ll.lat;
-      s.positions[i].lon = ll.lon;
+    } else if (Array.isArray(s.positions) && s.positions[row.positionIndex]) {
+      s.positions[row.positionIndex].lat = ll.lat;
+      s.positions[row.positionIndex].lon = ll.lon;
     }
     updatePinGeometry(props.map, activePin.value);
     syncEditMap();
@@ -362,8 +422,8 @@ function updatePoint(i, key, value) {
   if (isNaN(num)) return;
   if (s.type === "point") {
     s[key] = num;
-  } else if (Array.isArray(s.positions) && s.positions[i]) {
-    s.positions[i][key] = num;
+  } else if (Array.isArray(s.positions) && s.positions[row.positionIndex]) {
+    s.positions[row.positionIndex][key] = num;
   }
   updatePinGeometry(props.map, activePin.value);
   syncEditMap();
@@ -371,15 +431,24 @@ function updatePoint(i, key, value) {
 }
 
 function removePoint(i) {
+  const s = activePin.value?.shape;
+  if (!s || !Array.isArray(s.positions)) return;
+  const minPts = s.type === "polygon" ? 3 : 2;
+  if (Array.isArray(s.tablePositionIndices)) {
+    if (s.tablePositionIndices.length <= minPts) return;
+    s.tablePositionIndices.splice(i, 1);
+    return;
+  }
   if (isEditingExisting.value && props.drawing?.removeDraftPoint) {
     props.drawing.removeDraftPoint(i);
     return;
   }
-  const s = activePin.value?.shape;
-  if (!s || !Array.isArray(s.positions)) return;
-  const minPts = s.type === "polygon" ? 3 : 2;
-  if (s.positions.length <= minPts) return;
-  s.positions.splice(i, 1);
+  if (Array.isArray(s.positions)) {
+    if (s.positions.length <= minPts) return;
+    s.positions.splice(i, 1);
+  } else {
+    return;
+  }
   updatePinGeometry(props.map, activePin.value);
   syncEditMap();
 }
@@ -392,6 +461,9 @@ function addPointToActive() {
   const dLat = (last.lat - prev.lat) || 0.0002;
   const dLon = (last.lon - prev.lon) || 0.0002;
   s.positions.push({ lat: last.lat + dLat, lon: last.lon + dLon, height: 0 });
+  if (Array.isArray(s.tablePositionIndices)) {
+    s.tablePositionIndices.push(s.positions.length - 1);
+  }
   updatePinGeometry(props.map, activePin.value);
   syncEditMap();
 }

@@ -455,23 +455,25 @@ function flattenPinList(list) {
 
 function adjacencyEdgeName(shapeIndex, edgeIndex) {
   try {
-    const metas = props.gen.state.selectedShapesMeta || [];
-    const meta = metas[shapeIndex];
     const style = props.gen.template?.()?.vertexLabels ?? currentTemplate.value?.vertexLabels;
-    const nw = findNorthWestIndex(props.gen.state.utmPoints || []);
-    const lbl = (gi) => String(vertexLabel(style, gi, nw));
-    const multi = (props.gen.state.edgeTexts || []).length > 1;
+    const tableEdges = props.gen.state.tableEdges || [];
+    const edge = tableEdges[edgeIndex];
+    const outputIndices = props.gen.state.outputTableIndices || [];
+    const tablePoints = outputIndices.map((index) => props.gen.state.utmPoints[index]).filter(Boolean);
+    const nwIndex = findNorthWestIndex(tablePoints);
+    const pointLabels = new Map(
+      outputIndices.map((pointIndex, index) => [
+        pointIndex,
+        String(vertexLabel(style, index, nwIndex)),
+      ]),
+    );
     let edgeName = `${edgeIndex + 1}`;
-    if (meta && meta.count >= 2) {
-      const a = lbl(meta.startIdx + edgeIndex);
-      const nb = meta.isClosed
-        ? lbl(meta.startIdx + ((edgeIndex + 1) % meta.count))
-        : edgeIndex + 1 < meta.count
-          ? lbl(meta.startIdx + edgeIndex + 1)
-          : null;
-      if (nb) edgeName = `${a}-${nb}`;
-      if (multi) edgeName += ` (ترسیم ${shapeIndex + 1})`;
-    } else if (multi) {
+    if (edge) {
+      const start = pointLabels.get(edge.startIndex);
+      const end = pointLabels.get(edge.endIndex);
+      if (start && end) edgeName = `${start}-${end}`;
+    }
+    if ((props.gen.state.selectedShapesMeta || []).length > 1) {
       edgeName += ` (ترسیم ${shapeIndex + 1})`;
     }
     return edgeName;
@@ -481,6 +483,22 @@ function adjacencyEdgeName(shapeIndex, edgeIndex) {
 }
 
 const adjacencyShapes = computed(() => {
+  const tableEdges = props.gen.state.tableEdges || [];
+  if (tableEdges.length) {
+    const grouped = new Map();
+    tableEdges.forEach((edge, tableEdgeIndex) => {
+      if (!grouped.has(edge.shapeIndex)) grouped.set(edge.shapeIndex, []);
+      grouped.get(edge.shapeIndex).push({
+        edgeIndex: tableEdgeIndex,
+        name: adjacencyEdgeName(edge.shapeIndex, tableEdgeIndex),
+        value: edge.text ?? "",
+      });
+    });
+    return [...grouped].map(([shapeIndex, edges]) => ({
+      shapeIndex,
+      edges,
+    }));
+  }
   const texts = props.gen.state.edgeTexts || [];
   return texts
     .map((arr, s) => ({
@@ -499,24 +517,61 @@ const totalEdges = computed(() => adjacencyShapes.value.reduce((n, sh) => n + sh
 function setAdjacency(shapeIndex, edgeIndex, value) {
   const v = String(value ?? "");
   try {
-    const texts = props.gen.state.edgeTexts;
-    if (texts && texts[shapeIndex] && edgeIndex < texts[shapeIndex].length) {
-      texts[shapeIndex][edgeIndex] = v;
+    const tableEdge = props.gen.state.tableEdges?.[edgeIndex];
+    if (tableEdge) {
+      tableEdge.text = v;
+      if (
+        Number.isInteger(tableEdge.sourceAdjacencyIndex) &&
+        tableEdge.sourceAdjacencyIndex >= 0 &&
+        props.gen.state.edgeTexts?.[shapeIndex]
+      ) {
+        props.gen.state.edgeTexts[shapeIndex][tableEdge.sourceAdjacencyIndex] = v;
+      }
+    } else if (props.gen.state.edgeTexts?.[shapeIndex]?.[edgeIndex] !== undefined) {
+      props.gen.state.edgeTexts[shapeIndex][edgeIndex] = v;
     }
   } catch (e) {}
-  // روی خود ترسیم هم ذخیره شود تا با بازگشت و محاسبه مجدد از بین نرود
   try {
     const pinId = props.gen.state.selectedShapesMeta?.[shapeIndex]?.pinId;
     const pins = flattenPinList(props.gen.last?.pins || []);
     const pin = pins.find((p) => p.id === pinId);
     if (pin) {
       if (!pin.shape) pin.shape = {};
-      const n = props.gen.state.edgeTexts?.[shapeIndex]?.length ?? 0;
-      const arr = Array.isArray(pin.shape.adjacents) ? [...pin.shape.adjacents] : [];
-      while (arr.length < n) arr.push("");
-      arr[edgeIndex] = v;
-      pin.shape.adjacents = arr;
-      pin.shape.adjacentsEnabled = arr.some((x) => String(x || "").trim());
+      const shapeEdges = (props.gen.state.tableEdges || [])
+        .map((edge, index) => ({ edge, index }))
+        .filter(({ edge }) => edge.shapeIndex === shapeIndex);
+      const selectedEdgeIndex = shapeEdges.findIndex(({ index }) => index === edgeIndex);
+      if (Array.isArray(pin.shape.tablePositionIndices)) {
+        const adjacents = Array.isArray(pin.shape.tableAdjacents)
+          ? [...pin.shape.tableAdjacents]
+          : [];
+        while (adjacents.length < shapeEdges.length) adjacents.push("");
+        if (selectedEdgeIndex >= 0) adjacents[selectedEdgeIndex] = v;
+        pin.shape.tableAdjacents = adjacents;
+        const sourceIndex = props.gen.state.tableEdges?.[edgeIndex]?.sourceAdjacencyIndex;
+        if (Number.isInteger(sourceIndex) && sourceIndex >= 0) {
+          const sourceAdjacents = Array.isArray(pin.shape.adjacents)
+            ? [...pin.shape.adjacents]
+            : [];
+          while (sourceAdjacents.length <= sourceIndex) sourceAdjacents.push("");
+          sourceAdjacents[sourceIndex] = v;
+          pin.shape.adjacents = sourceAdjacents;
+        }
+      } else {
+        const sourceIndex = props.gen.state.tableEdges?.[edgeIndex]?.sourceAdjacencyIndex;
+        if (Number.isInteger(sourceIndex) && sourceIndex >= 0) {
+          const adjacents = Array.isArray(pin.shape.adjacents)
+            ? [...pin.shape.adjacents]
+            : [];
+          while (adjacents.length <= sourceIndex) adjacents.push("");
+          adjacents[sourceIndex] = v;
+          pin.shape.adjacents = adjacents;
+          pin.shape.adjacentsEnabled = adjacents.some((text) => String(text || "").trim());
+          if (props.gen.state.edgeTexts?.[shapeIndex]) {
+            props.gen.state.edgeTexts[shapeIndex][sourceIndex] = v;
+          }
+        }
+      }
     }
   } catch (e) {}
   rerender();

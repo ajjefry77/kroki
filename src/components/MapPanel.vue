@@ -8,7 +8,7 @@
       @click.stop
     >
       <div class="text-xs font-semibold text-center">
-        نقاط مرزی را به‌ترتیب روی نقشه انتخاب کنید
+        {{ manualCsvSelection.kind === "kml" ? "نقاط اصلی را روی نقشه انتخاب کنید" : "نقاط مرزی را به‌ترتیب روی نقشه انتخاب کنید" }}
         <span class="text-[var(--accent)]">({{ manualCsvSelection.selected.length }} انتخاب از {{ manualCsvSelection.points.length }})</span>
       </div>
       <div class="flex items-center justify-center gap-2">
@@ -18,12 +18,12 @@
         <button class="btn btn-ghost btn-xs" @click="cancelManualCsvSelection">
           انصراف
         </button>
-        <button class="btn btn-primary btn-xs" :disabled="manualCsvSelection.selected.length < 3" @click="completeManualCsvSelection">
-          <i class="fas fa-check ml-1"></i> ثبت پلی‌گان
+        <button class="btn btn-primary btn-xs" :disabled="manualCsvSelection.selected.length < (manualCsvSelection.kind === 'kml' ? 1 : 3)" @click="completeManualCsvSelection">
+          <i class="fas fa-check ml-1"></i> {{ manualCsvSelection.kind === "kml" ? "ثبت نقاط منتخب" : "ثبت پلی‌گان" }}
         </button>
       </div>
       <p class="text-[10px] text-[var(--text-muted)] text-center leading-4">
-        نقاط انتخاب‌شده شماره‌گذاری می‌شوند؛ سایر نقاط پس از ثبت پلی‌گان حذف خواهند شد.
+        {{ manualCsvSelection.kind === "kml" ? "هندسهٔ کامل حفظ می‌شود و فقط نقاط منتخب در جدول خروجی می‌آیند." : "نقاط انتخاب‌شده شماره‌گذاری می‌شوند؛ سایر نقاط پس از ثبت پلی‌گان حذف خواهند شد." }}
       </p>
     </div>
 
@@ -248,7 +248,7 @@ const props = defineProps({
   pins: { type: Object, required: true },
 });
 
-const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin", "csvFile", "removePin", "manualCsvSelectionComplete"]);
+const emit = defineEmits(["mapReady", "openKroki", "addPins", "editPin", "csvFile", "removePin", "manualCsvSelectionComplete", "manualKmlSelectionComplete"]);
 
 const mapContainerRef = ref(null);
 const kmlInput = ref(null);
@@ -440,7 +440,15 @@ function removeManualCsvSelection() {
 }
 
 function startManualCsvSelection({ points, name, invalidRows }) {
-  if (!map || !map.isStyleLoaded() || !Array.isArray(points) || points.length <= 50) return false;
+  return startManualPointSelection({ points, name, invalidRows, kind: "csv" });
+}
+
+function startManualKmlSelection(points) {
+  return startManualPointSelection({ points, name: "", invalidRows: [], kind: "kml" });
+}
+
+function startManualPointSelection({ points, name, invalidRows, kind }) {
+  if (!map || !map.getStyle() || !Array.isArray(points) || points.length <= 50) return false;
   removeManualCsvSelection();
 
   const sourceId = `csv-boundary-${Date.now()}`;
@@ -499,6 +507,10 @@ function startManualCsvSelection({ points, name, invalidRows }) {
     points,
     name,
     invalidRows,
+    kind,
+    targetPinIds: kind === "kml"
+      ? [...new Set(points.map((point) => point.pinId).filter(Boolean))]
+      : [],
     selected: [],
     sourceId,
     pointLayerId,
@@ -540,14 +552,19 @@ function cancelManualCsvSelection() {
 
 function completeManualCsvSelection() {
   const session = manualCsvSelection.value;
-  if (!session || session.selected.length < 3) return;
+  const minPoints = session?.kind === "kml" ? 1 : 3;
+  if (!session || session.selected.length < minPoints) return;
   const payload = {
     points: session.selected.map((pointIndex) => session.points[pointIndex]),
     name: session.name,
     invalidRows: session.invalidRows,
+    targetPinIds: session.targetPinIds,
   };
+  const eventName = session.kind === "kml"
+    ? "manualKmlSelectionComplete"
+    : "manualCsvSelectionComplete";
   removeManualCsvSelection();
-  emit("manualCsvSelectionComplete", payload);
+  emit(eventName, payload);
 }
 
 function yieldToUI() {
@@ -571,6 +588,7 @@ async function onKmlChange(e) {
   loadingCancellable.value = true;
   loading.value = true;
   const bounds = new mapboxgl.LngLatBounds();
+  const kmlImportId = crypto.randomUUID();
   try {
     const text = await readKmlText(file, file.name);
     if (kmlCancelRequested) return;
@@ -586,6 +604,7 @@ async function onKmlChange(e) {
     }
 
     let added = 0;
+    const selectablePoints = [];
     const total = geojson.features.length;
     for (let fi = 0; fi < total; fi++) {
       if (kmlCancelRequested) return;
@@ -640,6 +659,8 @@ async function onKmlChange(e) {
           shape: {
             type: shapeType,
             positions,
+            sourceKmlImportId: kmlImportId,
+            sourceKmlFileName: file.name,
             color: "#ff0000",
             outlineColor: "#ff0000",
             opacity: 0.7,
@@ -662,6 +683,14 @@ async function onKmlChange(e) {
         );
         kmlExtendBounds(bounds, single.coordinates);
         props.pins.push(pin);
+        positions.forEach((point, positionIndex) => {
+          selectablePoints.push({
+            lat: point.lat,
+            lon: point.lon,
+            pinId: pin.id,
+            positionIndex,
+          });
+        });
         // تک‌انتخابی: فقط اولین ترسیم ایمپورت‌شده انتخاب می‌ماند
         if (added === 0) {
           try {
@@ -671,7 +700,7 @@ async function onKmlChange(e) {
           pin.selected = false;
           if (pin.shape) pin.shape.show = false;
           try {
-            setPinVisibilityOnMap(map, pin, false);
+            setPinVisibleOnMap(map, pin, false);
           } catch (e) {}
         }
         added++;
@@ -693,6 +722,20 @@ async function onKmlChange(e) {
 
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { padding: 50, duration: 2000 });
+    }
+    if (selectablePoints.length > 50) {
+      const importedPinIds = new Set(selectablePoints.map((point) => point.pinId));
+      for (const pin of flattenPins(props.pins)) {
+        if (!importedPinIds.has(pin.id)) continue;
+        pin.selected = true;
+        if (pin.shape) pin.shape.show = true;
+        setPinVisibleOnMap(map, pin, true);
+      }
+      if (drawing.value?.drawMode) {
+        alert("فایل بارگذاری شد؛ برای انتخاب نقاط اصلی، ترسیم فعال را تمام یا لغو کنید و فایل را دوباره بارگذاری کنید.");
+      } else if (!startManualKmlSelection(selectablePoints)) {
+        alert("ترسیم‌ها بارگذاری شدند، اما انتخاب دستی نقاط روی نقشه در دسترس نیست.");
+      }
     }
   } catch (error) {
     console.error("خطا در بارگذاری فایل KML:", error);
@@ -773,6 +816,11 @@ function onMapClick(e) {
       return;
     }
 
+    if (Array.isArray(s.tablePositionIndices)) {
+      s.tablePositionIndices = s.tablePositionIndices
+        .filter((index) => index !== bestIdx)
+        .map((index) => index > bestIdx ? index - 1 : index);
+    }
     positions.splice(bestIdx, 1);
     updatePinGeometry(map, pin);
     return;
@@ -1023,7 +1071,7 @@ async function initMapAsync() {
     try {
       for (const p of flattenPins(props.pins)) {
         if (p.selected === false || (p.shape && p.shape.show === false)) {
-          setPinVisibilityOnMap(map, p, false);
+          setPinVisibleOnMap(map, p, false);
         }
       }
     } catch (e) {}
@@ -1082,5 +1130,5 @@ onUnmounted(() => {
   }
 });
 
-defineExpose({ map: () => map, drawing: () => drawing.value, setCsvLoading, startManualCsvSelection });
+defineExpose({ map: () => map, drawing: () => drawing.value, setCsvLoading, startManualCsvSelection, startManualKmlSelection });
 </script>
