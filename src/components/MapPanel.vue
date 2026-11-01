@@ -233,6 +233,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, reactive, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { sharedMapQuery, sharedDrawingKey } from "../utils/sharedMapLink.js";
+import { resolveMapQuery } from "../utils/secureMapLinks.js";
+import { MapLinksApi } from "../api/mapLinks.api.js";
+import { restoreSharedDrawing } from "../utils/sharedDrawing.js";
 import DrawToolbar from "./DrawToolbar.vue";
 import MapSearchBox from "./MapSearchBox.vue";
 import Loading from "./Loading.vue";
@@ -243,6 +248,12 @@ import { registerDrawLayer, bringDrawingsToFront } from "../utils/layerOrder";
 import { renderPinOnMap, updatePinGeometry } from "../utils/pinRenderer";
 import { selectOnlyPin, flattenPins, setPinVisibleOnMap } from "../utils/pins";
 import { loadMapView, saveMapView, readSharedMapState, syncSharedMapState } from "../utils/sessionPersist";
+
+const route = useRoute();
+const router = useRouter();
+let disposed = false;
+let viewTimer = null;
+let appliedSharedKey = "";
 
 const props = defineProps({
   pins: { type: Object, required: true },
@@ -359,50 +370,27 @@ function hasSharedMapState(shared = readSharedMapState()) {
 function restoreSharedDrawingFromUrl() {
   if (!map || !drawing.value) return;
   const shared = readSharedMapState();
-  const polygon = Array.isArray(shared.polygon) ? shared.polygon : [];
-  const hasPoint = !!shared.point && Number.isFinite(shared.point.lng) && Number.isFinite(shared.point.lat);
-  const hasPolygon = polygon.length >= 3;
-  if (!hasPoint && !hasPolygon) return;
-  const restorePolygon = hasPolygon;
-
-  const pin = {
-    id: "shared-link-" + Date.now() + "-" + Math.random().toString(16).slice(2),
-    name: "ترسیم ارسال‌شده",
-    date: new Date(),
-    save: -1,
-    type: "draw",
-    selected: true,
-    shape: {
-      type: restorePolygon ? "polygon" : "point",
-      positions: restorePolygon
-        ? polygon.map((p) => ({ lon: p.lng, lat: p.lat, color: "#ff0000" }))
-        : [{ lon: shared.point.lng, lat: shared.point.lat, color: "#ff0000" }],
-      lon: restorePolygon ? undefined : shared.point.lng,
-      lat: restorePolygon ? undefined : shared.point.lat,
-      color: "#ff0000",
-      outlineColor: "#ff0000",
-      opacity: 0.7,
-      width: 3,
-      show: true,
-    },
-  };
-
-  props.pins.push(pin);
-  renderPinOnMap(map, pin);
-  selectOnlyPin(props.pins, pin.id, map);
-
-  if (restorePolygon) {
-    const lngs = polygon.map((p) => p.lng);
-    const lats = polygon.map((p) => p.lat);
-    map.fitBounds(
-      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { padding: 60, maxZoom: 19.5, duration: 700 },
-    );
-  } else {
-    map.setCenter([shared.point.lng, shared.point.lat]);
-    map.setZoom(Math.max(map.getZoom(), 16));
+  const key = sharedDrawingKey(shared);
+  if (!key) {
+    appliedSharedKey = "";
+    return;
   }
+  if (key === appliedSharedKey) return;
+  restoreSharedDrawing({ map, pins: props.pins, shared, renderPin: renderPinOnMap });
+  appliedSharedKey = key;
 }
+
+// Query-only navigation may reuse this component; import after readiness too.
+watch(() => route.fullPath, async () => {
+  if (route.name !== "draw") return;
+  const path = route.fullPath;
+  try {
+    await resolveMapQuery(sharedMapQuery(), MapLinksApi.open);
+    if (disposed || route.fullPath !== path) return;
+    restoreSharedDrawingFromUrl();
+  }
+  catch (e) { initError.value = "خطا در دریافت ترسیم از لینک: " + e.message; }
+});
 
 function addGeoJSONSourceAndLayers(sourceId, geojson, pin) {
   map.addSource(sourceId, { type: "geojson", data: geojson });
@@ -847,6 +835,17 @@ function findPinByPoint(point) {
   return flat.find((p) => p.id === id && p.selected !== false) || null;
 }
 
+// hover هر فریم اتفاق می‌افتد؛ queryRenderedFeatures گران است →
+// نتیجه‌ی آخر تا ۴۵ms قابل استفاده‌ی مجدد است (cursor همیشه لازم نیست دقیق باشد)
+let findPinCache = { point: null, result: null, at: 0 };
+function findPinByCached(e) {
+  const key = `${e.point.x | 0},${e.point.y | 0}`;
+  const now = Date.now();
+  if (findPinCache.point === key && now - findPinCache.at < 45) return findPinCache.result;
+  findPinCache = { point: key, result: findPinByPoint(e.point), at: now };
+  return findPinCache.result;
+}
+
 function onMapHover(e) {
   if (!drawing.value) return;
   if (
@@ -862,10 +861,10 @@ function onMapHover(e) {
     return;
   }
   if (drawing.value.drawMode === "eraser") {
-    map.getCanvas().style.cursor = findPinByPoint(e.point) ? "pointer" : "not-allowed";
+    map.getCanvas().style.cursor = findPinByCached(e) ? "pointer" : "not-allowed";
     return;
   }
-  map.getCanvas().style.cursor = findPinByPoint(e.point) ? "pointer" : "";
+  map.getCanvas().style.cursor = findPinByCached(e) ? "pointer" : "";
 }
 
 function onMapClick(e) {
@@ -1045,7 +1044,9 @@ function initMap() {
 }
 
 async function initMapAsync() {
-  mapboxgl = await loadMap();
+  const [lib] = await Promise.all([loadMap(), resolveMapQuery(sharedMapQuery(), MapLinksApi.open)]);
+  mapboxgl = lib;
+  if (disposed || !mapContainerRef.value) return;
   mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
   // توکن برای glyphs (فونت لیبل‌های ترسیم) و سرویس‌های mapbox لازم است.
   // تله‌متری (events.mapbox.com) به‌صورت جداگانه در loadMapbox.js غیرفعال شده،
@@ -1120,7 +1121,6 @@ async function initMapAsync() {
       }
     }
     // ذخیره خودکار موقعیت نقشه
-    let viewTimer = null;
     const persistView = () => {
       if (viewTimer) clearTimeout(viewTimer);
       viewTimer = setTimeout(() => {
@@ -1128,6 +1128,13 @@ async function initMapAsync() {
           const c = map.getCenter();
           saveMapView({ lng: c.lng, lat: c.lat, zoom: map.getZoom() });
           syncSharedMapState({ lng: c.lng, lat: c.lat, zoom: map.getZoom() });
+          // Keep the router query in sync; geometry and unrelated query keys survive.
+          const nextQuery = sharedMapQuery();
+          const query = { ...route.query, ...nextQuery };
+          if (nextQuery.map) {
+            for (const key of ["lat", "lng", "lon", "zoom", "z", "point", "polygon", "tool"]) delete query[key];
+          }
+          router.replace({ path: route.path, query });
         } catch (e) {}
       }, 400);
     };
@@ -1146,7 +1153,8 @@ async function initMapAsync() {
     // بعد از لود کامل، یک resize تا کاشی‌ها در ارتفاع موبایل درست بچینند
     requestAnimationFrame(() => { try { map.resize(); } catch (e) {} });
     drawing.value = reactive(useDrawing(map, props.pins));
-    restoreSharedDrawingFromUrl();
+    try { restoreSharedDrawingFromUrl(); }
+    catch (e) { initError.value = "خطا در دریافت ترسیم از لینک: " + e.message; }
     for (const p of props.pins || []) {
       if (p.shape && p.shape.type && p.type === "draw") {
         try {
@@ -1204,6 +1212,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  disposed = true;
+  if (viewTimer) clearTimeout(viewTimer);
   removeManualCsvSelection();
   teardownCustomPan();
   try { resizeObserver && resizeObserver.disconnect(); } catch (e) {}

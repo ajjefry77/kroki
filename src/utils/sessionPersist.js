@@ -1,3 +1,5 @@
+import { parseSharedMapQuery, updateSharedMapUrl } from "./sharedMapLink.js";
+import { resolvedMapQuery } from "./secureMapLinks.js";
 // ذخیره‌سازی محلی وضعیت ترسیم تا با رفرش صفحه اطلاعات پاک نشود.
 // شامل: ترسیم‌های ذخیره‌شده (pins)، پیش‌نویس در حال ترسیم (حتی ناقص)، فرم و مرحله ویزارد.
 
@@ -6,6 +8,9 @@ const DRAFT_KEY = "kroki.draft.v1";
 const WIZARD_KEY = "kroki.wizard.v1";
 const VIEW_KEY = "kroki.mapview.v1";
 const GEN_KEY = "kroki.gen.v1";
+// تصویر ماهواره (dataURL حجیم) در کلید جداگانه نگه داشته می‌شود تا هر
+// بروزرسانی period بقیه snapshot مجبور به stringify چند مگابایت نباشد
+const GEN_IMAGE_KEY = "kroki.gen.image.v1";
 
 function safeGet(key) {
   try {
@@ -142,68 +147,17 @@ export function clearWizard() {
 }
 
 // ---------- map viewport ----------
-function parseCoordinatePair(value) {
-  if (!value || typeof value !== "string") return null;
-  const parts = value.split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n));
-  if (parts.length < 2) return null;
-  return { lng: parts[0], lat: parts[1] };
-}
-
-function parseSharedUrlParams() {
-  const params = new URLSearchParams(window.location.search || "");
-  const hash = window.location.hash || "";
-  if (hash.includes("?")) {
-    const query = hash.slice(hash.indexOf("?") + 1);
-    const hashParams = new URLSearchParams(query);
-    for (const [key, value] of hashParams.entries()) {
-      if (!params.has(key)) params.set(key, value);
-    }
-  }
-  return params;
-}
-
 export function readSharedMapState() {
-  const params = parseSharedUrlParams();
-  const lat = Number(params.get("lat"));
-  const lng = Number(params.get("lng") ?? params.get("lon"));
-  const zoom = Number(params.get("zoom") ?? params.get("z"));
-  const point = parseCoordinatePair(params.get("point"));
-  const polygonRaw = params.get("polygon");
-  const polygon = polygonRaw ? polygonRaw.split(";").map(parseCoordinatePair).filter(Boolean) : [];
-  return {
-    lat: Number.isFinite(lat) ? lat : null,
-    lng: Number.isFinite(lng) ? lng : null,
-    zoom: Number.isFinite(zoom) ? zoom : null,
-    point,
-    polygon,
-    tool: params.get("tool") || "",
-  };
+  return parseSharedMapQuery(resolvedMapQuery());
 }
 
 export function syncSharedMapState(state = {}) {
   if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  const hash = url.hash || "#/";
-  const hashSplit = hash.indexOf("?");
-  const hashBase = hashSplit >= 0 ? hash.slice(0, hashSplit) : hash;
-  const hashParams = new URLSearchParams(hashSplit >= 0 ? hash.slice(hashSplit + 1) : "");
-  for (const key of ["lat", "lng", "lon", "zoom", "z", "point", "polygon", "tool"]) {
-    hashParams.delete(key);
-  }
-  if (state.lat != null && Number.isFinite(state.lat)) hashParams.set("lat", Number(state.lat).toFixed(6));
-  if (state.lng != null && Number.isFinite(state.lng)) hashParams.set("lng", Number(state.lng).toFixed(6));
-  if (state.zoom != null && Number.isFinite(state.zoom)) hashParams.set("zoom", Number(state.zoom).toFixed(2));
-  if (state.point && Number.isFinite(state.point.lng) && Number.isFinite(state.point.lat)) {
-    hashParams.set("point", `${Number(state.point.lng).toFixed(6)},${Number(state.point.lat).toFixed(6)}`);
-  }
-  if (Array.isArray(state.polygon) && state.polygon.length) {
-    hashParams.set("polygon", state.polygon.map((p) => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`).join(";"));
-  }
-  if (state.tool) hashParams.set("tool", state.tool);
-  url.hash = `${hashBase}${hashParams.toString() ? `?${hashParams.toString()}` : ""}`;
+  const url = updateSharedMapUrl(window.location.href, state);
   const next = `${url.pathname}${url.search}${url.hash}`;
-  if ((window.location.pathname + window.location.search + window.location.hash) !== next) {
-    window.history.replaceState({}, "", next);
+  if (window.location.pathname + window.location.search + window.location.hash !== next) {
+    // Preserve Vue Router's history metadata (back/forward positions).
+    window.history.replaceState(window.history.state, "", next);
   }
 }
 
@@ -229,9 +183,7 @@ export function clearAllSession() {
   clearDraft();
   clearWizard();
   clearGen();
-}
-
-// ---------- gen (نتیجه محاسبه‌شده پیش‌نمایش) ----------
+}// ---------- gen (نتیجه محاسبه‌شده پیش‌نمایش) ----------
 // state محاسبه‌شده کروکی را نگه می‌داریم تا رفرش در مرحله پیش‌نمایش/پرداخت
 // صفحه را خالی نکند. mapImage (دیتاURL تصویر ماهواره) ممکن است حجیم باشد؛
 // اگر جا نشد، بدون آن ذخیره می‌کنیم تا بقیه پیش‌نمایش برگردد.
@@ -242,12 +194,29 @@ export function loadGen() {
   if (!g.state.ready) return null;
   const pts = g.state.utmPoints;
   if (!Array.isArray(pts) || pts.length < 2) return null;
+  // تصویر ماهواره از کلید مستقل خوانده شود (سازگار با نوشته‌های قدیمی داخل خود gen)
+  const img = safeGet(GEN_IMAGE_KEY);
+  if (!g.state.mapImage) g.state.mapImage = img || "";
   return g;
 }
 
 export function saveGenSnapshot(snap) {
   if (!snap || !snap.state || !snap.state.ready) return;
   const st = snap.state;
+
+  // تصویر ماهواره را فقط وقتی واقعا عوض شده بنویس (حذف هزینه stringify تکراری)
+  const image = st.mapImage || "";
+  let cachedImage = null;
+  try {
+    cachedImage = localStorage.getItem(GEN_IMAGE_KEY);
+  } catch {}
+  if (image && image !== cachedImage) {
+    try {
+      if (image) localStorage.setItem(GEN_IMAGE_KEY, image);
+      else safeRemove(GEN_IMAGE_KEY);
+    } catch {}
+  }
+
   const base = {
     state: {
       utmPoints: st.utmPoints || [],
@@ -262,7 +231,7 @@ export function saveGenSnapshot(snap) {
       templateId: st.templateId || "technical",
       orientation: st.orientation || "portrait",
       styleOverrides: st.styleOverrides || {},
-      mapImage: st.mapImage || "",
+      mapImage: "",
       ready: true,
       errorMsg: "",
     },
@@ -272,15 +241,10 @@ export function saveGenSnapshot(snap) {
   };
   try {
     safeSet(GEN_KEY, base);
-    return;
-  } catch (e) {}
-  // اگر جا نشد (سهمیه localStorage)، بدون تصویر ماهواره دوباره تلاش کن
-  try {
-    base.state.mapImage = "";
-    safeSet(GEN_KEY, base);
-  } catch (e2) {}
+  } catch {}
 }
 
 export function clearGen() {
   safeRemove(GEN_KEY);
+  safeRemove(GEN_IMAGE_KEY);
 }

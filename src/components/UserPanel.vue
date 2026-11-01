@@ -474,6 +474,7 @@
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { auth, fmtMoney, fmtDate } from "../stores/auth";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS } from "../utils/templates";
+import { userTxSign as txSign, userTxColor as txColor, txStatusClass as statusClass, txStatusLabel as statusLabel, krokiStatusClass, krokiStatusLabel } from "../utils/txStatus";
 import TemplateDesigner from "./TemplateDesigner.vue";
 import SavedKrokiViewer from "./SavedKrokiViewer.vue";
 
@@ -528,33 +529,6 @@ async function submitCharge() {
     msgOk.value = true;
     msg.value = "در حال انتقال به درگاه پرداخت...";
   }
-}
-
-function txSign(tx) {
-  if (tx.status === "rejected") return "—";
-  if (tx.type === "charge_request") return "";
-  if (tx.type === "spend") return "−";
-  if (tx.type === "free" || tx.type === "referral") return "0";
-  return "+";
-}
-function txColor(tx) {
-  if (tx.status === "rejected") return "text-[var(--danger)]";
-  if (tx.type === "spend") return "text-[var(--danger)]";
-  if (tx.type === "free" || tx.type === "referral") return "text-[var(--info)]";
-  if (tx.type === "charge_request") return "text-[var(--warning)]";
-  return "text-[var(--success)]";
-}
-function statusClass(s) {
-  if (s === "success" || s === "approved") return "bg-[var(--success-glow)] text-[var(--success)]";
-  if (s === "pending") return "bg-[var(--warning-glow)] text-[var(--warning)]";
-  if (s === "rejected") return "bg-[var(--danger-glow)] text-[var(--danger)]";
-  return "bg-[var(--surface3)] text-[var(--text-muted)]";
-}
-function statusLabel(s) {
-  if (s === "success" || s === "approved") return "موفق";
-  if (s === "pending") return "در انتظار";
-  if (s === "rejected") return "رد شده";
-  return s || "موفق";
 }
 
 function chargeStatusClass(s) {
@@ -623,17 +597,6 @@ async function track() {
   } else {
     trackMsg.value = res.error || "کروکی یافت نشد";
   }
-}
-
-function krokiStatusClass(s) {
-  if (s === "issued") return "bg-[var(--success-glow)] text-[var(--success)]";
-  if (s === "paid") return "bg-[var(--info-glow)] text-[var(--info)]";
-  return "bg-[var(--warning-glow)] text-[var(--warning)]";
-}
-function krokiStatusLabel(s) {
-  if (s === "issued") return "صادر شده";
-  if (s === "paid") return "پرداخت شده";
-  return "پیش‌نویس";
 }
 
 // ───── عملیات کروکی‌های ذخیره‌شده ─────

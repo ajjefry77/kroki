@@ -134,22 +134,26 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed, onMounted, onUnmounted, defineAsyncComponent, shallowRef } from "vue";
-import { getTodayJalali } from "./utils/jalali";
+// App یک لایه‌ی نازک است: مسیرها در src/router، حالت ویزارد در stores/wizard،
+// پیش‌نمایش در composables/usePreviewGen و ماندگاری در composables/useSessionSync.
+import { ref, watch, computed, onMounted, onUnmounted, defineAsyncComponent, shallowRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
+import { sharedMapQuery } from "./utils/sharedMapLink.js";
 import { logger } from "./utils/logger";
 import { auth } from "./stores/auth";
+import { useWizardStore, wizardStepIds } from "./stores/wizard";
+import { usePreviewGen } from "./composables/usePreviewGen";
+import { createSessionSync, suspendPersist, resumePersist } from "./composables/useSessionSync";
+import { cleanupPinLayers } from "./utils/mapLayers";
+import { defaultKrokiForm, pinsFromSavedKroki, formFromSavedKroki } from "./utils/krokiDraft";
 import {
-  loadPins,
   savePins,
-  loadWizard,
   saveWizard,
-  clearAllSession,
   clearDraft,
-  loadGen,
-  saveGenSnapshot,
   clearGen,
+  clearAllSession,
 } from "./utils/sessionPersist";
-import { normalizeSingleSelection } from "./utils/pins";
 
 const LandingPage = defineAsyncComponent(() => import("./components/LandingPage.vue"));
 import Loading from "./components/Loading.vue";
@@ -175,280 +179,78 @@ const steps = [
   { id: "done", label: "دانلود" },
 ];
 
-const page = ref("app");
-// ویزارد ذخیره‌شده (فرم/قالب/مرحله) را بازیابی کن تا رفرش اطلاعات را پاک نکند
-const savedWizard = (() => {
-  try {
-    return loadWizard();
-  } catch (e) {
-    return null;
-  }
-})();
-// پیش‌نمایش با snapshot قابلیت بازیابی دارد؛
-// مرحله done هم با کد پیگیری نگه داشته می‌شود (ترسیم‌ها بعد صدور پاک‌اند
-// و دانلود مجدد از «کروکی‌های من» انجام می‌شود)
-const _savedStep = savedWizard?.step === "payment" ? "preview" : savedWizard?.step;
-const _initialStep = (() => {
-  if (_savedStep === "draw" || _savedStep === "info") return _savedStep;
-  if (_savedStep === "preview") return _savedStep;
-  if (_savedStep === "done") return "done";
-  return "landing";
-})();
-const step = ref(_initialStep);
-const reachedIndex = ref(
-  _initialStep === "landing" ? 0 : Number(savedWizard?.reachedIndex) || 0,
-);
-const authReturn = ref("landing");
-const userPanelTab = ref("wallet");
+const route = useRoute();
+const router = useRouter();
+const wizard = useWizardStore();
+const { pins, form: krokiForm, templateId, trackingCode, editingKrokiId, reachedIndex } = storeToRefs(wizard);
 
-const pins = reactive([]);
-try {
-  const savedPins = loadPins();
-  if (Array.isArray(savedPins) && savedPins.length) {
-    savedPins.forEach((p) => {
-      // تاریخ‌ها به صورت رشته ذخیره شده‌اند؛ همان‌طور نگه می‌داریم
-      pins.push(p);
-    });
-    // تک‌انتخابی: اگر چند ترسیم انتخاب مانده، فقط آخری می‌ماند
-    try {
-      normalizeSingleSelection(pins);
-    } catch (e) {}
-  }
-} catch (e) {}
-const map = ref(null);
-const templateId = ref(savedWizard?.templateId || "technical");
-const trackingCode = ref(savedWizard?.trackingCode || "");
-// وقتی یک پیش‌نویسِ ذخیره‌شده در سرور را برای ادامه/ویرایش باز می‌کنیم
-const editingKrokiId = ref(null);
+// صفحات مستقل (auth/admin/...) از روی route.name و مراحل ویزارد از meta.step
+const page = computed(() => (route.meta.wizard ? "app" : route.name));
+const step = computed(() => route.meta.step || "landing");
+
+const genApi = usePreviewGen();
+const gen = genApi.gen;
+const userPanelTab = ref("wallet");
 const logOpen = ref(false);
 const logStats = computed(() => logger.getStats());
 
-const gen = shallowRef(null);
-let genPromise = null;
-function ensureGen() {
-  if (gen.value) return Promise.resolve(gen.value);
-  if (!genPromise) {
-    genPromise = import("./composables/useKrokiGenerator").then((m) => {
-      gen.value = m.useKrokiGenerator();
-      return gen.value;
-    }).catch((e) => {
-      genPromise = null;
-      throw e;
-    });
-  }
-  return genPromise;
-}
+const sessionSync = createSessionSync(wizard, genApi);
 
-// ---------- ماندگاری پیش‌نمایش (gen) ----------
-let genPersistTimer = null;
-function persistGen() {
-  if (persistSuspended) return;
-  try {
-    const g = gen.value;
-    if (!g || !g.state?.ready) return;
-    saveGenSnapshot({
-      state: {
-        utmPoints: g.state.utmPoints,
-        outputTableIndices: g.state.outputTableIndices,
-        areaM2: g.state.areaM2,
-        tableEdges: g.state.tableEdges,
-        utmZone: g.state.utmZone,
-        centerUtm: g.state.centerUtm,
-        shapeCentroids: g.state.shapeCentroids,
-        edgeTexts: g.state.edgeTexts,
-        selectedShapesMeta: g.state.selectedShapesMeta,
-        templateId: g.state.templateId,
-        orientation: g.state.orientation,
-        styleOverrides: { ...(g.state.styleOverrides || {}) },
-        mapImage: g.state.mapImage || "",
-        ready: true,
-      },
-      form: g.last?.form ? { ...g.last.form } : { ...krokiForm },
-      templateId: templateId.value,
-    });
-  } catch (e) {}
-}
-function schedulePersistGen() {
-  if (genPersistTimer) clearTimeout(genPersistTimer);
-  genPersistTimer = setTimeout(persistGen, 400);
-}
+const map = shallowRef(null);
 
-let genRestoring = false;
-// پیش‌نمایش را بعد رفرش برمی‌گرداند: اول از snapshot (فوری، بدون شبکه)،
-// اگر نبود با محاسبه مجدد محلی از روی pins+form
-async function restoreGenIfNeeded() {
-  if (genRestoring) return false;
-  const g = gen.value;
-  if (!g) return false;
-  if (g.state?.ready) return true;
-  genRestoring = true;
-  try {
-    // ۱) تلاش با snapshot ذخیره‌شده
-    let snap = null;
-    try {
-      snap = loadGen();
-    } catch (e) {
-      snap = null;
-    }
-    if (snap?.state) {
-      try {
-        g.setTemplate(snap.templateId || templateId.value);
-      } catch (e) {}
-      if (snap.templateId) templateId.value = snap.templateId;
-      try {
-        Object.assign(g.state, {
-          utmPoints: snap.state.utmPoints || [],
-          outputTableIndices: snap.state.outputTableIndices || [],
-          areaM2: snap.state.areaM2 || 0,
-          tableEdges: snap.state.tableEdges || [],
-          utmZone: snap.state.utmZone ?? null,
-          centerUtm: snap.state.centerUtm || null,
-          shapeCentroids: snap.state.shapeCentroids || [],
-          edgeTexts: snap.state.edgeTexts || [],
-          selectedShapesMeta: snap.state.selectedShapesMeta || [],
-          templateId: snap.state.templateId || templateId.value,
-          orientation: snap.state.orientation || "portrait",
-          styleOverrides: { ...(snap.state.styleOverrides || {}) },
-          mapImage: snap.state.mapImage || g.state.mapImage || "",
-          ready: true,
-          errorMsg: "",
-          generating: false,
-        });
-        g.last.form = snap.form ? { ...snap.form } : { ...krokiForm };
-        g.last.pins = pins;
-        // نشانی پیشنهادی را به فرم اصلی هم برگردان
-        if (!krokiForm.address && g.last.form?.address) {
-          krokiForm.address = g.last.form.address;
-        }
-        logger.info("preview", "بازیابی پیش‌نمایش پس از رفرش از حافظه محلی");
-        return true;
-      } catch (e) {}
-    }
-    // ۲) fallback: محاسبه مجدد محلی (بدون نیاز به نقشه؛ فقط mapImage خالی می‌ماند)
-    try {
-      g.setTemplate(templateId.value);
-      const ok = await g.computeGeometry(pins, krokiForm);
-      if (ok) {
-        if (!krokiForm.address && g.last?.form?.address) {
-          krokiForm.address = g.last.form.address;
-        }
-        persistGen();
-        logger.info("preview", "بازیابی پیش‌نمایش پس از رفرش با محاسبه مجدد");
-        return true;
-      }
-    } catch (e) {}
-    return false;
-  } finally {
-    genRestoring = false;
-  }
-}
-
-const krokiForm = reactive({
-  title: savedWizard?.form?.title ?? "پلان وضعیت موجود",
-  client: savedWizard?.form?.client ?? "",
-  clientPhone: savedWizard?.form?.clientPhone ?? "",
-  clientNationalId: savedWizard?.form?.clientNationalId ?? "",
-  address: savedWizard?.form?.address ?? "",
-  city: savedWizard?.form?.city ?? "",
-  date: savedWizard?.form?.date || getTodayJalali(),
-  surveyor: savedWizard?.form?.surveyor ?? "",
-  plaque: savedWizard?.form?.plaque ?? "",
-  streetWidth: savedWizard?.form?.streetWidth ?? "",
-  initialSurveyType: savedWizard?.form?.initialSurveyType ?? "",
-  logo: savedWizard?.form?.logo ?? "",
-  description: savedWizard?.form?.description ?? "",
+onMounted(() => {
+  auth.syncUser();
 });
 
-// با رفرش، ترسیم‌ها و فرم نباید پاک شوند → ذخیره خودکار در localStorage
-let persistTimer = null;
-// بعد از پرداخت، هیچ‌چیز از کروکی پرداخت‌شده نباید در حافظه بماند؛
-// با این پرچم، ذخیره خودکار (حتی beforeunload) تا سفارش بعدی متوقف می‌شود
-let persistSuspended = false;
-function persistSession() {
-  if (persistSuspended) return;
-  try {
-    savePins(pins);
-  } catch (e) {}
-  try {
-    saveWizard({
-      step: step.value,
-      reachedIndex: reachedIndex.value,
-      templateId: templateId.value,
-      trackingCode: trackingCode.value || "",
-      form: { ...krokiForm },
-    });
-  } catch (e) {}
-}
-function schedulePersist() {
-  if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = setTimeout(persistSession, 300);
-}
-
-watch(
-  pins,
-  () => schedulePersist(),
-  { deep: true },
-);
-watch([step, reachedIndex, templateId], () => schedulePersist());
-watch(krokiForm, () => schedulePersist(), { deep: true });
-// هر تغییر پیش‌نمایش (جهت، استایل، مجاورت‌ها) هم ذخیره شود
-watch(
-  () => gen.value?.state,
-  () => schedulePersistGen(),
-  { deep: true },
-);
-
-watch(step, (s) => {
-  logger.info("step", "تغییر مرحله", { step: s });
-  // اگر وارد پیش‌نمایش شدیم ولی gen خالی است (مثلاً بعد رفرش)، برگردان
-  if (s === "preview") {
-    ensureGen()
-      .then(() => restoreGenIfNeeded())
-      .catch(() => {});
-  }
+onUnmounted(() => {
+  sessionSync.dispose();
 });
 
-const krokiIds = steps.map((s) => s.id);
+// ---------- پیمایش و گاردها ----------
+// مقصد بازگشت بعد از ورود موفق. به جای threading دستی بین توابع،
+// بازگشت هدف در این ref ثبت و in onAuthSuccess حل می‌شود.
+const authReturn = ref("");
 
 function openAuth(returnTo) {
   authReturn.value = returnTo;
-  page.value = "auth";
-}
-
-function go(id) {
-  if (id !== "landing" && !auth.isAuthenticated.value) {
-    openAuth("start");
-    return;
-  }
-  if (id !== "landing") ensureGen().catch(() => {});
-  // نشانی خودکار (پیشنهاد map.ir در پیش‌نمایش) را به فرم اصلی برمی‌گردانیم
-  // تا در payload ثبت/صدور به سرور هم ارسال شود
-  if ((id === "preview" || id === "done") && !krokiForm.address) {
-    const auto = gen.value?.last?.form?.address || "";
-    if (auto) krokiForm.address = auto;
-  }
-  const idx = steps.findIndex((s) => s.id === id);
-  if (idx !== -1) {
-    reachedIndex.value = Math.max(reachedIndex.value, idx);
-  }
-  // ورود به ترسیم یعنی شروع کار جدید → ذخیره خودکار دوباره فعال شود
-  if (id === "draw") persistSuspended = false;
-  step.value = id;
-}
-
-function navigate(id) {
-  go(id);
+  router.push({ name: "auth", query: { ...currentMapQuery(), return: returnTo } });
 }
 
 function goHome() {
-  page.value = "app";
-  step.value = "landing";
+  router.push({ name: "landing" });
+}
+
+function openAdmin() {
+  authReturn.value = "admin";
+  router.push({ name: "admin" });
+}
+
+function openUserPanel(tab) {
+  if (tab) userPanelTab.value = tab;
+  authReturn.value = "userpanel";
+  router.push({ name: "userpanel" });
+}
+
+function openAgencyRequest() {
+  authReturn.value = "agency-request";
+  router.push({ name: "agency-request" });
+}
+
+function openExpertRequest() {
+  // دکمه «درخواست همکاری» باید همیشه فرم را باز کند (حتی برای مهمان).
+  // کنترل ورود/نقش موقع ارسال در ExpertRequestPage انجام می‌شود تا دکمه هیچ‌وقت بی‌اثر به‌نظر نرسد.
+  router.push({ name: "expert-request" });
+}
+
+function openExperts() {
+  router.push({ name: "experts" });
 }
 
 function onAuthSuccess() {
   // اگر کاربر وسط مکثِ «در حال انتقال...» خودش برگشته باشد، جلو نبریمش
-  if (page.value !== "auth") return;
-  const ret = authReturn.value;
+  if (route.name !== "auth") return;
+  const ret = authReturn.value || route.query.return || "";
+  authReturn.value = "";
   if (ret === "admin") {
     openAdmin();
     return;
@@ -465,59 +267,58 @@ function onAuthSuccess() {
     openExpertRequest();
     return;
   }
-  if (auth.isAdmin.value) {
-    openAdmin();
-    return;
-  }
   if (ret === "start") {
-    page.value = "app";
     start();
+  } else if (auth.isAdmin.value) {
+    openAdmin();
   } else {
     goHome();
   }
 }
 
-function openAdmin() {
-  if (!auth.isAuthenticated.value) {
-    openAuth("admin");
+// اگر session کاربر از دست رفت (توکن منقضی/لاگ‌اوت دیگر tab)، به صفحه‌ی
+// ورود برگردیم و مقصد بازگشت را ثبت کنیم
+watch(
+  () => auth.isAuthenticated.value,
+  (ok) => {
+    if (ok || route.name === "auth") return;
+    const name = route.name;
+    const isWizardStep = route.meta.wizard && step.value !== "landing";
+    if (!isWizardStep && name !== "admin" && name !== "userpanel") return;
+    authReturn.value = name === "admin" ? "admin" : name === "userpanel" ? "userpanel" : "start";
+    router.push({ name: "auth", query: { ...currentMapQuery(), return: authReturn.value } });
+  },
+);
+
+// ---------- پیمایش ویزارد ----------
+// پارامترهای view نقشه (لینک اشتراکی) باید هنگام جابه‌جایی مراحل حفظ شوند
+function currentMapQuery() {
+  return sharedMapQuery();
+}
+
+function pushStep(id) {
+  router.push({ path: "/" + id, query: currentMapQuery() });
+}
+
+function go(id) {
+  if (id !== "landing" && !auth.isAuthenticated.value) {
+    openAuth("start");
     return;
   }
-  if (!auth.isAdmin.value) return;
-  page.value = "admin";
-}
-
-function openUserPanel(tab) {
-  if (!auth.isAuthenticated.value) {
-    openAuth("userpanel");
-    return;
+  if (id !== "landing") genApi.ensureGen().catch(() => {});
+  // نشانی خودکار (پیشنهاد map.ir در پیش‌نمایش) را به فرم اصلی برمی‌گردانیم
+  // تا در payload ثبت/صدور به سرور هم ارسال شود
+  if ((id === "preview" || id === "done") && !wizard.form.address) {
+    const auto = genApi.gen.value?.last?.form?.address || "";
+    if (auto) wizard.form.address = auto;
   }
-  if (tab) userPanelTab.value = tab;
-  page.value = "userpanel";
+  if (id === "draw") resumePersist();
+  if (id === "landing") goHome();
+  else pushStep(id);
 }
 
-function openAgencyRequest() {
-  if (!auth.isAuthenticated.value) {
-    openAuth("agency-request");
-    return;
-  }
-  if (auth.isAdmin.value || auth.isAgent.value) return;
-  page.value = "agency-request";
-}
-
-function openExpertRequest() {
-  // دکمه «درخواست همکاری» باید همیشه فرم را باز کند (حتی برای مهمان).
-  // کنترل ورود/نقش موقع ارسال در ExpertRequestPage انجام می‌شود تا دکمه هیچ‌وقت بی‌اثر به‌نظر نرسد.
-  page.value = "expert-request";
-}
-
-function openExperts() {
-  page.value = "experts";
-}
-
-function logout() {
-  auth.logout();
-  logger.info("auth", "خروج از حساب کاربری");
-  restart();
+function navigate(id) {
+  go(id);
 }
 
 function start() {
@@ -526,175 +327,55 @@ function start() {
     return;
   }
   logger.info("step", "شروع فرآیند ساخت کروکی");
-  page.value = "app";
-  reachedIndex.value = 0;
-  persistSuspended = false;
-  ensureGen().catch(() => {});
-  step.value = "draw";
+  wizard.reachedIndex = 0;
+  resumePersist();
+  genApi.ensureGen().catch(() => {});
+  pushStep("draw");
 }
 
-watch(
-  () => auth.isAuthenticated.value,
-  (ok) => {
-    if (ok || page.value === "auth") return;
-    const insideKroki = page.value === "app" && step.value !== "landing";
-    if (!insideKroki && page.value !== "admin" && page.value !== "userpanel") return;
-    authReturn.value = page.value === "admin" ? "admin" : page.value === "userpanel" ? "userpanel" : "start";
-    page.value = "auth";
-  },
-);
-
-let lastHash = "";
-
-function currentHash() {
-  const hash = window.location.hash || "";
-  const queryIndex = hash.indexOf("?");
-  const query = queryIndex >= 0 ? hash.slice(queryIndex) : "";
-  if (page.value === "admin") return "#/admin" + query;
-  if (page.value === "userpanel") return "#/userpanel" + query;
-  if (page.value === "agency-request") return "#/agency-request" + query;
-  if (page.value === "expert-request") return "#/expert-request" + query;
-  if (page.value === "experts") return "#/experts" + query;
-  if (page.value === "payment-result") return window.location.hash.startsWith("#/payment-result") ? window.location.hash : "#/payment-result" + query;
-  if (page.value === "auth") return "#/auth" + query;
-  if (step.value === "landing") return "#/" + query;
-  return "#/" + step.value + query;
+function logout() {
+  auth.logout();
+  logger.info("auth", "خروج از حساب کاربری");
+  restart();
 }
 
-function syncHash() {
-  const h = currentHash();
-  if (window.location.hash === h || lastHash === h) return;
-  lastHash = h;
-  window.history.pushState(null, "", h);
-}
-
-function enforceFromHash() {
-  lastHash = window.location.hash || "";
-  const rawHash = lastHash.split("?")[0];
-  const h = rawHash.replace(/^#\/?/, "");
-  if (h === "admin") {
-    openAdmin();
-  } else if (h === "userpanel") {
-    openUserPanel();
-  } else if (h === "agency-request") {
-    openAgencyRequest();
-  } else if (h === "expert-request") {
-    openExpertRequest();
-  } else if (h === "experts") {
-    openExperts();
-  } else if (h === "payment-result" || h.startsWith("payment-result?")) {
-    // بازگشت از درگاه بانکی: نتیجه پرداخت آنلاین (کیف پول از قبل شارژ شده)
-    page.value = "payment-result";
-  } else if (h === "auth") {
-    if (auth.isAuthenticated.value) goHome();
-    else page.value = "auth";
-  } else if (h === "" || h === "/") {
-    page.value = "app";
-    step.value = "landing";
-  } else if (krokiIds.includes(h)) {
-    if (!auth.isAuthenticated.value) {
-      step.value = "landing";
-      page.value = "app";
-      openAuth("start");
-    } else {
-      page.value = "app";
-      step.value = h;
-      reachedIndex.value = Math.max(reachedIndex.value, krokiIds.indexOf(h));
-      ensureGen().catch(() => {});
-    }
-  } else if (h === "payment") {
-    // سازگاری با لینک‌های قدیمی مرحله پرداخت حذف‌شده
-    if (!auth.isAuthenticated.value) {
-      step.value = "landing";
-      page.value = "app";
-      openAuth("start");
-    } else {
-      page.value = "app";
-      step.value = "preview";
-      ensureGen().catch(() => {});
-    }
-  }
-  const norm = currentHash();
-  if ((window.location.hash || "") !== norm) {
-    lastHash = norm;
-    window.history.replaceState(null, "", norm);
-  }
-}
-
-onMounted(() => {
-  enforceFromHash();
-  window.addEventListener("hashchange", enforceFromHash);
-  // فلاش نهایی قبل از رفرش/بستن تا آخرین تغییر (دیبانس‌شده) گم نشود
-  window.addEventListener("beforeunload", persistSession);
-  window.addEventListener("pagehide", persistSession);
-  window.addEventListener("beforeunload", persistGen);
-  window.addEventListener("pagehide", persistGen);
-  auth.syncUser();
-  // اگر با رفرش مستقیم روی پیش‌نمایش آمدیم، gen را برگردان
+// اگر با رفرش مستقیم روی پیش‌نمایش آمدیم، gen را برگردان
+function restorePreviewAfterLoad() {
   if (step.value === "preview") {
-    ensureGen()
-      .then(() => restoreGenIfNeeded())
+    genApi
+      .ensureGen()
+      .then(() => genApi.restoreGenIfNeeded({ wizard, persistGen: sessionSync.persistGen }))
       .catch(() => {});
   }
-});
+}
+onMounted(restorePreviewAfterLoad);
 
-onUnmounted(() => {
-  window.removeEventListener("hashchange", enforceFromHash);
-  window.removeEventListener("beforeunload", persistSession);
-  window.removeEventListener("pagehide", persistSession);
-  window.removeEventListener("beforeunload", persistGen);
-  window.removeEventListener("pagehide", persistGen);
-});
+// نشانی و پیشرفت مراحل: ورود به هر مرحله، بیشینه‌ی مراحل قابل بازگشت را ثبت می‌کند
+watch(
+  step,
+  (s) => {
+    wizard.markReached(s);
+  },
+  { immediate: true },
+);
 
-watch([page, step], syncHash);
-
+// ---------- ترسیم‌ها ----------
 function onMapReady({ map: m }) {
   map.value = m;
 }
 
 function removePin(pin) {
-  const idx = pins.findIndex((x) => x.id === pin.id);
-  if (idx !== -1) pins.splice(idx, 1);
+  wizard.removePinById(pin.id);
   // حذف باید بلافاصله در حافظه محلی هم اعمال شود تا بعد رفرش برنگردد
   try {
-    persistSession();
-  } catch (e) {}
-
-  const m = map.value;
-  if (!m) return;
-  const removeSource = (sid) => {
-    if (!sid) return;
-    let layers = [];
-    try {
-      layers = m.getStyle().layers || [];
-    } catch (e) {}
-    layers
-      .filter((l) => l.source === sid)
-      .forEach((l) => {
-        try {
-          m.removeLayer(l.id);
-        } catch (e) {}
-      });
-    try {
-      if (m.getSource(sid)) m.removeSource(sid);
-    } catch (e) {}
-  };
-  // علاوه بر سورس اصلی، سورس لیبل‌ها (شماره رئوس/طول اضلاع/مجاورت‌ها) هم
-  // باید پاک شود وگرنه اطلاعات نقاط روی نقشه می‌ماند
-  const sids = [];
-  if (pin.shape?._sourceIds?.length) sids.push(...pin.shape._sourceIds);
-  if (pin.shape) {
-    sids.push("draw-pin-" + pin.id);
-    sids.push("file-" + pin.id);
-  }
-  const allSids = [...new Set([...sids, ...sids.map((s) => s + "-labels")])];
-  allSids.forEach((sid) => removeSource(sid));
-  logger.info("draw", "حذف ترسیم", { name: pin.name, id: pin.id });
+    sessionSync.persistSession();
+  } catch {}
+  cleanupPinLayers(map.value, pin);
 }
 
 async function onDrawSubmit() {
-  const g = await ensureGen();
-  const geom = g.buildGeometry(pins);
+  const g = await genApi.ensureGen();
+  const geom = g.buildGeometry(pins.value);
   if (!geom) return;
   // نشانی خودکار را موازی با برداشت تصویر می‌گیریم تا موقع ورود به
   // قسمت اطلاعات، فیلد نشانی از قبل پر باشد
@@ -702,7 +383,7 @@ async function onDrawSubmit() {
     .then((m) => m.suggestAddressForPositions(geom.allPositions))
     .catch(() => "");
   try {
-    g.state.mapImage = await g.captureMapImage(map.value, pins, geom.allPositions);
+    g.state.mapImage = await g.captureMapImage(map.value, pins.value, geom.allPositions);
     logger.info("draw", "ثبت ترسیم‌ها و برداشت تصویر نقشه", {
       shapes: geom.metas.length,
       points: geom.allPositions.length,
@@ -712,153 +393,58 @@ async function onDrawSubmit() {
   }
   try {
     const auto = await addrPromise;
-    if (auto && !String(krokiForm.address || "").trim()) krokiForm.address = auto;
+    if (auto && !String(wizard.form.address || "").trim()) wizard.form.address = auto;
   } catch {}
   go("info");
 }
 
 async function onInfoSubmit() {
-  const g = await ensureGen();
-  g.setTemplate(templateId.value);
-  const ok = await g.computeGeometry(pins, krokiForm);
+  const g = await genApi.ensureGen();
+  g.setTemplate(wizard.templateId);
+  const ok = await g.computeGeometry(pins.value, wizard.form);
   if (!ok) return;
   // نشانی خودکار map.ir را به فرم اصلی برمی‌گردانیم تا در فیلد اطلاعات
   // دیده شود و در ثبت/پرداخت به سرور ارسال شود
-  if (!krokiForm.address && g.last?.form?.address) krokiForm.address = g.last.form.address;
+  if (!wizard.form.address && g.last?.form?.address) wizard.form.address = g.last.form.address;
   try {
-    persistGen();
-  } catch (e) {}
+    sessionSync.persistGen();
+  } catch {}
   go("preview");
 }
 
 function onPaymentDone(result) {
-  trackingCode.value = result?.trackingCode || "";
-  editingKrokiId.value = null;
+  wizard.trackingCode = result?.trackingCode || "";
+  wizard.editingKrokiId = null;
   // کروکی در سرور ثبت و پرداخت شده («کروکی‌های من»)؛ پس هیچ‌چیز از آن —
   // نه ترسیم‌ها، نه فرم، نه پیش‌نویس، نه پیش‌نمایش — نباید در حافظه بماند
-  persistSuspended = true;
+  suspendPersist();
   try {
-    pins.splice(0, pins.length);
-  } catch (e) {}
+    wizard.pins.splice(0, wizard.pins.length);
+  } catch {}
   try {
     savePins([]);
-  } catch (e) {}
+  } catch {}
   try {
     clearDraft();
-  } catch (e) {}
+  } catch {}
   try {
     clearGen();
-  } catch (e) {}
+  } catch {}
   try {
     saveWizard({
       step: "done",
-      reachedIndex: reachedIndex.value,
+      reachedIndex: wizard.reachedIndex,
       templateId: "technical",
-      trackingCode: trackingCode.value || "",
+      trackingCode: wizard.trackingCode || "",
       form: { ...defaultKrokiForm() },
     });
-  } catch (e) {}
+  } catch {}
+  // شروع سفارش بعدی دوباره ذخیره را فعال می‌کند (در go/start)
   go("done");
 }
 
-// فرم خالی پیش‌فرض برای پاک‌سازی حافظه بعد پرداخت
-function defaultKrokiForm() {
-  return {
-    title: "پلان وضعیت موجود",
-    client: "",
-    clientPhone: "",
-    clientNationalId: "",
-    address: "",
-    city: "",
-    date: getTodayJalali(),
-    surveyor: "",
-    plaque: "",
-    streetWidth: "",
-    initialSurveyType: "",
-    logo: "",
-    description: "",
-  };
-}
-
+// ---------- بازگردانی پیش‌نویس ذخیره‌شده ----------
 // بازگردانی یک کروکی ذخیره‌شده (پیش‌نویس) به ویزارد برای ادامه/ویرایش ترسیم
-function pinsFromSavedKroki(k) {
-  const out = [];
-  try {
-    const dd = k?.drawing_data;
-    if (Array.isArray(dd) && dd.length) {
-      for (const p of dd) {
-        if (!p || !p.shape) continue;
-        let copy = null;
-        try {
-          copy = JSON.parse(JSON.stringify(p));
-        } catch (e) {
-          continue;
-        }
-        if (copy.shape) delete copy.shape._sourceIds;
-        copy.selected = copy.selected !== false;
-        if (!copy.id) copy.id = crypto.randomUUID();
-        if (!copy.type) copy.type = "draw";
-        out.push(copy);
-      }
-      if (out.length) {
-        // تک‌انتخابی
-        try {
-          normalizeSingleSelection(out);
-        } catch (e) {}
-        return out;
-      }
-    }
-    // fallback قدیمی: فقط مختصات تخت
-    const pts = Array.isArray(k?.geometry_points) ? k.geometry_points : [];
-    const positions = pts
-      .map((p) => ({
-        lon: Number(p.lon ?? p.lng ?? p.x),
-        lat: Number(p.lat ?? p.y),
-        height: 0,
-      }))
-      .filter((p) => Number.isFinite(p.lon) && Number.isFinite(p.lat));
-    if (positions.length >= 2) {
-      out.push({
-        id: crypto.randomUUID(),
-        name: k?.title || "کروکی بازیابی‌شده",
-        descr: "",
-        shape: {
-          type: "polygon",
-          positions,
-          color: "#ff0000",
-          outlineColor: "#ff0000",
-          opacity: 0.7,
-          width: 3,
-          show: true,
-        },
-        date: new Date(),
-        save: -1,
-        type: "draw",
-        selected: true,
-      });
-    }
-  } catch (e) {}
-  return out;
-}
-
-function formFromSavedKroki(k) {
-  return {
-    title: k?.title ?? "پلان وضعیت موجود",
-    client: k?.client_name ?? "",
-    clientPhone: k?.client_phone ?? "",
-    clientNationalId: k?.client_national_id ?? "",
-    address: k?.address ?? "",
-    city: k?.city ?? "",
-    date: k?.survey_date || getTodayJalali(),
-    surveyor: k?.surveyor ?? "",
-    plaque: k?.plaque ?? "",
-    streetWidth: k?.street_width ?? "",
-    initialSurveyType: k?.initial_survey_type ?? "",
-    logo: k?.logo_url ?? "",
-    description: k?.description ?? "",
-  };
-}
-
 async function openDraftForEdit(kroki) {
   if (!kroki) return;
   let full = kroki;
@@ -867,153 +453,50 @@ async function openDraftForEdit(kroki) {
     try {
       const d = await auth.getKroki(full.id);
       if (d?.success && d?.kroki) full = d.kroki;
-    } catch (e) {}
+    } catch {}
   }
-  if (pins.length) {
+  if (wizard.pins.length) {
     const ok = confirm("ترسیم‌های فعلی جایگزین می‌شود. ادامه می‌دهید؟");
     if (!ok) return;
   }
-  pins.splice(0, pins.length);
   const restored = pinsFromSavedKroki(full);
   if (!restored.length) {
     alert("ترسیم معتبری در این کروکی یافت نشد.");
     return;
   }
-  restored.forEach((p) => pins.push(p));
-  Object.assign(krokiForm, formFromSavedKroki(full));
-  templateId.value = full.template_key || templateId.value || "technical";
-  editingKrokiId.value = full.id;
-  persistSuspended = false;
+  wizard.replacePins(restored);
+  Object.assign(wizard.form, formFromSavedKroki(full));
+  wizard.templateId = full.template_key || wizard.templateId || "technical";
+  wizard.editingKrokiId = full.id;
+  resumePersist();
   try {
     clearDraft();
-  } catch (e) {}
+  } catch {}
   try {
     clearGen();
-  } catch (e) {}
-  if (gen.value) {
-    try {
-      gen.value.state.ready = false;
-      gen.value.state.errorMsg = "";
-    } catch (e) {}
-  }
-  reachedIndex.value = 0;
-  page.value = "app";
-  step.value = "draw";
-  persistSession();
+  } catch {}
+  genApi.resetGen();
+  wizard.reachedIndex = 0;
+  resumePersist();
+  pushStep("draw");
+  sessionSync.persistSession();
   logger.info("kroki", "باز شدن پیش‌نویس ذخیره‌شده برای ویرایش", { id: full.id });
 }
 
 function restart() {
-  persistSuspended = false;
-  pins.splice(0, pins.length);
-  templateId.value = "technical";
-  trackingCode.value = "";
-  editingKrokiId.value = null;
-  krokiForm.title = "پلان وضعیت موجود";
-  krokiForm.client = "";
-  krokiForm.clientPhone = "";
-  krokiForm.clientNationalId = "";
-  krokiForm.address = "";
-  krokiForm.city = "";
-  krokiForm.surveyor = "";
-  krokiForm.plaque = "";
-  krokiForm.streetWidth = "";
-  krokiForm.initialSurveyType = "";
-  krokiForm.logo = "";
-  krokiForm.description = "";
-  krokiForm.date = getTodayJalali();
-  reachedIndex.value = 0;
-  step.value = "landing";
+  resumePersist();
+  wizard.reset();
   // شروع سفارش جدید یعنی پاک شدن عمدی → حافظه محلی هم پاک شود
   try {
     clearAllSession();
-  } catch (e) {}
+  } catch {}
   try {
     clearGen();
-  } catch (e) {}
+  } catch {}
   try {
-    persistSession();
-  } catch (e) {}
+    sessionSync.persistSession();
+  } catch {}
+  goHome();
   logger.info("system", "شروع سفارش جدید — بازنشانی وضعیت");
 }
 </script>
-
-<style>
-/* انیمیشن صفحات اصلی */
-.page-enter-active {
-  transition: all 0.35s var(--ease-out);
-}
-.page-leave-active {
-  transition: all 0.25s ease-in;
-}
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(20px) scale(0.98);
-  filter: blur(4px);
-}
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(-20px) scale(0.98);
-  filter: blur(4px);
-}
-
-/* انیمیشن مراحل ویزارد */
-.step-enter-active {
-  transition: all 0.3s var(--ease-out);
-}
-.step-leave-active {
-  transition: all 0.2s ease-in;
-}
-.step-enter-from {
-  opacity: 0;
-  transform: translateX(30px);
-}
-.step-leave-to {
-  opacity: 0;
-  transform: translateX(-30px);
-}
-
-/* انیمیشن مودال‌ها */
-.modal-enter-active {
-  transition: all 0.3s var(--ease-out);
-}
-.modal-leave-active {
-  transition: all 0.2s ease-in;
-}
-.modal-enter-from {
-  opacity: 0;
-  transform: scale(0.92);
-}
-.modal-leave-to {
-  opacity: 0;
-  transform: scale(0.92);
-}
-
-/* انیمیشن عمومی fade */
-.fade-enter-active {
-  transition: opacity 0.3s var(--ease-out);
-}
-.fade-leave-active {
-  transition: opacity 0.2s ease-in;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* انیمیشن slide up */
-.slide-up-enter-active {
-  transition: all 0.35s var(--ease-out);
-}
-.slide-up-leave-active {
-  transition: all 0.25s ease-in;
-}
-.slide-up-enter-from {
-  opacity: 0;
-  transform: translateY(24px);
-}
-.slide-up-leave-to {
-  opacity: 0;
-  transform: translateY(-16px);
-}
-</style>

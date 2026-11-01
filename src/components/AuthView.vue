@@ -183,7 +183,7 @@
 <script setup>
 import { ref, reactive, computed, watch, onBeforeUnmount, nextTick } from "vue";
 import { auth } from "../stores/auth";
-import { faToEn } from "../utils/validators";
+import { faToEn, isValidIranianMobile } from "../utils/validators";
 import Captcha from "./Captcha.vue";
 import AuthAlert from "./AuthAlert.vue";
 
@@ -334,7 +334,7 @@ async function sendOtp(resend = false) {
     return;
   }
   const mobile = faToEn(otp.phone || "").trim();
-  if (!/^09\d{9}$/.test(mobile)) {
+  if (!isValidIranianMobile(mobile)) {
     showError("شماره موبایل معتبر (11 رقم با 09) وارد کنید");
     return;
   }

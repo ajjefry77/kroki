@@ -190,20 +190,5 @@ export const auth = {
   removeExpert,
 };
 
-export function fmtMoney(n) {
-  return (Number(n) || 0).toLocaleString("fa-IR");
-}
-export function fmtDate(iso) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("fa-IR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
+// فرمت‌کننده‌های نمایشی از لایه‌ی view (سازگاری عقب برای فراخوانی‌های موجود)
+export { fmtMoney, fmtDate } from "../utils/format";

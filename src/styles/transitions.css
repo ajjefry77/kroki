@@ -1,0 +1,32 @@
+/* انیمیشن‌های سراسری برنامه (قبلاً داخل App.vue با <style> بدون scope بود —
+   به یک استایل‌شیت مستقل منتقل شد). */
+
+/* انیمیشن صفحات اصلی */
+.page-enter-active { transition: all 0.35s var(--ease-out); }
+.page-leave-active { transition: all 0.25s ease-in; }
+.page-enter-from { opacity: 0; transform: translateY(20px) scale(0.98); filter: blur(4px); }
+.page-leave-to { opacity: 0; transform: translateY(-20px) scale(0.98); filter: blur(4px); }
+
+/* انیمیشن مراحل ویزارد */
+.step-enter-active { transition: all 0.3s var(--ease-out); }
+.step-leave-active { transition: all 0.2s ease-in; }
+.step-enter-from { opacity: 0; transform: translateX(30px); }
+.step-leave-to { opacity: 0; transform: translateX(-30px); }
+
+/* انیمیشن مودال‌ها */
+.modal-enter-active { transition: all 0.3s var(--ease-out); }
+.modal-leave-active { transition: all 0.2s ease-in; }
+.modal-enter-from { opacity: 0; transform: scale(0.92); }
+.modal-leave-to { opacity: 0; transform: scale(0.92); }
+
+/* انیمیشن عمومی fade */
+.fade-enter-active { transition: opacity 0.3s var(--ease-out); }
+.fade-leave-active { transition: opacity 0.2s ease-in; }
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }
+
+/* انیمیشن slide up */
+.slide-up-enter-active { transition: all 0.35s var(--ease-out); }
+.slide-up-leave-active { transition: all 0.25s ease-in; }
+.slide-up-enter-from { opacity: 0; transform: translateY(24px); }
+.slide-up-leave-to { opacity: 0; transform: translateY(-16px); }

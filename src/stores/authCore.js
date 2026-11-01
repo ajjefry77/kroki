@@ -6,7 +6,7 @@ import {
   AuthApi,
   WalletApi,
 } from "../api";
-import { faToEn, validatePassword } from "../utils/validators";
+import { faToEn, validatePassword, isValidIranianMobile } from "../utils/validators";
 import { redeemReferral } from "./authReferrals";
 
 /*
@@ -206,7 +206,7 @@ function cleanUsername(s) {
 
 export async function requestOtp(phone) {
   const mobile = faToEn(phone || "").trim();
-  if (!/^09\d{9}$/.test(mobile)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
+  if (!isValidIranianMobile(mobile)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
   try {
     const data = await AuthApi.requestOtp({ phone: mobile });
     return { success: true, ttl: data?.ttl || 120, devCode: data?.devCode };
@@ -218,7 +218,7 @@ export async function requestOtp(phone) {
 export async function verifyOtpLogin(phone, code, fullName) {
   const mobile = faToEn(phone || "").trim();
   const otp = faToEn(code || "").trim();
-  if (!/^09\d{9}$/.test(mobile)) return { success: false, error: "شماره موبایل معتبر وارد کنید" };
+  if (!isValidIranianMobile(mobile)) return { success: false, error: "شماره موبایل معتبر وارد کنید" };
   if (!otp) return { success: false, error: "کد تایید را وارد کنید" };
   try {
     const body = { phone: mobile, code: otp };
@@ -243,7 +243,7 @@ export async function register(payload) {
   const password = String(payload?.password || "");
   const agentCode = faToEn(payload?.agentCode || "").trim().toUpperCase();
   if (name.length < 3) return { success: false, error: "نام و نام خانوادگی را کامل وارد کنید" };
-  if (!/^09\d{9}$/.test(phone)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
+  if (!isValidIranianMobile(phone)) return { success: false, error: "شماره موبایل معتبر (11 رقم با 09) وارد کنید" };
   const pwErr = validatePassword(password);
   if (pwErr) return { success: false, error: pwErr };
   try {
