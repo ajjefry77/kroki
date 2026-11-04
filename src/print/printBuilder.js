@@ -27,6 +27,17 @@ body { font-family: Tahoma, 'Vazirmatn', sans-serif; color: #222; background: #f
   padding: 6mm;
 }
 .sheet > * { flex-shrink: 0; }
+.points-sheet {
+  display: block;
+  page-break-before: always;
+  break-before: page;
+}
+.points-sheet h2 { font-size: 15px; margin: 0 0 3mm; }
+.points-sheet .points-subtitle { font-size: 9px; color: #555; margin-bottom: 3mm; }
+.points-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; direction: rtl; }
+.points-grid table { font-size: 10px; margin: 0; }
+.points-grid th, .points-grid td { border: 1px solid #bbb; padding: 3px 5px; text-align: center; white-space: nowrap; }
+.points-grid th { background: #f3f3f3; }
 
 .head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 4px; margin-bottom: 5px; }
 .head-logo-title { display: flex; align-items: center; gap: 8px; }
@@ -224,6 +235,7 @@ figcaption { font-size: 10px; color: #444; margin-top: 2px; font-weight: 600; }
 @page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 0; }
 @media print {
   figure, table, .sign-row { page-break-inside: avoid; }
+  .points-sheet { page-break-before: always; break-before: page; }
 }
 `;
 }
@@ -242,7 +254,11 @@ export function createPrintBuilder(state, last, template) {
         return `<tr><td>${rowIndex + 1}</td><td>${p.y.toFixed(2)}</td><td>${p.x.toFixed(2)}</td><td> ${zoneLabel(p.zone ?? state.utmZone ?? "")}</td></tr>`;
       })
       .join("");
-
+    const allPointRows = state.utmPoints
+      .map((point, index) => {
+        if (!point) return "";
+        return `<tr><td>${index + 1}</td><td>${Number(point.y).toFixed(2)}</td><td>${Number(point.x).toFixed(2)}</td></tr>`;
+      });
     const centerRow = state.centerUtm
       ? `<tr style="background:#eff6ff;font-weight:600"><td>مرکز</td><td>${state.centerUtm.y.toFixed(2)}</td><td>${state.centerUtm.x.toFixed(2)}</td><td> ${zoneLabel(state.centerUtm.zone ?? state.utmZone ?? "")}</td></tr>`
       : "";
@@ -258,6 +274,22 @@ export function createPrintBuilder(state, last, template) {
       </div>
       <div class="head-sub">قالب: ${escapeHtml(t.name)} — تاریخ برداشت: ${escapeHtml(last.form.date)}</div>
     </div>`;
+    const pointsPerPage = state.orientation === "landscape" ? 60 : 80;
+    const fullPointsPages = [];
+    for (let pageStart = 0; pageStart < allPointRows.length; pageStart += pointsPerPage) {
+      const pageRows = allPointRows.slice(pageStart, pageStart + pointsPerPage);
+      const pointColumns = Array.from({ length: 2 }, (_, columnIndex) => {
+        const start = Math.ceil(pageRows.length * columnIndex / 2);
+        const end = Math.ceil(pageRows.length * (columnIndex + 1) / 2);
+        return `<table class="utm-table"><thead><tr><th>نقطه</th><th>Y (Northing)</th><th>X (Easting)</th></tr></thead><tbody>${pageRows.slice(start, end).join("")}</tbody></table>`;
+      }).join("");
+      fullPointsPages.push(`<section class="sheet points-sheet">
+          ${headBlock}
+          <h2>فهرست کامل نقاط${pageStart ? " — ادامه" : ""}</h2>
+          <div class="points-subtitle">نقاط ${pageStart + 1} تا ${Math.min(pageStart + pageRows.length, allPointRows.length)} از ${allPointRows.length} — مختصات UTM، Zone: ${zoneLabel(state.utmZone ?? "—")}</div>
+          <div class="points-grid">${pointColumns}</div>
+        </section>`);
+    }
 
     const infoRows = [
       ["متقاضی", escapeHtml(last.form.client)],
@@ -421,7 +453,10 @@ export function createPrintBuilder(state, last, template) {
   </div>`;
     }
 
-    return { html, style: `headerColor:${t.headerColor}` };
+    return {
+      html: html + (state.utmPoints.length > 50 ? fullPointsPages.join("") : ""),
+      style: `headerColor:${t.headerColor}`,
+    };
   }
 
   function openPrint(canvas) {
@@ -457,7 +492,7 @@ export function createPrintBuilder(state, last, template) {
       const iw = iframe.contentWindow;
       const idoc = iframe.contentDocument;
       if (!iw || !idoc) return;
-      const sheet = idoc.querySelector(".sheet");
+      const sheets = Array.from(idoc.querySelectorAll(".sheet"));
       const images = Array.from(idoc.images);
 
       Promise.all(
@@ -477,13 +512,13 @@ export function createPrintBuilder(state, last, template) {
           const pageW = (printWmm * 96) / 25.4;
           const pageH = (printHmm * 96) / 25.4;
 
-          sheet.style.width = pageW + "px";
-          // ارتفاع طبیعی مثل پیش‌نمایش (بدون کش‌آمدن)؛ سقف یک صفحه تا خروجی
-          // دقیقاً هم‌شکل پیش‌نمایش بماند و تک‌صفحه حفظ شود
-          sheet.style.height = "auto";
-          sheet.style.maxHeight = pageH + "px";
-          sheet.style.margin = "0";
-          sheet.style.overflow = "hidden";
+          for (const sheet of sheets) {
+            sheet.style.width = pageW + "px";
+            sheet.style.height = pageH + "px";
+            sheet.style.maxHeight = pageH + "px";
+            sheet.style.margin = "0";
+            sheet.style.overflow = "hidden";
+          }
 
           iw.focus();
           iw.print();
