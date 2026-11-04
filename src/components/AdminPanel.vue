@@ -196,6 +196,7 @@ function showEditUser(u) {
     nationalId: u.nationalId || "",
     city: u.city || "",
     password: "",
+    freeAccessDays: "",
     error: "",
     saving: false,
   };

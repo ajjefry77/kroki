@@ -297,7 +297,7 @@ const currentTemplate = computed(() => getTemplate(props.templateId));
 
 // ── اعتبار و صدور مستقیم (بدون صفحه پرداخت؛ اولویت با کروکی رایگان) ──
 const price = computed(() => KROKI_PRICE);
-const freeKroki = computed(() => auth.freeOf());
+const hasFreeAccess = computed(() => auth.hasFreeAccess());
 const wallet = computed(() => auth.walletOf());
 const isAdmin = computed(() => auth.isAdmin.value);
 const processing = ref(false);
@@ -362,7 +362,7 @@ async function confirmAndIssue() {
     return;
   }
   // اولویت مصرف: کروکی رایگان، بعد موجودی کیف پول
-  const mode = freeKroki.value > 0 ? "free" : "wallet";
+  const mode = hasFreeAccess.value ? "free" : "wallet";
   if (!isAdmin.value && mode === "wallet" && wallet.value < price.value) {
     insufficientOpen.value = true;
     return;

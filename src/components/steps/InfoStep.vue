@@ -272,10 +272,13 @@
                 <dd class="font-bold">{{ areaPreview }}</dd>
               </div>
               <div class="flex items-center justify-between gap-2">
-                <dt class="text-[var(--text-muted)]">{{ isAdmin ? "هزینه" : freeKroki > 0 ? "اعتبار مصرفی" : "هزینه" }}</dt>
+                <dt class="text-[var(--text-muted)]">{{ isAdmin ? "هزینه" : hasFreeAccess ? "اعتبار مصرفی" : "هزینه" }}</dt>
                 <dd v-if="isAdmin" class="font-extrabold text-[var(--accent-soft)]">رایگان (مدیر)</dd>
                 <dd v-else-if="freeKroki > 0" class="font-extrabold text-[var(--success)]">
                   <i class="fas fa-gift ml-1"></i>{{ faNum(freeKroki) }} عدد کروکی رایگان
+                </dd>
+                <dd v-else-if="hasFreeAccess" class="font-extrabold text-[var(--success)]">
+                  <i class="fas fa-gift ml-1"></i>استفاده رایگان زمان‌دار
                 </dd>
                 <dd v-else class="font-extrabold text-[var(--accent-soft)]" dir="ltr">
                   <span v-if="showDiscount" class="font-medium text-[var(--text-faint)] line-through">{{ fmtMoney(originalPrice) }}</span>
@@ -456,6 +459,7 @@ const showDiscount = computed(() => true);
 
 // اعتبار کاربر: اگر کروکی رایگان داشت تعداد آن، وگرنه مبلغ نمایش داده می‌شود
 const freeKroki = computed(() => auth.freeOf());
+const hasFreeAccess = computed(() => auth.hasFreeAccess());
 const isAdmin = computed(() => auth.isAdmin.value);
 
 function faNum(v) {

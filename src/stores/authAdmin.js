@@ -75,13 +75,14 @@ export async function toggleActive(userId) {
   }
 }
 
-export async function editUser(userId, { name, password, phone, nationalId, city } = {}) {
+export async function editUser(userId, { name, password, phone, nationalId, city, freeAccessDays } = {}) {
   const body = {};
   if (String(name || "").trim()) body.full_name = String(name).trim();
   if (String(password || "").trim()) body.password = String(password).trim();
   if (phone !== undefined) body.phone = phone;
   if (nationalId !== undefined) body.national_id = nationalId;
   if (city !== undefined) body.city = city;
+  if (freeAccessDays !== undefined && freeAccessDays !== "") body.free_access_days = Math.max(0, Math.floor(Number(freeAccessDays) || 0));
   if (!Object.keys(body).length) return { success: true };
   try {
     const d = await UsersApi.update(userId, body);

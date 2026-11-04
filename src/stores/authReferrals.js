@@ -1,6 +1,6 @@
 import { listOf, ReferralsApi, UsersApi, AgencyApi } from "../api";
 import { faToEn } from "../utils/validators";
-import { state, loadWallet, refreshMe } from "./authCore";
+import { state, refreshMe } from "./authCore";
 
 /* ---------------- معرفی ---------------- */
 
@@ -9,9 +9,15 @@ export async function redeemReferral(code) {
   if (!normalized) return { success: false, error: "کد معرف را وارد کنید" };
   try {
     const d = await ReferralsApi.redeem(normalized);
-    await loadWallet();
+    await refreshMe();
     await loadMyReferrals();
-    return { success: true, granted: d?.granted, already: d?.already === true, freeKroki: d?.free_kroki_count };
+    return {
+      success: true,
+      granted: d?.granted,
+      already: d?.already === true,
+      freeKrokiGranted: Number(d?.granted ?? d?.free_kroki_granted ?? 0),
+      freeAccessDaysGranted: Number(d?.free_access_days_granted ?? 0),
+    };
   } catch (e) {
     return { success: false, error: e.message || "خطا در اعمال کد معرف" };
   }
@@ -55,13 +61,14 @@ export async function loadPersonalReferralCodes() {
   }
 }
 
-export async function createReferral({ code, free_kroki_amount, max_uses, expires_at } = {}) {
+export async function createReferral({ code, free_kroki_amount, free_access_days, max_uses, expires_at } = {}) {
   try {
     // سقف خالی = نامحدود (چندبارمصرف)؛ فقط عدد معتبر ارسال می‌شود
     const rawMax = String(max_uses ?? "").trim();
     const body = {
       code: String(code || "").trim(),
-      free_kroki_amount: Number(free_kroki_amount) || 1,
+      free_kroki_amount: Math.max(0, Math.floor(Number(free_kroki_amount) || 0)),
+      free_access_days: Math.max(0, Math.floor(Number(free_access_days) || 0)),
       max_uses: rawMax === "" ? null : Number(rawMax),
       expires_at: expires_at || "",
     };

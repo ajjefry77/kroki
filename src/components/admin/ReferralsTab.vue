@@ -4,14 +4,18 @@
       <div class="font-bold text-sm mb-3 flex items-center gap-2">
         <i class="fas fa-ticket text-[var(--accent)]"></i> ساخت کد معرف جدید
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
         <div>
           <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">کد (خالی = تصادفی)</label>
           <input v-model="referralForm.code" type="text" class="input" dir="ltr" placeholder="A1B2C3" />
         </div>
         <div>
-          <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">کروکی رایگان</label>
-          <input v-model.number="referralForm.free_kroki_amount" type="number" min="1" class="input" dir="ltr" />
+          <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">تعداد کروکی رایگان</label>
+          <input v-model.number="referralForm.free_kroki_amount" type="number" min="0" class="input" dir="ltr" />
+        </div>
+        <div>
+          <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">روز استفاده رایگان</label>
+          <input v-model.number="referralForm.free_access_days" type="number" min="0" class="input" dir="ltr" placeholder="۰ = بدون زمان" />
         </div>
         <div>
           <label class="block mb-1 text-[11px] font-medium text-[var(--text-muted)]">سقف استفاده (خالی = نامحدود)</label>
@@ -23,7 +27,7 @@
         </div>
       </div>
       <p class="text-[11px] text-[var(--text-muted)] leading-5 mb-3">
-        کدهای شخصی کاربران هم در جدول «کدهای شخصی کاربران» پایین همین صفحه می‌آیند و قابل ویرایش‌اند.
+        برای یک ماه، ۳۰ روز وارد کنید. کدهای شخصی کاربران هم در جدول پایین همین صفحه قابل ویرایش‌اند.
       </p>
       <div class="flex items-center gap-2">
         <button class="btn btn-primary btn-sm" :disabled="referralSaving" @click="createReferral">
@@ -45,6 +49,7 @@
             <tr>
               <th>کد</th>
               <th>کروکی رایگان</th>
+              <th>روز رایگان</th>
               <th>مصرف / سقف</th>
               <th>انقضا</th>
               <th>وضعیت</th>
@@ -53,7 +58,7 @@
           </thead>
           <tbody>
             <tr v-if="referrals.length === 0">
-              <td colspan="6" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
+              <td colspan="7" class="text-center text-[var(--text-faint)] py-10">کد معرفی ثبت نشده است</td>
             </tr>
             <tr v-for="r in referrals" :key="r.id">
               <td>
@@ -68,11 +73,22 @@
               <td>
                 <input
                   type="number"
-                  min="1"
+                  min="0"
                   class="input !w-20 !py-1.5 !text-xs text-center"
                   dir="ltr"
                   :value="referralEditDrafts[r.id]?.free_kroki_amount ?? r.free_kroki_amount"
                   @input="setReferralDraft(r.id, 'free_kroki_amount', $event.target.value)"
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  min="0"
+                  max="36500"
+                  class="input !w-20 !py-1.5 !text-xs text-center"
+                  dir="ltr"
+                  :value="referralEditDrafts[r.id]?.free_access_days ?? r.free_access_days ?? 0"
+                  @input="setReferralDraft(r.id, 'free_access_days', $event.target.value)"
                 />
               </td>
               <td class="text-xs whitespace-nowrap" dir="ltr">
@@ -206,7 +222,7 @@ const busy = ref(false);
 const referrals = computed(() => auth.state.referrals);
 const personalReferralCodes = computed(() => auth.state.personalReferralCodes?.length ? auth.state.personalReferralCodes : auth.state.users.filter((u) => u.referralCode).map((u) => ({ id: u.id, username: u.username, full_name: u.name, phone: u.phone, code: u.referralCode, free_kroki_amount: Number(u.personalFreeKroki ?? 1) })));
 
-const referralForm = reactive({ code: "", free_kroki_amount: 1, max_uses: "", expires_at: "" });
+const referralForm = reactive({ code: "", free_kroki_amount: 1, free_access_days: 0, max_uses: "", expires_at: "" });
 const referralSaving = ref(false);
 const referralMsg = ref("");
 const referralMsgOk = ref(true);
@@ -220,6 +236,7 @@ async function createReferral() {
   const res = await auth.createReferral({
     code: referralForm.code,
     free_kroki_amount: referralForm.free_kroki_amount,
+    free_access_days: referralForm.free_access_days,
     max_uses: referralForm.max_uses,
     expires_at: referralForm.expires_at,
   });
@@ -229,6 +246,7 @@ async function createReferral() {
   if (res.success) {
     referralForm.code = "";
     referralForm.free_kroki_amount = 1;
+    referralForm.free_access_days = 0;
     referralForm.max_uses = "";
     referralForm.expires_at = "";
   }
@@ -251,6 +269,7 @@ async function saveReferralEdit(r) {
   const patch = {};
   if (d.code !== undefined && String(d.code).trim() && String(d.code).trim().toUpperCase() !== r.code) patch.code = String(d.code).trim();
   if (d.free_kroki_amount !== undefined && d.free_kroki_amount !== "" && Number(d.free_kroki_amount) !== Number(r.free_kroki_amount)) patch.free_kroki_amount = Number(d.free_kroki_amount);
+  if (d.free_access_days !== undefined && d.free_access_days !== "" && Number(d.free_access_days) !== Number(r.free_access_days ?? 0)) patch.free_access_days = Number(d.free_access_days);
   // سقف خالی = نامحدود (چندبارمصرف)
   if (d.max_uses !== undefined) {
     const cur = r.max_uses == null ? "" : String(r.max_uses);

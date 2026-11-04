@@ -80,6 +80,7 @@ export function normalizeUser(u) {
     role: u?.role || u?.role_name || "user",
     wallet: Number(u?.wallet_balance ?? u?.wallet ?? 0),
     freeKroki: Number(u?.free_kroki_count ?? u?.freeKroki ?? 0),
+    freeAccessUntil: u?.free_access_until ?? u?.freeAccessUntil ?? null,
     active: u?.active !== false,
     referralCode: u?.referral_code || u?.referralCode || u?.agent_code || "",
     personalFreeKroki: Number(u?.referral_free_kroki ?? u?.personalFreeKroki ?? u?.free_kroki_amount ?? 1),
@@ -285,6 +286,12 @@ export function walletOf() {
 }
 export function freeOf() {
   return state.user ? Number(state.user.freeKroki) || 0 : 0;
+}
+
+export function hasFreeAccess() {
+  if (freeOf() > 0) return true;
+  const until = state.user?.freeAccessUntil ? new Date(state.user.freeAccessUntil).getTime() : 0;
+  return Number.isFinite(until) && until > Date.now();
 }
 
 /* ---------------- تراکنش‌ها ---------------- */

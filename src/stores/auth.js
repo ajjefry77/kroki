@@ -25,6 +25,7 @@ import {
   refreshMe,
   walletOf,
   freeOf,
+  hasFreeAccess,
   loadWallet,
   syncUser,
 } from "./authCore";
@@ -124,6 +125,7 @@ export const auth = {
   refreshMe,
   walletOf,
   freeOf,
+  hasFreeAccess,
   loadWallet,
   txList,
   loadTransactions,

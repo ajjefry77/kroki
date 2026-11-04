@@ -37,6 +37,13 @@
               <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">رمز عبور جدید</label>
               <input v-model="modal.password" type="password" class="input" placeholder="خالی = بدون تغییر" maxlength="72" autocomplete="new-password" />
             </div>
+            <div class="rounded-xl border border-[var(--info)]/25 bg-[var(--info-glow)] p-3">
+              <label class="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">مدت استفاده رایگان (روز)</label>
+              <input v-model="modal.freeAccessDays" type="number" min="0" max="36500" class="input" dir="ltr" placeholder="خالی = بدون تغییر" />
+              <p class="text-[10px] text-[var(--text-muted)] mt-1.5 leading-5">
+                وضعیت فعلی: {{ freeAccessUntilLabel }}. ثبت تعداد روز، دوره را از امروز شروع می‌کند؛ ۰ یعنی لغو دسترسی زمان‌دار. هر ماه ۳۰ روز است.
+              </p>
+            </div>
             <div v-if="modal.error" class="text-xs text-[var(--danger)] bg-[var(--danger-glow)] px-3 py-2 rounded-lg">
               {{ modal.error }}
             </div>
@@ -64,6 +71,10 @@ const props = defineProps({
   modal: { type: Object, required: true },
 });
 const emit = defineEmits(["close"]);
+
+const freeAccessUntilLabel = props.modal.user.freeAccessUntil
+  ? new Date(props.modal.user.freeAccessUntil).toLocaleString("fa-IR")
+  : "فعال نیست";
 
 const notify = inject("notify", () => {});
 
@@ -100,6 +111,7 @@ async function saveEditUser() {
   if (nationalId !== String(m.user.nationalId || "")) payload.nationalId = nationalId;
   if (String(m.city || "").trim() !== String(m.user.city || "")) payload.city = String(m.city || "").trim();
   if (String(m.password || "").trim()) payload.password = String(m.password).trim();
+  if (m.freeAccessDays !== "") payload.freeAccessDays = m.freeAccessDays;
   const res = await auth.editUser(m.user.id, payload);
   m.saving = false;
   if (res.success) {

@@ -25,7 +25,7 @@
 
     <main class="flex-1 max-w-5xl w-full mx-auto px-5 py-6">
       <!-- آمار -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="card !rounded-2xl flex items-center gap-4">
           <div class="w-11 h-11 rounded-xl bg-[var(--accent-glow)] border border-[var(--accent)]/30 flex items-center justify-center">
             <i class="fas fa-wallet text-[var(--accent)]"></i>
@@ -42,6 +42,15 @@
           <div>
             <div class="text-[11px] text-[var(--text-muted)]">کروکی رایگان</div>
             <div class="font-extrabold text-lg">{{ freeKroki }} عدد</div>
+          </div>
+        </div>
+        <div class="card !rounded-2xl flex items-center gap-4">
+          <div class="w-11 h-11 rounded-xl bg-[var(--success-glow)] border border-[var(--success)]/30 flex items-center justify-center">
+            <i class="fas fa-hourglass-half text-[var(--success)]"></i>
+          </div>
+          <div>
+            <div class="text-[11px] text-[var(--text-muted)]">زمان استفاده رایگان</div>
+            <div class="font-extrabold text-sm">{{ freeAccessRemaining }}</div>
           </div>
         </div>
         <div class="card !rounded-2xl flex items-center gap-4">
@@ -405,16 +414,18 @@
                 <tr>
                   <th>کد</th>
                   <th>کروکی هدیه</th>
+                  <th>زمان هدیه</th>
                   <th>تاریخ</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="myReferrals.length === 0">
-                  <td colspan="3" class="text-center text-[var(--text-faint)] py-10">هنوز کد معرفی فعال نکرده‌اید</td>
+                  <td colspan="4" class="text-center text-[var(--text-faint)] py-10">هنوز کد معرفی فعال نکرده‌اید</td>
                 </tr>
                 <tr v-for="r in myReferrals" :key="r.id">
                   <td class="text-xs font-bold tracking-widest" dir="ltr">{{ r.code }}</td>
-                  <td class="text-xs">{{ r.free_kroki_granted }} عدد</td>
+                  <td class="text-xs">{{ r.free_kroki_granted || 0 }} عدد</td>
+                  <td class="text-xs">{{ r.free_access_days_granted ? `${r.free_access_days_granted} روز` : "—" }}</td>
                   <td class="text-xs text-[var(--text-muted)]">{{ fmtDate(r.created_at) }}</td>
                 </tr>
               </tbody>
@@ -471,7 +482,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from "vue";
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { auth, fmtMoney, fmtDate } from "../stores/auth";
 import { SKETCH_TEMPLATES, TEMPLATE_ICONS } from "../utils/templates";
 import { userTxSign as txSign, userTxColor as txColor, txStatusClass as statusClass, txStatusLabel as statusLabel, krokiStatusClass, krokiStatusLabel } from "../utils/txStatus";
@@ -487,6 +498,21 @@ const props = defineProps({
 const user = computed(() => auth.state.user);
 const wallet = computed(() => auth.walletOf());
 const freeKroki = computed(() => auth.freeOf());
+const now = ref(Date.now());
+const faNumber = new Intl.NumberFormat("fa-IR");
+const freeAccessRemaining = computed(() => {
+  const until = user.value?.freeAccessUntil ? new Date(user.value.freeAccessUntil).getTime() : 0;
+  const remaining = until - now.value;
+  if (!Number.isFinite(until) || remaining <= 0) return "فعال نیست";
+  const minutes = Math.ceil(remaining / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const restMinutes = minutes % 60;
+  if (days) return `${faNumber.format(days)} روز و ${faNumber.format(hours)} ساعت`;
+  if (hours) return `${faNumber.format(hours)} ساعت و ${faNumber.format(restMinutes)} دقیقه`;
+  return `${faNumber.format(restMinutes)} دقیقه`;
+});
+let freeAccessClock;
 const transactions = ref([]);
 const pending = computed(() => auth.pendingOf(user.value?.id || "none"));
 
@@ -697,10 +723,13 @@ async function redeem() {
   referralMsg.value = "";
   const res = await auth.redeemReferral(String(referralCode.value).trim());
   referralMsgOk.value = res.success;
+  const gifts = [];
+  if (res.freeKrokiGranted) gifts.push(`${res.freeKrokiGranted} عدد کروکی رایگان`);
+  if (res.freeAccessDaysGranted) gifts.push(`${res.freeAccessDaysGranted} روز استفاده رایگان`);
   referralMsg.value = res.success
     ? res.already
       ? "این کد قبلاً برای شما فعال شده است؛ هدیه تکراری تعلق نمی‌گیرد."
-      : `کد معرف فعال شد؛ ${res.freeKroki ?? ""} عدد کروکی رایگان دریافت کردید.`
+      : `کد معرف فعال شد؛ ${gifts.join(" و ") || "هدیه شما اعمال شد"}.`
     : res.error;
   if (res.success) {
     referralCode.value = "";
@@ -747,6 +776,9 @@ watch(activeTab, (tab) => {
 });
 
 onMounted(() => {
+  freeAccessClock = setInterval(() => {
+    now.value = Date.now();
+  }, 60000);
   loadTx();
   auth.loadMyCharges();
   auth.loadTemplates();
@@ -755,6 +787,8 @@ onMounted(() => {
   auth.loadMyReferralCode();
   auth.loadSubordinates();
 });
+
+onBeforeUnmount(() => clearInterval(freeAccessClock));
 </script>
 
 <style scoped>

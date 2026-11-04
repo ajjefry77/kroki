@@ -303,8 +303,8 @@ npm run preview
 | `POST` | `/api/referrals/redeem` | اعمال کد معرف (واردکننده زیرمجموعه مالک کد می‌شود) |
 | `GET` | `/api/referrals/my` | کدهای معرف من |
 | `GET` | `/api/referrals` | همه کدها (ادمین) |
-| `POST` | `/api/referrals` | ایجاد کد معرف (با `user_id` اختیاری برای اتصال به مالک) |
-| `PATCH` | `/api/referrals/:id` | ویرایش کد معرف |
+| `POST` | `/api/referrals` | ایجاد کد معرف با `free_kroki_amount` و/یا `free_access_days` |
+| `PATCH` | `/api/referrals/:id` | ویرایش کد و هدیه‌های کروکی/زمانی |
 | `DELETE` | `/api/referrals/:id` | حذف کد معرف |
 | `GET` | `/api/referrals/my-code` | کد معرف شخصی کاربر جاری |
 | `POST` | `/api/referrals/my-code` | ساخت خودکار کد شخصی (اگر ندارد) |
@@ -313,10 +313,13 @@ npm run preview
 ### کاربران (ادمین)
 | متد | مسیر | توضیح |
 |-----|------|-------|
-| `GET` | `/api/users` | لیست کاربران (شامل `referral_code`) |
-| `PATCH` | `/api/users/:id` | ویرایش کاربر |
+| `GET` | `/api/users` | لیست کاربران (شامل `referral_code` و `free_access_until`) |
+| `PATCH` | `/api/users/:id` | ویرایش کاربر؛ `free_access_days` تنظیم مهلت از امروز و `0` لغو دسترسی است |
 | `POST` | `/api/users/:id/credit` | شارژ کیف پول کاربر |
 | `POST` | `/api/users/:id/referral-code` | تعریف کد معرف شخصی برای کاربر (`{ code }`) |
+
+کد معرف عمومی می‌تواند به‌جای تعداد کروکی یا در کنار آن، مدت دسترسی رایگان بدهد؛
+برای یک ماه ۳۰ روز تنظیم کنید. زمان باقی‌مانده در پنل کاربر نمایش داده می‌شود.
 
 ### پنل ادمین
 | متد | مسیر | توضیح |
