@@ -145,6 +145,7 @@ export function useKrokiGenerator() {
         pinId: pin.id,
         tableIndices,
         tableEdges,
+        referenceSelection: Array.isArray(pin.shape.tablePositionIndices),
       });
     }
     if (allPositions.length < 2) return null;

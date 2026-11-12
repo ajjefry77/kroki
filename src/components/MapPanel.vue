@@ -513,6 +513,58 @@ function removeManualCsvSelection() {
   manualCsvSelection.value = null;
 }
 
+function showSelectedKmlReferencePoints(session) {
+  const sourceId = "kml-reference-points";
+  const layerId = `${sourceId}-circles`;
+  const labelLayerId = `${sourceId}-labels`;
+  if (map.getLayer(labelLayerId)) map.removeLayer(labelLayerId);
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+  const features = session.selected.map((pointIndex, order) => {
+    const point = session.points[pointIndex];
+    return {
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [Number(point.lon), Number(point.lat)],
+      },
+      properties: { order: order + 1 },
+    };
+  });
+  map.addSource(sourceId, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features },
+  });
+  map.addLayer({
+    id: layerId,
+    type: "circle",
+    source: sourceId,
+    paint: {
+      "circle-radius": 11,
+      "circle-color": "#00e5ff",
+      "circle-stroke-color": "#111827",
+      "circle-stroke-width": 3,
+    },
+  });
+  map.addLayer({
+    id: labelLayerId,
+    type: "symbol",
+    source: sourceId,
+    layout: {
+      "text-field": ["to-string", ["get", "order"]],
+      "text-font": ["Open Sans Bold"],
+      "text-size": 12,
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+    },
+    paint: {
+      "text-color": "#111827",
+      "text-halo-color": "#ffffff",
+      "text-halo-width": 1.5,
+    },
+  });
+}
+
 function startManualCsvSelection({ points, name, invalidRows }) {
   return startManualPointSelection({ points, name, invalidRows, kind: "csv" });
 }
@@ -628,6 +680,7 @@ function completeManualCsvSelection() {
   const session = manualCsvSelection.value;
   const minPoints = session?.kind === "kml" ? 1 : 3;
   if (!session || session.selected.length < minPoints) return;
+  if (session.kind === "kml") showSelectedKmlReferencePoints(session);
   const payload = {
     points: session.selected.map((pointIndex) => session.points[pointIndex]),
     name: session.name,

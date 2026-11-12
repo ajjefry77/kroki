@@ -479,25 +479,26 @@ export function createRenderFunctions(state, last, template) {
         let angle = Math.atan2(b.y - a.y, b.x - a.x);
         if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
 
-        // اندازه ضلع داخل کروکی می‌افتد تا با متن مجاورت (بیرون ضلع) تداخل نداشته باشد
-        const inX = Math.max(30, Math.min(mx - nx * offIn, W - 30));
-        const inY = Math.max(drawTop + 14, Math.min(my - ny * offIn, drawBottom - 14));
+        if (!meta.referenceSelection) {
+          const inX = Math.max(30, Math.min(mx - nx * offIn, W - 30));
+          const inY = Math.max(drawTop + 14, Math.min(my - ny * offIn, drawBottom - 14));
 
-        ctx.save();
-        ctx.translate(inX, inY);
-        ctx.rotate(angle);
-        ctx.font = `700 ${fLen}px Vazirmatn, Tahoma, sans-serif`;
-        const lenTxt = lenM.toFixed(2);
-        const lenW = ctx.measureText(lenTxt).width;
-        const lenBw = Math.round(4 * FS);
-        const lenBh = Math.round(12 * FS);
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.fillRect(-lenW / 2 - lenBw, -lenBh, lenW + lenBw * 2, lenBh * 2);
-        ctx.fillStyle = t.textColor;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(lenTxt, 0, 0);
-        ctx.restore();
+          ctx.save();
+          ctx.translate(inX, inY);
+          ctx.rotate(angle);
+          ctx.font = `700 ${fLen}px Vazirmatn, Tahoma, sans-serif`;
+          const lenTxt = lenM.toFixed(2);
+          const lenW = ctx.measureText(lenTxt).width;
+          const lenBw = Math.round(4 * FS);
+          const lenBh = Math.round(12 * FS);
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.fillRect(-lenW / 2 - lenBw, -lenBh, lenW + lenBw * 2, lenBh * 2);
+          ctx.fillStyle = t.textColor;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(lenTxt, 0, 0);
+          ctx.restore();
+        }
 
         // مجاورت بیرون ضلع و در امتداد آن
         const street = state.edgeTexts[m]?.[i] || "";
@@ -528,6 +529,59 @@ export function createRenderFunctions(state, last, template) {
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(street, 0, 0);
+          ctx.restore();
+        }
+      }
+
+      if (meta.referenceSelection) {
+        const referenceEdges = state.tableEdges.filter(
+          (edge) => edge.shapeIndex === m,
+        );
+        for (const edge of referenceEdges) {
+          const a = cpts[edge.startIndex];
+          const b = cpts[edge.endIndex];
+          const aUtm = pts[edge.startIndex];
+          const bUtm = pts[edge.endIndex];
+          if (!a || !b || !aUtm || !bUtm) continue;
+
+          const length = Math.hypot(bUtm.x - aUtm.x, bUtm.y - aUtm.y);
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const edgePx = Math.hypot(dx, dy);
+          if (!edgePx) continue;
+
+          let nx = -dy / edgePx;
+          let ny = dx / edgePx;
+          const mx = (a.x + b.x) / 2;
+          const my = (a.y + b.y) / 2;
+          if (nx * (mx - scx) + ny * (my - scy) < 0) {
+            nx = -nx;
+            ny = -ny;
+          }
+          const angle = Math.atan2(dy, dx);
+          const readableAngle = angle > Math.PI / 2 || angle < -Math.PI / 2
+            ? angle + Math.PI
+            : angle;
+          const labelX = Math.max(30, Math.min(mx - nx * offIn, W - 30));
+          const labelY = Math.max(
+            drawTop + 14,
+            Math.min(my - ny * offIn, drawBottom - 14),
+          );
+          const text = length.toFixed(2);
+
+          ctx.save();
+          ctx.translate(labelX, labelY);
+          ctx.rotate(readableAngle);
+          ctx.font = `700 ${fLen}px Vazirmatn, Tahoma, sans-serif`;
+          const textWidth = ctx.measureText(text).width;
+          const padX = Math.round(4 * FS);
+          const padY = Math.round(12 * FS);
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fillRect(-textWidth / 2 - padX, -padY, textWidth + padX * 2, padY * 2);
+          ctx.fillStyle = t.textColor;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(text, 0, 0);
           ctx.restore();
         }
       }
