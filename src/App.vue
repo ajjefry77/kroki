@@ -2,6 +2,9 @@
   <div class="min-h-screen flex flex-col overflow-x-hidden bg-[var(--bg)]">
     <LogPanel v-model="logOpen" />
 
+    <SignupGiftPopup :gift="signupGift" @close="onGiftClose" />
+    <FreeDayPopup :occasion="freeDayInfo?.occasion || ''" :open="freeDayPopup" @close="freeDayPopup = false" />
+
     <Transition name="page" mode="out-in">
       <AuthView v-if="page === 'auth'" key="auth" @back="goHome" @success="onAuthSuccess" />
 
@@ -25,6 +28,7 @@
         :is-admin="auth.isAdmin.value"
         :wallet="auth.walletOf()"
         :free="auth.freeOf()"
+        :free-days="auth.freeDaysLeft()"
         @start="start"
         @toggleLog="logOpen = !logOpen"
         @login="openAuth('landing')"
@@ -157,6 +161,8 @@ import {
 
 const LandingPage = defineAsyncComponent(() => import("./components/LandingPage.vue"));
 import Loading from "./components/Loading.vue";
+import FreeDayPopup from "./components/FreeDayPopup.vue";
+import SignupGiftPopup from "./components/SignupGiftPopup.vue";
 
 const WizardHeader = defineAsyncComponent(() => import("./components/WizardHeader.vue"));
 const LogPanel = defineAsyncComponent(() => import("./components/LogPanel.vue"));
@@ -201,6 +207,53 @@ const map = shallowRef(null);
 onMounted(() => {
   auth.syncUser();
 });
+
+// ---------- پاپ‌آپ‌های استفاده رایگان ----------
+// ۱) هدیه خوش‌آمدگویی بعد از ثبت‌نام ۲) اعلام روز رایگان سراسری
+const signupGift = ref(null);
+const freeDayPopup = ref(false);
+const freeDayInfo = computed(() => auth.state.freeDay);
+let freeDayPopupShown = false;
+
+async function showFreeDayPopup() {
+  if (freeDayPopupShown) return;
+  const day = await auth.loadFreeDay();
+  if (!day) return;
+  freeDayPopupShown = true;
+  freeDayPopup.value = true;
+}
+
+function onGiftClose() {
+  signupGift.value = null;
+  if (auth.isAuthenticated.value) void showFreeDayPopup();
+}
+
+function takePendingGift() {
+  if (signupGift.value) return true;
+  const gift = auth.takeSignupGift();
+  if (!gift) return false;
+  signupGift.value = gift;
+  return true;
+}
+
+watch(
+  [() => auth.isAuthenticated.value, () => route.name],
+  () => {
+    if (!auth.isAuthenticated.value) {
+      freeDayPopup.value = false;
+      return;
+    }
+    if (route.name !== "landing") {
+      // در صفحه‌های دیگر فقط وضعیت روز رایگان را تازه می‌کنیم (برای پرداخت رایگان)
+      void auth.loadFreeDay();
+      return;
+    }
+    // اگر هدیه ثبت‌نام در انتظار است، اول آن نمایش داده می‌شود و پس از بستن، روز رایگان
+    if (takePendingGift()) return;
+    void showFreeDayPopup();
+  },
+  { immediate: true },
+);
 
 onUnmounted(() => {
   sessionSync.dispose();

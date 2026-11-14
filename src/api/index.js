@@ -8,3 +8,4 @@ export { UsersApi } from "./users.api";
 export { AdminApi } from "./admin.api";
 export { AgencyApi } from "./agency.api";
 export { ExpertsApi } from "./experts.api";
+export { FreeDaysApi } from "./freeDays.api";

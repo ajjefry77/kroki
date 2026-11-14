@@ -5,6 +5,7 @@ import {
   setUnauthorizedHandler,
   AuthApi,
   WalletApi,
+  FreeDaysApi,
 } from "../api";
 import { faToEn, validatePassword, isValidIranianMobile } from "../utils/validators";
 import { redeemReferral } from "./authReferrals";
@@ -64,6 +65,10 @@ export const state = reactive({
   agentDetail: null,
   experts: [],
   expertRequests: [],
+  // روز رایگان سراسری امروز + داده‌های تب «روزهای رایگان» پنل مدیریت
+  freeDay: null,
+  freeDays: [],
+  signupGift: null,
 });
 
 setUserTemplatesProvider(() => state.templates.map((t) => ({ ...t })));
@@ -122,6 +127,9 @@ export function logout() {
   state.agentDetail = null;
   state.experts = [];
   state.expertRequests = [];
+  state.freeDay = null;
+  state.freeDays = [];
+  state.signupGift = null;
   setAuthToken(null);
   localStorage.removeItem(LS.token);
   localStorage.removeItem(LS.user);
@@ -228,6 +236,7 @@ export async function verifyOtpLogin(phone, code, fullName) {
     const { token, user } = data || {};
     if (!token || !user) return { success: false, error: "پاسخ سرور نامعتبر است" };
     applyAuth(token, user);
+    if (data?.isNew) rememberSignupGift(data?.signup_gift || giftFromUser(user));
     await refreshMe();
     restoreFreshSession(token, user);
     return { success: true, isNew: data?.isNew === true };
@@ -259,6 +268,7 @@ export async function register(payload) {
     const { token, user } = data || {};
     if (!token || !user) return { success: false, error: "پاسخ سرور نامعتبر است" };
     applyAuth(token, user);
+    rememberSignupGift(data?.signup_gift || giftFromUser(user));
     await refreshMe();
     restoreFreshSession(token, user);
     // اعمال کد معرف دقیقاً با همان مسیر پنل کاربری (POST /referrals/redeem) تا
@@ -281,6 +291,62 @@ export async function register(payload) {
   }
 }
 
+/* ---------------- هدیه ثبت‌نام و روز رایگان سامانه ---------------- */
+
+const SIGNUP_GIFT_KEY = "kroki_signup_gift";
+
+function rememberSignupGift(gift) {
+  try {
+    const value = Math.floor(Number(gift?.value));
+    if (!["days", "krokis"].includes(gift?.type) || !Number.isFinite(value) || value <= 0) return;
+    localStorage.setItem(SIGNUP_GIFT_KEY, JSON.stringify({ type: gift.type, value }));
+  } catch {}
+}
+
+// اگر پاسخ سرور فیلد signup_gift را نداشت، هدیه را از خود کاربر تازه‌ساخته استخراج می‌کنیم
+function giftFromUser(user) {
+  const kroki = Math.floor(Number(user?.free_kroki_count ?? 0));
+  if (kroki > 0) return { type: "krokis", value: kroki };
+  const until = user?.free_access_until ? new Date(user.free_access_until).getTime() : 0;
+  if (Number.isFinite(until) && until > Date.now()) {
+    return { type: "days", value: Math.max(1, Math.round((until - Date.now()) / 86400000)) };
+  }
+  return null;
+}
+
+/** هدیه‌ای که بعد از ثبت‌نام ذخیره شده را یک‌بار برمی‌گرداند (برای پاپ‌آپ خوش‌آمدگویی) */
+export function takeSignupGift() {
+  try {
+    const raw = localStorage.getItem(SIGNUP_GIFT_KEY);
+    if (!raw) return null;
+    localStorage.removeItem(SIGNUP_GIFT_KEY);
+    const gift = JSON.parse(raw);
+    const value = Math.floor(Number(gift?.value));
+    if (!["days", "krokis"].includes(gift?.type) || !Number.isFinite(value) || value <= 0) return null;
+    return { type: gift.type, value };
+  } catch {
+    return null;
+  }
+}
+
+/** وضعیت امروز را از سرور می‌گیرد؛ اگر روز رایگان باشد state.freeDay پر می‌شود */
+export async function loadFreeDay() {
+  try {
+    const d = await FreeDaysApi.today();
+    state.freeDay = d?.free ? { day: d.day || "", occasion: d.occasion || "" } : null;
+  } catch {
+    state.freeDay = null;
+  }
+  return state.freeDay;
+}
+
+/** تعداد روزهای باقی‌مانده از استفاده رایگان زمان‌دار */
+export function freeDaysLeft() {
+  const until = state.user?.freeAccessUntil ? new Date(state.user.freeAccessUntil).getTime() : 0;
+  if (!Number.isFinite(until) || until <= Date.now()) return 0;
+  return Math.max(1, Math.ceil((until - Date.now()) / 86400000));
+}
+
 export function walletOf() {
   return state.user ? Number(state.user.wallet) || 0 : 0;
 }
@@ -289,6 +355,8 @@ export function freeOf() {
 }
 
 export function hasFreeAccess() {
+  // روز رایگان سراسری: همه کاربران امروز می‌توانند رایگان کروکی بگیرند
+  if (state.freeDay) return true;
   if (freeOf() > 0) return true;
   const until = state.user?.freeAccessUntil ? new Date(state.user.freeAccessUntil).getTime() : 0;
   return Number.isFinite(until) && until > Date.now();

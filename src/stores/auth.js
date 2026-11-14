@@ -25,6 +25,9 @@ import {
   refreshMe,
   walletOf,
   freeOf,
+  freeDaysLeft,
+  loadFreeDay,
+  takeSignupGift,
   hasFreeAccess,
   loadWallet,
   syncUser,
@@ -105,6 +108,13 @@ import {
   decideExpertRequest,
   removeExpert,
 } from "./authExperts";
+import {
+  loadFreeDays,
+  saveFreeDay,
+  removeFreeDay,
+  loadSignupGift,
+  saveSignupGift,
+} from "./authFreeDays";
 
 export { KROKI_PRICE, KROKI_ORIGINAL_PRICE, WALLET_CARD, CARD_OWNER };
 
@@ -125,6 +135,9 @@ export const auth = {
   refreshMe,
   walletOf,
   freeOf,
+  freeDaysLeft,
+  loadFreeDay,
+  takeSignupGift,
   hasFreeAccess,
   loadWallet,
   txList,
@@ -190,6 +203,11 @@ export const auth = {
   loadExpertRequests,
   decideExpertRequest,
   removeExpert,
+  loadFreeDays,
+  saveFreeDay,
+  removeFreeDay,
+  loadSignupGift,
+  saveSignupGift,
 };
 
 // فرمت‌کننده‌های نمایشی از لایه‌ی view (سازگاری عقب برای فراخوانی‌های موجود)

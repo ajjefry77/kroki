@@ -84,6 +84,7 @@
         <TransactionsTab v-else-if="activeTab === 'transactions'" />
         <RolesTab v-else-if="activeTab === 'roles'" />
         <ReferralsTab v-else-if="activeTab === 'referrals'" @go-to-user="goToUser" />
+        <FreeAccessTab v-else-if="activeTab === 'freeAccess'" />
         <AgencyRequestsTab v-else-if="activeTab === 'agencyRequests'" />
         <ExpertRequestsTab v-else-if="activeTab === 'expertRequests'" />
         <ExpertsTab v-else-if="activeTab === 'experts'" />
@@ -132,6 +133,7 @@ const KrokisAdminTab = defineAsyncComponent(() => import("./admin/KrokisAdminTab
 const TransactionsTab = defineAsyncComponent(() => import("./admin/TransactionsTab.vue"));
 const RolesTab = defineAsyncComponent(() => import("./admin/RolesTab.vue"));
 const ReferralsTab = defineAsyncComponent(() => import("./admin/ReferralsTab.vue"));
+const FreeAccessTab = defineAsyncComponent(() => import("./admin/FreeAccessTab.vue"));
 const AgencyRequestsTab = defineAsyncComponent(() => import("./admin/AgencyRequestsTab.vue"));
 const ExpertRequestsTab = defineAsyncComponent(() => import("./admin/ExpertRequestsTab.vue"));
 const ExpertsTab = defineAsyncComponent(() => import("./admin/ExpertsTab.vue"));
@@ -168,6 +170,7 @@ const tabs = computed(() => [
   { id: "transactions", label: "تراکنش‌ها", icon: "fa-clock-rotate-left", badge: null },
   { id: "roles", label: "نقش‌ها", icon: "fa-user-shield", badge: null },
   { id: "referrals", label: "طرح ها", icon: "fa-ticket", badge: null },
+  { id: "freeAccess", label: "روزهای رایگان", icon: "fa-calendar-days", badge: null },
   { id: "agencyRequests", label: "درخواست نمایندگی", icon: "fa-user-clock", badge: pendingAgencyCount.value || null },
   { id: "expertRequests", label: "درخواست‌های همکاری", icon: "fa-handshake", badge: pendingExpertCount.value || null },
   { id: "experts", label: "کارشناسان", icon: "fa-user-tie", badge: null },

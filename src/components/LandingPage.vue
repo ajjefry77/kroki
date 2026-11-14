@@ -138,11 +138,18 @@
                           <i class="fas fa-gift text-[var(--info)]"></i> رایگان
                         </div>
                         <div class="font-extrabold text-[var(--info)]">
-                          {{ free }}
-                          <span
-                            class="text-[10px] font-medium text-[var(--text-muted)]"
-                            >کروکی</span
-                          >
+                          <template v-if="free > 0">
+                            {{ free }}
+                            <span class="text-[10px] font-medium text-[var(--text-muted)]">کروکی</span>
+                          </template>
+                          <template v-else-if="freeDays > 0">
+                            {{ freeDays.toLocaleString('fa-IR') }}
+                            <span class="text-[10px] font-medium text-[var(--text-muted)]">روز</span>
+                          </template>
+                          <template v-else>
+                            0
+                            <span class="text-[10px] font-medium text-[var(--text-muted)]">کروکی</span>
+                          </template>
                         </div>
                       </div>
                     </div>
@@ -765,6 +772,7 @@ const props = defineProps({
   isAdmin: { type: Boolean, default: false },
   wallet: { type: Number, default: 0 },
   free: { type: Number, default: 0 },
+  freeDays: { type: Number, default: 0 },
 });
 
 defineEmits([
