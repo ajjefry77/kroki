@@ -22,6 +22,7 @@
             <span class="logo-3d relative shrink-0">
               <img
                 src="/favicon.png"
+                width="40" height="40"
                 alt="لوگوی سامانه کروکی"
                 class="w-10 h-10 rounded-xl object-contain shadow-lg shadow-[var(--accent-glow-strong)] transition-transform duration-500"
                 :class="scrolled ? 'scale-90' : 'scale-100'"
@@ -223,6 +224,7 @@
     </button>
 
     <!-- هیرو سه‌بعدی -->
+    <main>
     <section
       ref="heroSection"
       class="relative flex-1 flex items-center justify-center py-16 md:py-24 overflow-hidden"
@@ -252,14 +254,14 @@
 
       <div class="relative max-w-7xl mx-auto px-5 text-center w-full">
         <div
-          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--accent)]/40 bg-[var(--accent-glow)] text-[var(--accent-soft)] text-xs font-medium mb-6 reveal badge-3d"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--accent)]/40 bg-[var(--accent-glow)] text-[var(--accent-soft)] text-xs font-medium mb-6 badge-3d"
         >
           <i class="fas fa-certificate"></i>
           رسمی، سازمانی و با استانداردهای فنی
         </div>
 
         <h1
-          class="text-4xl md:text-6xl font-black leading-tight mb-5 reveal hero-title"
+          class="text-4xl md:text-6xl font-black leading-tight mb-5 hero-title"
         >
           کروکی نقشه ملک خود را
           <span
@@ -270,7 +272,7 @@
         </h1>
 
         <p
-          class="max-w-2xl mx-auto text-base md:text-lg text-[var(--text-muted)] leading-8 mb-8 reveal"
+          class="max-w-2xl mx-auto text-base md:text-lg text-[var(--text-muted)] leading-8 mb-8"
         >
           از روی نقشه هوایی، مرز ملک خود را ترسیم کنید، اطلاعات فنی و قالب
           موردنظر را انتخاب نمایید و خروجی استاندارد کروکی با مختصات UTM، طول
@@ -278,7 +280,7 @@
         </p>
 
         <div
-          class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12 reveal"
+          class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12"
         >
           <button
             class="btn btn-primary !px-8 !py-3 !text-base !rounded-xl"
@@ -298,7 +300,7 @@
 
         <!-- موکاپ سه‌بعدی واکنش‌گرا -->
         <div
-          class="scene relative mx-auto max-w-3xl reveal"
+          class="scene relative mx-auto max-w-3xl"
           @mousemove="onMockupMove"
           @mouseleave="resetMockup"
         >
@@ -317,7 +319,7 @@
               <span class="w-3 h-3 rounded-full bg-[var(--success)]/70"></span>
               <span class="mx-auto text-[11px] text-[var(--text-muted)]"
                 >پیش‌نمایش کروکی —
-                <span class="text-[var(--accent)] font-bold"
+                <span class="text-[var(--accent-dim)] font-bold"
                   >نمای سه‌بعدی تعاملی</span
                 ></span
               >
@@ -742,6 +744,8 @@
       </div>
     </section>
 
+    </main>
+
     <footer
       class="border-t border-[var(--border)] py-6 bg-[var(--bg-elevated)]/70"
     >
@@ -750,7 +754,7 @@
       >
         کلیه حقوق مادی و معنوی متعلق به شرکت ساج گستر کاسپین می‌باشد
         <div class="mt-4 flex justify-center">
-          <a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7999093&Code=IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7999093&Code=IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz' alt='' style='cursor:pointer' code='IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz'></a>
+          <a aria-label="مشاهده نماد اعتماد الکترونیکی" referrerpolicy='origin' target='_blank' rel="noopener noreferrer" href='https://trustseal.enamad.ir/?id=7999093&Code=IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7999093&Code=IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz' alt='' width='125' height='125' loading='lazy' style='cursor:pointer; object-fit:contain' code='IVCrstFMVnEGCuWsiD6lSK3gzlj6vETz'></a>
         </div>
       </div>
     </footer>
@@ -1376,10 +1380,10 @@ section[id] {
 @keyframes floatY {
   0%,
   100% {
-    margin-top: 0;
+    transform: translateY(0);
   }
   50% {
-    margin-top: -12px;
+    transform: translateY(-12px);
   }
 }
 @keyframes drift {

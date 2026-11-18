@@ -2,7 +2,15 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig(({ mode }) => ({
-  plugins: [vue()],
+  plugins: [vue(), {
+    name: 'fontawesome-display-swap',
+    enforce: 'pre',
+    transform(code, id) {
+      if (/fontawesome-free[\\/]css[\\/](solid|regular)\.min\.css/.test(id)) {
+        return code.replace(/font-display:block/g, 'font-display:swap')
+      }
+    },
+  }],
   server: {
     host: true,
     port: 5174,
