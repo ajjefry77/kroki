@@ -97,6 +97,8 @@
               :template-id="templateId"
               :tracking-code="trackingCode"
               :form-index="1"
+              :authed="auth.isAuthenticated.value"
+              @login="openAuth('done')"
               @restart="restart"
               @home="go('landing')"
             />
@@ -320,6 +322,10 @@ function onAuthSuccess() {
     openExpertRequest();
     return;
   }
+  if (ret === "done") {
+    go("done");
+    return;
+  }
   if (ret === "start") {
     start();
   } else if (auth.isAdmin.value) {
@@ -336,8 +342,7 @@ watch(
   (ok) => {
     if (ok || route.name === "auth") return;
     const name = route.name;
-    const isWizardStep = route.meta.wizard && step.value !== "landing";
-    if (!isWizardStep && name !== "admin" && name !== "userpanel") return;
+    if (name !== "admin" && name !== "userpanel") return;
     authReturn.value = name === "admin" ? "admin" : name === "userpanel" ? "userpanel" : "start";
     router.push({ name: "auth", query: { ...currentMapQuery(), return: authReturn.value } });
   },
@@ -354,10 +359,6 @@ function pushStep(id) {
 }
 
 function go(id) {
-  if (id !== "landing" && !auth.isAuthenticated.value) {
-    openAuth("start");
-    return;
-  }
   if (id !== "landing") genApi.ensureGen().catch(() => {});
   // نشانی خودکار (پیشنهاد map.ir در پیش‌نمایش) را به فرم اصلی برمی‌گردانیم
   // تا در payload ثبت/صدور به سرور هم ارسال شود
@@ -375,10 +376,6 @@ function navigate(id) {
 }
 
 function start() {
-  if (!auth.isAuthenticated.value) {
-    openAuth("start");
-    return;
-  }
   logger.info("step", "شروع فرآیند ساخت کروکی");
   wizard.reachedIndex = 0;
   resumePersist();
@@ -466,6 +463,11 @@ async function onInfoSubmit() {
 }
 
 function onPaymentDone(result) {
+  if (result?.guest) {
+    wizard.trackingCode = "";
+    go("done");
+    return;
+  }
   wizard.trackingCode = result?.trackingCode || "";
   wizard.editingKrokiId = null;
   // کروکی در سرور ثبت و پرداخت شده («کروکی‌های من»)؛ پس هیچ‌چیز از آن —

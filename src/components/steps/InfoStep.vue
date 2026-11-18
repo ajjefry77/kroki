@@ -273,7 +273,8 @@
               </div>
               <div class="flex items-center justify-between gap-2">
                 <dt class="text-[var(--text-muted)]">{{ isAdmin ? "هزینه" : hasFreeAccess ? "اعتبار مصرفی" : "هزینه" }}</dt>
-                <dd v-if="isAdmin" class="font-extrabold text-[var(--accent-soft)]">رایگان (مدیر)</dd>
+                <dd v-if="!auth.isAuthenticated.value" class="font-extrabold text-[var(--success)]">خروجی PDF رایگان</dd>
+                <dd v-else-if="isAdmin" class="font-extrabold text-[var(--accent-soft)]">رایگان (مدیر)</dd>
                 <dd v-else-if="freeKroki > 0" class="font-extrabold text-[var(--success)]">
                   <i class="fas fa-gift ml-1"></i>{{ faNum(freeKroki) }} عدد کروکی رایگان
                 </dd>
@@ -331,7 +332,7 @@ onMounted(() => {
   document.addEventListener("keydown", onEscapeDrop);
   void suggestAddress();
   try {
-    auth.loadWallet();
+    if (auth.isAuthenticated.value) auth.loadWallet();
   } catch (e) {}
 });
 

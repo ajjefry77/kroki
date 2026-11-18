@@ -10,10 +10,10 @@ import RouteShell from "./RouteShell.vue";
 export const routes = [
   // ویزارد کروکی
   { path: "/", name: "landing", meta: { wizard: true, step: "landing" }, component: RouteShell },
-  { path: "/draw", name: "draw", meta: { wizard: true, step: "draw", requiresAuth: true, returnTag: "start" }, component: RouteShell },
-  { path: "/info", name: "info", meta: { wizard: true, step: "info", requiresAuth: true, returnTag: "start" }, component: RouteShell },
-  { path: "/preview", name: "preview", meta: { wizard: true, step: "preview", requiresAuth: true, returnTag: "start" }, component: RouteShell },
-  { path: "/done", name: "done", meta: { wizard: true, step: "done", requiresAuth: true, returnTag: "start" }, component: RouteShell },
+  { path: "/draw", name: "draw", meta: { wizard: true, step: "draw" }, component: RouteShell },
+  { path: "/info", name: "info", meta: { wizard: true, step: "info" }, component: RouteShell },
+  { path: "/preview", name: "preview", meta: { wizard: true, step: "preview" }, component: RouteShell },
+  { path: "/done", name: "done", meta: { wizard: true, step: "done" }, component: RouteShell },
 
   // صفحات مستقل
   { path: "/auth", name: "auth", component: RouteShell },

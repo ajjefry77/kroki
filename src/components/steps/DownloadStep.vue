@@ -12,12 +12,13 @@
           کروکی شما آماده دانلود است
         </h2>
         <p class="text-sm text-[var(--text-muted)] mb-1">
-          سفارش با موفقیت تکمیل شد.
+          {{ authed ? "سفارش با موفقیت تکمیل شد." : "خروجی PDF شما آماده است." }}
         </p>
         <div
           class="flex items-center justify-center gap-3 text-xs text-[var(--text-muted)] mt-4"
         >
           <span
+            v-if="trackingCode"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface2)] border border-[var(--border)]"
           >
             <i class="fas fa-hashtag text-[var(--accent)]"></i>
@@ -85,7 +86,8 @@
 
       <!-- دانلود — ردیف اول: PNG و PDF -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        <button class="download-card" @click="downloadSketch">
+        <button class="download-card" :class="{ 'is-locked': !authed }" @click="requireLogin(downloadSketch)">
+          <span v-if="!authed" class="login-overlay"><i class="fas fa-lock"></i> برای استفاده وارد شوید</span>
           <div
             class="w-12 h-12 rounded-xl bg-[var(--accent-glow)] border border-[var(--accent)]/30 flex items-center justify-center mb-3"
           >
@@ -98,11 +100,12 @@
           <span
             class="text-xs font-semibold text-[var(--accent-soft)] flex items-center gap-1"
           >
-            <i class="fas fa-download"></i> دانلود PNG
+            <i class="fas fa-download"></i> {{ authed ? "دانلود PNG" : "برای استفاده وارد شوید" }}
           </span>
         </button>
 
-        <button class="download-card" @click="downloadMap">
+        <button class="download-card" :class="{ 'is-locked': !authed }" @click="requireLogin(downloadMap)">
+          <span v-if="!authed" class="login-overlay"><i class="fas fa-lock"></i> برای استفاده وارد شوید</span>
           <div
             class="w-12 h-12 rounded-xl bg-[var(--accent-glow)] border border-[var(--accent)]/30 flex items-center justify-center mb-3"
           >
@@ -115,7 +118,7 @@
           <span
             class="text-xs font-semibold text-[var(--accent-soft)] flex items-center gap-1"
           >
-            <i class="fas fa-download"></i> دانلود PNG
+            <i class="fas fa-download"></i> {{ authed ? "دانلود PNG" : "برای استفاده وارد شوید" }}
           </span>
         </button>
 
@@ -139,7 +142,7 @@
 
       <!-- دانلود — ردیف دوم: KML و KMZ و DXF -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        <!-- <button class="download-card" @click="downloadKml">
+        <!-- <button class="download-card" @click="requireLogin(downloadKml)">
           <div
             class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-300/40 flex items-center justify-center mb-3"
           >
@@ -156,7 +159,8 @@
           </span>
         </button> -->
 
-        <button class="download-card" @click="downloadKmz" :disabled="kmzBusy">
+        <button class="download-card" :class="{ 'is-locked': !authed }" @click="requireLogin(downloadKmz)" :disabled="kmzBusy">
+          <span v-if="!authed" class="login-overlay"><i class="fas fa-lock"></i> برای استفاده وارد شوید</span>
           <div
             class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-300/40 flex items-center justify-center mb-3"
           >
@@ -173,11 +177,12 @@
             class="text-xs font-semibold text-emerald-600 flex items-center gap-1"
           >
             <i :class="kmzBusy ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
-            {{ kmzBusy ? "در حال ساخت..." : "دانلود KMZ" }}
+            {{ !authed ? "برای استفاده وارد شوید" : kmzBusy ? "در حال ساخت..." : "دانلود KMZ" }}
           </span>
         </button>
 
-        <button class="download-card" @click="downloadDxf">
+        <button class="download-card" :class="{ 'is-locked': !authed }" @click="requireLogin(downloadDxf)">
+          <span v-if="!authed" class="login-overlay"><i class="fas fa-lock"></i> برای استفاده وارد شوید</span>
           <div
             class="w-12 h-12 rounded-xl bg-orange-50 border border-orange-300/40 flex items-center justify-center mb-3"
           >
@@ -190,11 +195,12 @@
           <span
             class="text-xs font-semibold text-orange-600 flex items-center gap-1"
           >
-            <i class="fas fa-download"></i> دانلود DXF
+            <i class="fas fa-download"></i> {{ authed ? "دانلود DXF" : "برای استفاده وارد شوید" }}
           </span>
         </button>
 
-        <button class="download-card" @click="downloadCsv">
+        <button class="download-card" :class="{ 'is-locked': !authed }" @click="requireLogin(downloadCsv)">
+          <span v-if="!authed" class="login-overlay"><i class="fas fa-lock"></i> برای استفاده وارد شوید</span>
           <div
             class="w-12 h-12 rounded-xl bg-sky-50 border border-sky-300/40 flex items-center justify-center mb-3"
           >
@@ -207,14 +213,14 @@
           <span
             class="text-xs font-semibold text-sky-600 flex items-center gap-1"
           >
-            <i class="fas fa-download"></i> دانلود CSV
+            <i class="fas fa-download"></i> {{ authed ? "دانلود CSV" : "برای استفاده وارد شوید" }}
           </span>
         </button>
       </div>
 
       <!-- ردیف سوم: CSV و توضیحات -->
       <!-- <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <button class="download-card" @click="downloadCsv">
+        <button class="download-card" :class="{ 'is-locked': !authed }" @click="requireLogin(downloadCsv)">
           <div
             class="w-12 h-12 rounded-xl bg-sky-50 border border-sky-300/40 flex items-center justify-center mb-3"
           >
@@ -227,7 +233,7 @@
           <span
             class="text-xs font-semibold text-sky-600 flex items-center gap-1"
           >
-            <i class="fas fa-download"></i> دانلود CSV
+            <i class="fas fa-download"></i> {{ authed ? "دانلود CSV" : "برای استفاده وارد شوید" }}
           </span>
         </button>
 
@@ -286,9 +292,10 @@ const props = defineProps({
   trackingCode: { type: String, default: "" },
   form: { type: Object, default: () => ({}) },
   formIndex: { type: Number, default: 1 },
+  authed: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["restart", "home"]);
+const emit = defineEmits(["restart", "home", "login"]);
 
 const hiddenCanvasRef = ref(null);
 const canvasW = ref(700);
@@ -317,6 +324,14 @@ onMounted(() => {
     code: props.trackingCode,
   });
 });
+
+function requireLogin(action) {
+  if (!props.authed) {
+    emit("login");
+    return;
+  }
+  action();
+}
 
 function downloadSketch() {
   try {
@@ -374,6 +389,8 @@ function downloadCsv() {
 
 <style scoped>
 .download-card {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(180deg, var(--surface), var(--bg-elevated));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -383,6 +400,23 @@ function downloadCsv() {
     transform 0.25s var(--ease-out),
     border-color 0.25s,
     box-shadow 0.25s;
+}
+.download-card.is-locked > :not(.login-overlay) {
+  filter: blur(4px);
+  opacity: 0.55;
+}
+.login-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgb(var(--accent-rgb) / 0.08);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 800;
 }
 .download-card:hover {
   transform: translateY(-4px);

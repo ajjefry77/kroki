@@ -362,6 +362,14 @@ async function confirmAndIssue() {
     return;
   }
   // اولویت مصرف: کروکی رایگان، بعد موجودی کیف پول
+  if (!auth.isAuthenticated.value) {
+    if (!geometryPoints()) {
+      consumeError.value = "\u062a\u0631\u0633\u06cc\u0645 \u0645\u0639\u062a\u0628\u0631\u06cc \u062b\u0628\u062a \u0646\u0634\u062f\u0647 \u0627\u0633\u062a.";
+      return;
+    }
+    emit("done", { guest: true });
+    return;
+  }
   const mode = hasFreeAccess.value ? "free" : "wallet";
   if (!isAdmin.value && mode === "wallet" && wallet.value < price.value) {
     insufficientOpen.value = true;
@@ -666,7 +674,7 @@ onMounted(async () => {
   } catch (e) {}
   updatePreview();
   try {
-    await auth.loadWallet();
+    if (auth.isAuthenticated.value) await auth.loadWallet();
   } catch (e) {}
   try {
     const n = eligiblePinsOf(props.pins || props.gen.last?.pins || []).length;
