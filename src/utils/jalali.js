@@ -49,3 +49,7 @@ export function makeExportFilename(prefix = "mapiq", index = 1) {
   const date = getTodayJalaliCompact();
   return `${prefix}_${index}_${date}`;
 }
+
+export function applicantFilename(client) {
+  return String(client || "").replace(/[<>:"/\\|?*\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "") || "kroki";
+}

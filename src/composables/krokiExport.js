@@ -4,7 +4,7 @@ import {
   buildInfoText,
   dataUrlToBytes,
 } from "../utils/kmz";
-import { makeExportFilename } from "../utils/jalali";
+import { applicantFilename } from "../utils/jalali";
 import { logger } from "../utils/logger";
 import { vertexLabel } from "../utils/templates";
 import { findNorthWestIndex } from "../utils/canvas";
@@ -47,7 +47,7 @@ export function createExportFunctions(state, last, template, renderSketch) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = makeExportFilename("mapiq", 1) + ".kml";
+    a.download = applicantFilename(last.form?.client) + ".kml";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -201,7 +201,7 @@ export function createExportFunctions(state, last, template, renderSketch) {
     files.push({ path: "data/info.txt", content: infoContent });
 
     // ۸) ساخت و دانلود KMZ
-    const filename = makeExportFilename("mapiq", 1) + ".kmz";
+    const filename = applicantFilename(last.form?.client) + ".kmz";
     await buildKmz({ files, filename });
     logger.info("export", "خروجی KMZ با پوشه‌بندی ساخته شد", {
       files: files.length,
@@ -313,7 +313,7 @@ export function createExportFunctions(state, last, template, renderSketch) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = makeExportFilename("mapiq", 1) + ".dxf";
+    a.download = applicantFilename(last.form?.client) + ".dxf";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -360,7 +360,7 @@ export function createExportFunctions(state, last, template, renderSketch) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = makeExportFilename("mapiq_points", 1) + ".csv";
+    a.download = applicantFilename(last.form?.client) + ".csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

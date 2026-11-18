@@ -1,3 +1,4 @@
+﻿import { applicantFilename } from "../utils/jalali";
 import {
   zoneLabel,
   effectiveLogoSrc,
@@ -465,10 +466,8 @@ export function createPrintBuilder(state, last, template) {
     const finalHtml = html.replace("__SKETCH__", sketchImg);
     const landscape = state.orientation === "landscape";
 
-    // نام فایل خروجی PDF (عنوان تب چاپ): «اسم متقاضی + تاریخ»
-    const clientName = String(last.form.client || "کروکی").trim() || "کروکی";
-    const dateName = String(last.form.date || getTodayJalali()).trim() || getTodayJalali();
-    const pdfTitle = `${clientName} ${dateName}`.replace(/[<>:"/\\|?*]/g, " ").replace(/\s+/g, " ").trim();
+    // نام فایل خروجی PDF (عنوان تب چاپ): «اسم متقاضی»
+    const pdfTitle = applicantFilename(last.form?.client);
 
     const iframe = document.createElement("iframe");
     iframe.style.cssText =

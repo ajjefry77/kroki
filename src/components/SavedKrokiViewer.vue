@@ -199,7 +199,7 @@ import { auth } from "../stores/auth";
 import { useKrokiGenerator } from "../composables/useKrokiGenerator";
 import { getTemplate } from "../utils/templates";
 import { canvasSizeForPoints } from "../utils/canvas";
-import { makeExportFilename } from "../utils/jalali";
+import { applicantFilename } from "../utils/jalali";
 import { logger } from "../utils/logger";
 
 const props = defineProps({
@@ -455,7 +455,7 @@ async function saveEdit() {
 
 function fname(suffix) {
   try {
-    return makeExportFilename("mapiq", 1) + suffix;
+    return applicantFilename(full.value?.client_name || props.kroki?.client_name) + suffix;
   } catch (e) {
     return "kroki" + suffix;
   }
@@ -472,7 +472,7 @@ function dlMap() {
     if (!url) return;
     const a = document.createElement("a");
     a.href = url;
-    a.download = fname("_map.png");
+    a.download = fname(".png");
     a.click();
   } catch (e) {}
 }

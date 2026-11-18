@@ -277,7 +277,7 @@
 import { ref, onMounted, nextTick } from "vue";
 import { getTemplate } from "../../utils/templates";
 import { canvasSizeForPoints } from "../../utils/canvas";
-import { makeExportFilename } from "../../utils/jalali";
+import { applicantFilename } from "../../utils/jalali";
 import { logger } from "../../utils/logger";
 
 const props = defineProps({
@@ -322,7 +322,7 @@ function downloadSketch() {
   try {
     props.gen.renderSketch(hiddenCanvasRef.value);
   } catch (e) {}
-  const name = makeExportFilename("mapiq", props.formIndex);
+  const name = applicantFilename(props.form.client);
   props.gen.downloadCanvasImage(hiddenCanvasRef.value, name + ".png");
   logger.info("download", "دانلود کروکی PNG");
 }
@@ -330,7 +330,7 @@ function downloadSketch() {
 function downloadMap() {
   const url = props.gen.state.mapImage;
   if (!url) return;
-  const name = makeExportFilename("mapiq_map", props.formIndex);
+  const name = applicantFilename(props.form.client);
   const a = document.createElement("a");
   a.href = url;
   a.download = name + ".png";
